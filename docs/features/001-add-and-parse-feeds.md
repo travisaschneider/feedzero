@@ -67,7 +67,8 @@ Feature: Add a feed URL and display its articles
 
 1. `<feed-list>` emits `feed:added` with URL via event bus
 2. `main.js` calls `addFeedFlow(url)` from `feed-service.js`
-3. `feed-service.js` checks for duplicate URL in existing feeds
+3. `feed-service.js` checks for duplicate URL via `feedExistsByUrl()` index query
+3a. If URL exists but can't be decrypted (orphan from old session), removes orphan and proceeds
 4. Fetches via `/api/feed?url=<encoded>` (CORS proxy)
 5. `validator.js` detects format: tries JSON parse first, then XML
 6. `parser.js` routes to `parseRss()`, `parseAtom()`, or `parseJsonFeed()`
@@ -94,7 +95,8 @@ Feature: Add a feed URL and display its articles
 |------|----------|
 | `tests/core/parser/parser.test.js` | RSS, Atom, and JSON Feed parsing (14 tests) |
 | `tests/core/parser/validator.test.js` | Format detection (5 tests) |
-| `tests/core/feeds/feed-service.test.js` | Full flow with mocked fetch/db (6 tests) |
+| `tests/core/feeds/feed-service.test.js` | Full flow, error messages, orphan cleanup, duplicates (11 tests) |
+| `tests/core/storage/db.test.js` | Index-level duplicate detection, ConstraintError handling (3 tests) |
 
 ## Design Decisions
 

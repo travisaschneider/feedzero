@@ -55,6 +55,12 @@ Feature: Data persists across browser sessions
 - **Default passphrase retained** — Real passphrase prompt is a separate feature (Option B). This fix makes persistence work with the existing hardcoded key.
 - **Silent decryption failure** — If the wrong passphrase is used, `getAllDecrypted` skips records that fail to decrypt and returns an empty array. No error thrown — the UI simply shows no data.
 
+## Orphan Cleanup
+
+Records encrypted with a previous (wrong) key remain in IndexedDB with valid plaintext index fields (e.g. `url`) but undecryptable content. These "orphan" records cause false-positive duplicate detection — the URL exists in the index but the feed doesn't appear in the decrypted list.
+
+`feed-service.js` handles this in `addFeedFlow()`: if the URL exists in the index but not in decrypted feeds, the orphaned records are removed via `removeFeedsByUrl()` before re-adding.
+
 ## Limitations
 
 - Hardcoded passphrase `"feedzero-default-key"` — encryption is obfuscation, not real protection
