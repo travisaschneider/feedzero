@@ -131,6 +131,54 @@ describe("Database", () => {
     });
   });
 
+  describe("persistence across sessions", () => {
+    it("should decrypt data after close and reopen with same passphrase", async () => {
+      // Session 1: add a feed
+      const feed = unwrap(
+        createFeed({
+          url: "https://example.com/rss",
+          title: "Persistent Feed",
+        }),
+      );
+      await addFeed(feed);
+
+      // Close (simulates ending a session)
+      close();
+
+      // Session 2: reopen with same passphrase
+      const reopenResult = await open("test-passphrase");
+      expect(isOk(reopenResult)).toBe(true);
+
+      // Data should still be readable
+      const feedsResult = await getFeeds();
+      expect(isOk(feedsResult)).toBe(true);
+      const feeds = unwrap(feedsResult);
+      expect(feeds).toHaveLength(1);
+      expect(feeds[0].title).toBe("Persistent Feed");
+      expect(feeds[0].url).toBe("https://example.com/rss");
+    });
+
+    it("should fail to decrypt data with a different passphrase", async () => {
+      // Session 1: add a feed
+      const feed = unwrap(
+        createFeed({ url: "https://example.com/rss", title: "Secret Feed" }),
+      );
+      await addFeed(feed);
+
+      // Close
+      close();
+
+      // Session 2: reopen with different passphrase
+      const reopenResult = await open("wrong-passphrase");
+      expect(isOk(reopenResult)).toBe(true);
+
+      // Data should not be readable (decryption fails silently, returns empty)
+      const feedsResult = await getFeeds();
+      expect(isOk(feedsResult)).toBe(true);
+      expect(unwrap(feedsResult)).toHaveLength(0);
+    });
+  });
+
   describe("encryption", () => {
     it("should store data encrypted (raw values are not plaintext)", async () => {
       const feed = unwrap(

@@ -8,14 +8,11 @@ let cryptoKey = null;
 
 /**
  * Open the database and derive encryption key from passphrase.
+ * Reuses the stored salt if one exists, so the same passphrase
+ * derives the same key across sessions.
  */
 export async function open(passphrase) {
   try {
-    const salt = generateSalt();
-    const keyResult = await deriveKey(passphrase, salt);
-    if (!keyResult.ok) return keyResult;
-    cryptoKey = keyResult.value;
-
     db = new Dexie(DB_NAME);
     db.version(DB_VERSION).stores({
       feeds: "id, &url",
@@ -25,8 +22,17 @@ export async function open(passphrase) {
 
     await db.open();
 
-    // Store salt for future sessions
-    await db.meta.put({ key: "salt", value: Array.from(salt) });
+    // Reuse existing salt or generate a new one for first-time setup
+    const existing = await db.meta.get("salt");
+    const salt = existing ? new Uint8Array(existing.value) : generateSalt();
+
+    const keyResult = await deriveKey(passphrase, salt);
+    if (!keyResult.ok) return keyResult;
+    cryptoKey = keyResult.value;
+
+    if (!existing) {
+      await db.meta.put({ key: "salt", value: Array.from(salt) });
+    }
 
     return ok(true);
   } catch (e) {

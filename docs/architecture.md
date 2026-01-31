@@ -80,6 +80,8 @@ Events: `feed:added`, `feed:selected`, `feed:removed`, `feed:updated`, `article:
 ## Encryption Model
 
 - Passphrase → PBKDF2 (100k iterations, SHA-256) → AES-GCM-256 key
+- Salt generated once on first launch, stored in `meta` store, reused on subsequent opens
+- Same passphrase + same salt = same key across sessions
 - Each record encrypted with random 12-byte IV
 - Stored as `{id, iv, ciphertext, ...indexFields}` — content encrypted, index fields in plaintext for Dexie queries
 - Key derived once on app open, held in memory, cleared on close
