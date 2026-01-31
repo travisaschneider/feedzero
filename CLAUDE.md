@@ -22,10 +22,11 @@ FeedZero is a privacy-first RSS reader. Vanilla JS (ES modules), Web Components,
 
 - **DOMPurify** — HTML sanitization (XSS protection). Do not hand-roll sanitizers.
 - **Dexie.js** — IndexedDB wrapper with query API. Used in `db.js` for encrypted storage.
+- **Defuddle** — Full-text extraction from web pages (browser bundle, zero deps). Used in `defuddle-extractor.js`. Pluggable — can be swapped for Readability or other extractors.
 
 ### Data Flow
 
-User adds feed URL → `feed-service.js` (duplicate check) → `fetch` via `/api/feed` CORS proxy → `validator.js` (RSS/Atom/JSON Feed detection) → `parser.js` (extraction) → `sanitizer.js` (DOMPurify) → `schema.js` (object creation) → `crypto.js` (AES-GCM-256 encryption) → `db.js` (Dexie/IndexedDB storage) → event bus notifies UI → auto-selects new feed.
+User adds feed URL → `feed-service.js` (duplicate check) → `fetch` via `/api/feed` CORS proxy → `validator.js` (RSS/Atom/JSON Feed detection) → `parser.js` (extraction) → `extractor.js` (full-text extraction for summary-only articles via `/api/page`) → `sanitizer.js` (DOMPurify) → `schema.js` (object creation) → `crypto.js` (AES-GCM-256 encryption) → `db.js` (Dexie/IndexedDB storage) → event bus notifies UI → auto-selects new feed.
 
 ### Core Modules
 
@@ -35,7 +36,9 @@ User adds feed URL → `feed-service.js` (duplicate check) → `fetch` via `/api
 - **src/core/storage/crypto.js** — PBKDF2 key derivation + AES-GCM encrypt/decrypt via Web Crypto API.
 - **src/core/storage/db.js** — Dexie-based storage. All data encrypted at rest. Index fields (url, feedId, publishedAt) stored in plaintext for querying; content fields encrypted. Call `open(passphrase)` before any operations.
 - **src/core/storage/schema.js** — `createFeed()`, `createArticle()` factory functions return Result types.
-- **src/core/feeds/feed-service.js** — `addFeedFlow(url)` orchestrates: duplicate check → fetch via CORS proxy → parse → store. Returns Result.
+- **src/core/extractor/extractor.js** — Public API: `extract(html, url)` and `needsExtraction(article)`. Delegates to active extractor implementation.
+- **src/core/extractor/defuddle-extractor.js** — Defuddle-based extraction. Swap this import in `extractor.js` to use a different library.
+- **src/core/feeds/feed-service.js** — `addFeedFlow(url)` orchestrates: duplicate check → fetch via CORS proxy → parse → extract full text for summary-only articles → store. Returns Result.
 - **src/core/parser/parser.js** — `parse(text, feedUrl)` handles RSS 2.0, Atom 1.0, and JSON Feed 1.1. Returns `{feed, articles}`.
 - **src/core/parser/sanitizer.js** — DOMPurify wrapper with allowlisted tags/attrs. Links get `rel="noopener noreferrer"` automatically.
 - **src/main.js** — App entry point. Only module that wires components together via event bus.

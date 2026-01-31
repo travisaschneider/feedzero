@@ -2,7 +2,7 @@
 
 ## Overview
 
-FeedZero is a privacy-first RSS reader built with vanilla JavaScript (ES modules) and Web Components. Uses targeted libraries for security-critical code: DOMPurify (sanitization) and Dexie.js (IndexedDB).
+FeedZero is a privacy-first RSS reader built with vanilla JavaScript (ES modules) and Web Components. Uses targeted libraries for security-critical code: DOMPurify (sanitization), Dexie.js (IndexedDB), and Defuddle (full-text extraction).
 
 ## Data Flow
 
@@ -28,6 +28,10 @@ User enters feed URL in <feed-list>
   parser.js → Extracts feed metadata + articles
       │
       ▼
+  extractor.js → For summary-only articles: fetch page via /api/page,
+                  extract full text with Defuddle, sanitize with DOMPurify
+      │
+      ▼
   sanitizer.js → DOMPurify strips dangerous HTML
       │
       ▼
@@ -45,7 +49,12 @@ User enters feed URL in <feed-list>
 
 ## CORS Proxy
 
-Browsers block cross-origin feed fetches. In development, `vite.config.js` defines a plugin that proxies `/api/feed?url=<encoded>` — the Vite server fetches the feed server-side and returns the response. Production will require a dedicated proxy or server function.
+Browsers block cross-origin fetches. In development, `vite.config.js` defines a plugin with two proxy endpoints:
+
+- `/api/feed?url=<encoded>` — fetches RSS/Atom/JSON feeds (default content-type: `text/xml`)
+- `/api/page?url=<encoded>` — fetches article web pages for full-text extraction (default content-type: `text/html`)
+
+Both use the same `proxyHandler()` function. Production will require a dedicated proxy or server function.
 
 ## Module Dependency Graph
 
@@ -53,6 +62,10 @@ Browsers block cross-origin feed fetches. In development, `vite.config.js` defin
 main.js
 ├── core/events/event-bus.js     (no deps)
 ├── core/feeds/feed-service.js
+│   ├── core/extractor/extractor.js
+│   │   └── core/extractor/defuddle-extractor.js
+│   │       ├── defuddle               (npm)
+│   │       └── core/parser/sanitizer.js
 │   ├── core/parser/parser.js
 │   │   ├── core/parser/validator.js
 │   │   │   └── utils/result.js
