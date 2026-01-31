@@ -1,14 +1,11 @@
 import { createEventBus } from "./core/events/event-bus.js";
 import {
   open,
-  addFeed,
   getFeeds,
-  addArticles,
   getArticles,
   updateArticle,
 } from "./core/storage/db.js";
-import { parse } from "./core/parser/parser.js";
-import { createFeed, createArticle } from "./core/storage/schema.js";
+import { addFeedFlow } from "./core/feeds/feed-service.js";
 import { createKeyboardNav } from "./ui/components/keyboard-nav.js";
 import { EVENTS } from "./utils/constants.js";
 
@@ -45,48 +42,17 @@ async function init() {
 
   // Handle add feed
   bus.on(EVENTS.FEED_ADDED, async ({ url }) => {
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        feedList?.showError(`Failed to fetch feed: ${response.status}`);
-        return;
-      }
-      const xml = await response.text();
-      const parseResult = parse(xml, url);
-      if (!parseResult.ok) {
-        feedList?.showError(parseResult.error);
-        return;
-      }
+    const result = await addFeedFlow(url);
+    if (!result.ok) {
+      feedList?.showError(result.error);
+      return;
+    }
 
-      const { feed: feedData, articles: parsedArticles } = parseResult.value;
-      const feedResult = createFeed({
-        url,
-        title: feedData.title,
-        description: feedData.description,
-        siteUrl: feedData.siteUrl,
-      });
-      if (!feedResult.ok) {
-        feedList?.showError(feedResult.error);
-        return;
-      }
-      const feed = feedResult.value;
-      await addFeed(feed);
-
-      const articles = parsedArticles
-        .map((a) => {
-          const r = createArticle({ feedId: feed.id, ...a });
-          return r.ok ? r.value : null;
-        })
-        .filter(Boolean);
-      await addArticles(articles);
-
-      // Refresh feed list
-      const allFeeds = await getFeeds();
-      if (allFeeds.ok && feedList) {
-        feedList.setFeeds(allFeeds.value);
-      }
-    } catch (e) {
-      feedList?.showError(`Error: ${e.message}`);
+    // Refresh feed list and auto-select the new feed
+    const allFeeds = await getFeeds();
+    if (allFeeds.ok && feedList) {
+      feedList.setFeeds(allFeeds.value);
+      feedList.selectFeed(result.value.feed.id);
     }
   });
 
