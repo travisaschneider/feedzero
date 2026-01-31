@@ -1,5 +1,6 @@
 import { ok, err } from "../../utils/result.js";
 import { parse } from "../parser/parser.js";
+import { needsExtraction, extract } from "../extractor/extractor.js";
 import { createFeed, createArticle } from "../storage/schema.js";
 import {
   addFeed,
@@ -26,6 +27,30 @@ function friendlyError(rawError) {
     return "This URL is not a valid feed. Please check the URL and try again.";
   }
   return rawError;
+}
+
+/**
+ * Fetch and extract full-text content for articles that only have summaries.
+ * Modifies articles in place. Failures are non-fatal — the article keeps its original content.
+ */
+async function extractFullText(articles) {
+  for (const article of articles) {
+    if (!needsExtraction(article)) continue;
+
+    try {
+      const pageUrl = `/api/page?url=${encodeURIComponent(article.link)}`;
+      const response = await fetch(pageUrl);
+      if (!response.ok) continue;
+
+      const html = await response.text();
+      const result = extract(html, article.link);
+      if (result.ok && result.value.content) {
+        article.content = result.value.content;
+      }
+    } catch {
+      // Extraction failure is non-fatal — keep original content/summary
+    }
+  }
 }
 
 /**
@@ -63,6 +88,9 @@ export async function addFeedFlow(url) {
     if (!parseResult.ok) return err(friendlyError(parseResult.error));
 
     const { feed: feedData, articles: parsedArticles } = parseResult.value;
+
+    // Extract full text for articles that only have summaries
+    await extractFullText(parsedArticles);
 
     // Create and store feed
     const feedResult = createFeed({

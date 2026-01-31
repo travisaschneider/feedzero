@@ -17,6 +17,34 @@ const ATOM_XML = `<?xml version="1.0" encoding="UTF-8"?>
   </entry>
 </feed>`;
 
+// Feed where articles only have summaries, no full content
+const SUMMARY_ONLY_ATOM = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Summary Feed</title>
+  <link href="https://example.com" rel="alternate"/>
+  <entry>
+    <title>Summary Post</title>
+    <link href="https://example.com/post/99" rel="alternate"/>
+    <id>tag:example.com,2024:99</id>
+    <published>2024-01-15T12:00:00Z</published>
+    <summary>A short teaser.</summary>
+    <author><name>Bob</name></author>
+  </entry>
+</feed>`;
+
+const EXTRACTED_PAGE_HTML = `<!DOCTYPE html>
+<html><head><title>Summary Post</title></head>
+<body>
+  <nav>Nav</nav>
+  <article>
+    <h1>Summary Post</h1>
+    <p>This is the full article content that was extracted from the page.</p>
+    <p>It has multiple paragraphs to ensure it is substantial enough.</p>
+    <p>The extraction process pulled this from the linked URL.</p>
+  </article>
+  <footer>Footer</footer>
+</body></html>`;
+
 const JSON_FEED_STR = JSON.stringify({
   version: "https://jsonfeed.org/version/1.1",
   title: "Example JSON Feed",
@@ -233,6 +261,69 @@ describe("feed-service", () => {
       const result = await addFeedFlow("https://example.com/feed");
       expect(isErr(result)).toBe(true);
       expect(result.error).toMatch(/could not be reached/i);
+    });
+
+    it("should extract full text for summary-only articles", async () => {
+      globalThis.fetch = vi.fn().mockImplementation((url) => {
+        if (url.includes("/api/feed")) {
+          return Promise.resolve({
+            ok: true,
+            text: () => Promise.resolve(SUMMARY_ONLY_ATOM),
+          });
+        }
+        if (url.includes("/api/page")) {
+          return Promise.resolve({
+            ok: true,
+            text: () => Promise.resolve(EXTRACTED_PAGE_HTML),
+          });
+        }
+        return Promise.resolve({ ok: false, status: 404 });
+      });
+
+      const result = await addFeedFlow("https://example.com/summary-feed");
+      expect(isOk(result)).toBe(true);
+
+      const { articles } = unwrap(result);
+      expect(articles.length).toBe(1);
+      // Content should be populated from extraction, not just the short summary
+      expect(articles[0].content).toBeTruthy();
+      expect(articles[0].content.length).toBeGreaterThan(50);
+    });
+
+    it("should not extract for articles that already have full content", async () => {
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(ATOM_XML),
+      });
+
+      const result = await addFeedFlow("https://example.com/full-feed");
+      expect(isOk(result)).toBe(true);
+
+      // fetch should only be called once (for the feed), not for article pages
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it("should gracefully handle extraction failure and keep original content", async () => {
+      globalThis.fetch = vi.fn().mockImplementation((url) => {
+        if (url.includes("/api/feed")) {
+          return Promise.resolve({
+            ok: true,
+            text: () => Promise.resolve(SUMMARY_ONLY_ATOM),
+          });
+        }
+        if (url.includes("/api/page")) {
+          // Page fetch fails
+          return Promise.resolve({ ok: false, status: 500 });
+        }
+        return Promise.resolve({ ok: false, status: 404 });
+      });
+
+      const result = await addFeedFlow("https://example.com/summary-feed");
+      expect(isOk(result)).toBe(true);
+
+      // Should still succeed — extraction failure is non-fatal
+      const { articles } = unwrap(result);
+      expect(articles.length).toBe(1);
     });
   });
 });
