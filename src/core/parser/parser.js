@@ -48,10 +48,10 @@ function parseRss(doc, feedUrl) {
     title: text(item, "title") || "Untitled",
     link: text(item, "link") || "",
     content: sanitize(
-      text(item, "content\\:encoded") || text(item, "description") || "",
+      text(item, "content:encoded") || text(item, "description") || "",
     ),
     summary: sanitize(text(item, "description") || ""),
-    author: text(item, "author") || text(item, "dc\\:creator") || "",
+    author: text(item, "author") || text(item, "dc:creator") || "",
     publishedAt: parseDate(text(item, "pubDate")),
     guid: text(item, "guid") || text(item, "link") || "",
   }));
@@ -82,10 +82,12 @@ function parseAtom(doc, feedUrl) {
   return ok({ feed, articles });
 }
 
-function text(parent, selector) {
+function text(parent, tag) {
   if (!parent) return "";
-  const el = parent.querySelector(selector);
-  return el ? el.textContent.trim() : "";
+  // Use getElementsByTagName for reliable namespaced element lookup
+  // (querySelector fails with namespace-prefixed tags like content:encoded)
+  const els = parent.getElementsByTagName(tag);
+  return els.length > 0 ? els[0].textContent.trim() : "";
 }
 
 function linkHref(parent, rel) {
