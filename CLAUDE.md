@@ -61,8 +61,9 @@ Follow this sequence for all features:
 
 1. **PLAN** — Gherkin-style stories, minimal scope. Confirm with user before proceeding.
 2. **TEST** — Write failing tests first. Run them to confirm they fail for the right reasons.
-3. **CODE** — Write the minimum code to pass the tests.
+3. **CODE** — Write the minimum code to pass the tests. Add JSDoc to all public functions. Add inline comments where intent or "why" is not obvious from the code itself. Do not comment the obvious.
 4. **VERIFY** — Run full test suite, confirm no regressions.
+5. **DOCUMENT** — Review the `docs/` folder. Update `docs/architecture.md`, `docs/data-schema.md`, and relevant feature docs in `docs/features/` to reflect what changed. Create a new feature doc from `docs/features/TEMPLATE.md` for any new feature. Update ADRs in `docs/decisions/` if architectural decisions were made.
 
 ## Principles
 
