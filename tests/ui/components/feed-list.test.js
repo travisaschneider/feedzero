@@ -28,8 +28,8 @@ describe("FeedList", () => {
     ]);
     const items = el.shadowRoot.querySelectorAll("li");
     expect(items).toHaveLength(2);
-    expect(items[0].textContent).toBe("Feed A");
-    expect(items[1].textContent).toBe("Feed B");
+    expect(items[0].querySelector(".feed-title").textContent).toBe("Feed A");
+    expect(items[1].querySelector(".feed-title").textContent).toBe("Feed B");
     expect(el.shadowRoot.querySelector(".empty").hidden).toBe(true);
   });
 
@@ -81,6 +81,58 @@ describe("FeedList", () => {
 
     el.hideError();
     expect(err.hidden).toBe(true);
+  });
+
+  it("should render remove button for each feed", () => {
+    el.setFeeds([{ id: "1", title: "A" }]);
+    const btn = el.shadowRoot.querySelector(".remove-btn");
+    expect(btn).not.toBeNull();
+    expect(btn.getAttribute("aria-label")).toBe("Remove feed");
+  });
+
+  it("should emit feed:removed on remove button click with confirm", () => {
+    const handler = vi.fn();
+    bus.on(EVENTS.FEED_REMOVED, handler);
+    vi.stubGlobal(
+      "confirm",
+      vi.fn(() => true),
+    );
+
+    el.setFeeds([{ id: "f1", title: "Test" }]);
+    el.shadowRoot.querySelector(".remove-btn").click();
+
+    expect(handler).toHaveBeenCalledWith({ feedId: "f1" }, EVENTS.FEED_REMOVED);
+    vi.unstubAllGlobals();
+  });
+
+  it("should not emit feed:removed when confirm is cancelled", () => {
+    const handler = vi.fn();
+    bus.on(EVENTS.FEED_REMOVED, handler);
+    vi.stubGlobal(
+      "confirm",
+      vi.fn(() => false),
+    );
+
+    el.setFeeds([{ id: "f1", title: "Test" }]);
+    el.shadowRoot.querySelector(".remove-btn").click();
+
+    expect(handler).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it("should not emit feed:selected when remove button is clicked", () => {
+    const selectedHandler = vi.fn();
+    bus.on(EVENTS.FEED_SELECTED, selectedHandler);
+    vi.stubGlobal(
+      "confirm",
+      vi.fn(() => true),
+    );
+
+    el.setFeeds([{ id: "f1", title: "Test" }]);
+    el.shadowRoot.querySelector(".remove-btn").click();
+
+    expect(selectedHandler).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 
   it("should have proper ARIA attributes", () => {

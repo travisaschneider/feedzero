@@ -7,10 +7,14 @@ template.innerHTML = `
   form { display: flex; gap: var(--space-xs); margin-bottom: var(--space-sm); }
   form input { flex: 1; }
   ul { list-style: none; padding: 0; margin: 0; }
-  li { padding: var(--space-xs) var(--space-sm); border-radius: var(--radius); cursor: pointer; }
+  li { display: flex; align-items: center; padding: var(--space-xs) var(--space-sm); border-radius: var(--radius); cursor: pointer; }
   li:hover { background: var(--color-bg-hover); }
   li[aria-selected="true"] { background: var(--color-bg-active); font-weight: 600; }
   li:focus-visible { outline: 2px solid var(--color-accent); outline-offset: -2px; }
+  .feed-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .remove-btn { display: none; background: none; border: none; color: var(--color-text-secondary); cursor: pointer; font-size: 1rem; padding: 0 4px; line-height: 1; }
+  li:hover .remove-btn, .remove-btn:focus-visible { display: inline; }
+  .remove-btn:hover { color: var(--color-danger, #c00); }
   .empty { color: var(--color-text-secondary); font-size: 0.875rem; padding: var(--space-sm); }
   .error { color: var(--color-danger); font-size: 0.875rem; padding: var(--space-xs); }
   .actions { display: flex; gap: var(--space-xs); margin-bottom: var(--space-sm); }
@@ -75,6 +79,17 @@ export class FeedList extends HTMLElement {
       });
 
     this.shadowRoot.querySelector("ul").addEventListener("click", (e) => {
+      if (e.target.closest(".remove-btn")) {
+        const li = e.target.closest("li");
+        if (
+          li &&
+          this.#bus &&
+          confirm("Remove this feed and all its articles?")
+        ) {
+          this.#bus.emit(EVENTS.FEED_REMOVED, { feedId: li.dataset.id });
+        }
+        return;
+      }
       const li = e.target.closest("li");
       if (li && this.#bus) {
         this.selectFeed(li.dataset.id);
@@ -126,7 +141,6 @@ export class FeedList extends HTMLElement {
 
     for (const feed of this.#feeds) {
       const li = document.createElement("li");
-      li.textContent = feed.title;
       li.dataset.id = feed.id;
       li.setAttribute("role", "option");
       li.setAttribute("tabindex", "0");
@@ -134,6 +148,18 @@ export class FeedList extends HTMLElement {
         "aria-selected",
         feed.id === this.#selectedId ? "true" : "false",
       );
+
+      const title = document.createElement("span");
+      title.className = "feed-title";
+      title.textContent = feed.title;
+      li.appendChild(title);
+
+      const removeBtn = document.createElement("button");
+      removeBtn.className = "remove-btn";
+      removeBtn.setAttribute("aria-label", "Remove feed");
+      removeBtn.innerHTML = "&times;";
+      li.appendChild(removeBtn);
+
       ul.appendChild(li);
     }
   }

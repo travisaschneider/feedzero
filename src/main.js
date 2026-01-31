@@ -5,6 +5,7 @@ import {
   getFeed,
   getArticles,
   updateArticle,
+  removeFeed,
 } from "./core/storage/db.js";
 import {
   addFeedFlow,
@@ -114,6 +115,18 @@ async function init() {
     } finally {
       refreshingFeed = false;
     }
+  });
+
+  // Handle remove feed
+  bus.on(EVENTS.FEED_REMOVED, async ({ feedId }) => {
+    const result = await removeFeed(feedId);
+    if (!result.ok) return;
+    const allFeeds = await getFeeds();
+    if (allFeeds.ok && feedList) {
+      feedList.setFeeds(allFeeds.value);
+    }
+    if (articleList) articleList.setArticles([]);
+    if (articleView) articleView.setArticle(null);
   });
 
   // Keyboard navigation
