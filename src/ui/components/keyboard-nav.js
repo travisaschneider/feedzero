@@ -8,7 +8,13 @@ export function createKeyboardNav() {
 
   function handleKeydown(e) {
     if (!active) return;
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    // Shadow DOM retargets e.target to the host element, so drill into
+    // shadow roots to find the actual focused element.
+    let focused = document.activeElement;
+    while (focused?.shadowRoot?.activeElement) {
+      focused = focused.shadowRoot.activeElement;
+    }
+    if (focused?.tagName === "INPUT" || focused?.tagName === "TEXTAREA") return;
 
     const handlers = {
       j: () => moveFocus(1),
@@ -26,15 +32,20 @@ export function createKeyboardNav() {
 
   function moveFocus(direction) {
     const focused = document.activeElement;
-    const shadowRoot = focused?.shadowRoot || focused?.closest?.('[role="listbox"]')?.getRootNode();
+    const shadowRoot =
+      focused?.shadowRoot ||
+      focused?.closest?.('[role="listbox"]')?.getRootNode();
 
     // Find the active listbox
     let listbox = null;
-    for (const el of document.querySelectorAll('feed-list, article-list')) {
+    for (const el of document.querySelectorAll("feed-list, article-list")) {
       const lb = el.shadowRoot?.querySelector('[role="listbox"]');
       if (lb && lb.children.length > 0) {
         // Prefer the listbox that has focus within it
-        if (el.shadowRoot?.activeElement || el.contains(document.activeElement)) {
+        if (
+          el.shadowRoot?.activeElement ||
+          el.contains(document.activeElement)
+        ) {
           listbox = lb;
           break;
         }
@@ -47,8 +58,13 @@ export function createKeyboardNav() {
     const items = [...listbox.querySelectorAll('[role="option"]')];
     if (items.length === 0) return;
 
-    const currentIndex = items.findIndex((el) => el === listbox.getRootNode().activeElement);
-    const nextIndex = Math.max(0, Math.min(items.length - 1, currentIndex + direction));
+    const currentIndex = items.findIndex(
+      (el) => el === listbox.getRootNode().activeElement,
+    );
+    const nextIndex = Math.max(
+      0,
+      Math.min(items.length - 1, currentIndex + direction),
+    );
     items[nextIndex].focus();
   }
 
@@ -62,7 +78,7 @@ export function createKeyboardNav() {
 
   function goBack() {
     // Move focus back to feed list
-    const feedList = document.querySelector('feed-list');
+    const feedList = document.querySelector("feed-list");
     if (feedList) feedList.focus();
   }
 
@@ -75,11 +91,11 @@ export function createKeyboardNav() {
   }
 
   function attach() {
-    document.addEventListener('keydown', handleKeydown);
+    document.addEventListener("keydown", handleKeydown);
   }
 
   function detach() {
-    document.removeEventListener('keydown', handleKeydown);
+    document.removeEventListener("keydown", handleKeydown);
   }
 
   return { attach, detach, enable, disable };
