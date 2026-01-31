@@ -40,6 +40,25 @@ const ATOM_FEED = `<?xml version="1.0" encoding="UTF-8"?>
   </entry>
 </feed>`;
 
+const RSS_WITH_CONTENT_ENCODED = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>Namespaced Feed</title>
+    <link>https://example.com</link>
+    <description>Feed with content:encoded</description>
+    <item>
+      <title>Full Content Post</title>
+      <link>https://example.com/post/1</link>
+      <description>A short summary of the post.</description>
+      <content:encoded>&lt;p&gt;This is the full article content with &lt;strong&gt;rich HTML&lt;/strong&gt; that is much longer than the description summary.&lt;/p&gt;&lt;p&gt;It has multiple paragraphs and formatting.&lt;/p&gt;</content:encoded>
+      <dc:creator>Alice</dc:creator>
+      <pubDate>Mon, 01 Jan 2024 00:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>`;
+
 describe("Parser", () => {
   describe("RSS 2.0", () => {
     it("should parse feed metadata", () => {
@@ -64,6 +83,34 @@ describe("Parser", () => {
       const { articles } = unwrap(parse(RSS_FEED, "https://example.com/feed"));
       expect(articles[1].content).not.toContain("<script>");
       expect(articles[1].content).toContain("Another post");
+    });
+
+    it("should prefer content:encoded over description", () => {
+      const { articles } = unwrap(
+        parse(RSS_WITH_CONTENT_ENCODED, "https://example.com/feed"),
+      );
+      expect(articles[0].content).toContain("full article content");
+      expect(articles[0].content).toContain("multiple paragraphs");
+      // content should NOT be the short description
+      expect(articles[0].content).not.toBe(articles[0].summary);
+      expect(articles[0].content.length).toBeGreaterThan(
+        articles[0].summary.length,
+      );
+    });
+
+    it("should extract dc:creator as author", () => {
+      const { articles } = unwrap(
+        parse(RSS_WITH_CONTENT_ENCODED, "https://example.com/feed"),
+      );
+      expect(articles[0].author).toBe("Alice");
+    });
+
+    it("should keep summary separate from content:encoded", () => {
+      const { articles } = unwrap(
+        parse(RSS_WITH_CONTENT_ENCODED, "https://example.com/feed"),
+      );
+      expect(articles[0].summary).toContain("short summary");
+      expect(articles[0].summary).not.toContain("multiple paragraphs");
     });
   });
 

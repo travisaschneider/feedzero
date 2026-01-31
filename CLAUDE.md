@@ -53,6 +53,10 @@ User adds feed URL → `feed-service.js` (duplicate check) → `fetch` via `/api
 - Test files mirror source structure under `tests/`.
 - Coverage threshold: 90% branches/functions/lines/statements.
 - Note: DOMPurify + happy-dom will execute inline scripts during sanitization. Use non-callable code in test fixtures (e.g., `var x = 1;` not `alert(1)`).
+- **happy-dom DOM fidelity gaps:** happy-dom's DOMParser does not behave identically to browser DOMParser. Known differences:
+  - `querySelector` with CSS-escaped colons (e.g. `content\\:encoded`) may work in happy-dom but fail in browsers. Always use `getElementsByTagName` for XML namespace-prefixed elements.
+  - `CDATA` sections in XML with namespace declarations may fail to parse. Use entity-escaped HTML (`&lt;p&gt;`) instead of `<![CDATA[<p>]]>` in test fixtures.
+  - When writing parser tests, always include fixtures with real RSS namespace prefixes (`content:encoded`, `dc:creator`) to catch selector issues that only manifest in browsers.
 
 ### CORS Proxy
 
@@ -83,3 +87,4 @@ Follow this sequence for all features:
 - IndexedDB records store encrypted content + plaintext index fields for Dexie queries
 - Sanitization delegated to DOMPurify — do not bypass or hand-roll
 - Feed format detection tries JSON parse first (for JSON Feed), then XML (for RSS/Atom)
+- XML namespace-prefixed elements (`content:encoded`, `dc:creator`) must use `getElementsByTagName`, never `querySelector` — CSS selectors cannot reliably handle namespace colons
