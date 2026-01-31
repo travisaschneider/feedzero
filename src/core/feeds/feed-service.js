@@ -43,6 +43,15 @@ async function extractFullText(articles) {
       const response = await fetch(pageUrl);
       if (!response.ok) continue;
 
+      const contentType = (
+        response.headers.get("content-type") || ""
+      ).toLowerCase();
+      if (
+        !contentType.includes("text/html") &&
+        !contentType.includes("text/xhtml")
+      )
+        continue;
+
       const html = await response.text();
       const result = extract(html, article.link);
       if (result.ok && result.value.content) {

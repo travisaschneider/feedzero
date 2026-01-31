@@ -299,6 +299,9 @@ describe("feed-service", () => {
         if (url.includes("/api/page")) {
           return Promise.resolve({
             ok: true,
+            headers: new Headers({
+              "content-type": "text/html; charset=utf-8",
+            }),
             text: () => Promise.resolve(EXTRACTED_PAGE_HTML),
           });
         }
