@@ -12,7 +12,6 @@ import {
   getArticles,
   updateArticle,
   getArticleByGuid,
-  clearAll,
 } from "../../../src/core/storage/db.js";
 import { createFeed, createArticle } from "../../../src/core/storage/schema.js";
 import { isOk, isErr, unwrap } from "../../../src/utils/result.js";
@@ -297,30 +296,6 @@ describe("Database", () => {
       const result = await getArticleByGuid(feed2.id, "shared-guid");
       expect(isOk(result)).toBe(true);
       expect(result.value).toBeNull();
-    });
-  });
-
-  describe("clearAll", () => {
-    it("should remove all feeds and articles", async () => {
-      const feed = unwrap(createFeed({ url: "https://x.com/rss", title: "X" }));
-      await addFeed(feed);
-      const article = unwrap(
-        createArticle({
-          feedId: feed.id,
-          title: "Post",
-          link: "https://x.com/1",
-        }),
-      );
-      await addArticles([article]);
-
-      const result = await clearAll();
-      expect(isOk(result)).toBe(true);
-
-      const feeds = await getFeeds();
-      expect(unwrap(feeds)).toHaveLength(0);
-
-      const articles = await getArticles(feed.id);
-      expect(unwrap(articles)).toHaveLength(0);
     });
   });
 });

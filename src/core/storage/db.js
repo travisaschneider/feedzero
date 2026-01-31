@@ -206,19 +206,6 @@ export async function getArticleByGuid(feedId, guid) {
   }
 }
 
-/**
- * Delete all feeds, articles, and meta (except salt) from the database.
- */
-export async function clearAll() {
-  try {
-    await db.feeds.clear();
-    await db.articles.clear();
-    return ok(true);
-  } catch (e) {
-    return err(`Failed to clear database: ${e.message}`);
-  }
-}
-
 // --- Internal helpers ---
 
 async function putEncrypted(table, id, data) {

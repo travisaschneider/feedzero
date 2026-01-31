@@ -15,7 +15,6 @@ template.innerHTML = `
   .error { color: var(--color-danger); font-size: 0.875rem; padding: var(--space-xs); }
   .actions { display: flex; gap: var(--space-xs); margin-bottom: var(--space-sm); }
   .actions button { font-size: 0.75rem; cursor: pointer; }
-  .clear-all { margin-top: auto; }
 </style>
 <form aria-label="Add feed">
   <label>
@@ -26,7 +25,6 @@ template.innerHTML = `
 </form>
 <div class="actions">
   <button class="refresh-all" title="Refresh all feeds">Refresh All</button>
-  <button class="clear-all" title="Clear all data and start fresh">Clear All</button>
 </div>
 <div class="error" role="alert" hidden></div>
 <ul role="listbox" aria-label="Feeds"></ul>
@@ -64,12 +62,6 @@ export class FeedList extends HTMLElement {
       .querySelector(".refresh-all")
       .addEventListener("click", () => {
         if (this.#bus) this.#bus.emit(EVENTS.REFRESH_ALL);
-      });
-
-    this.shadowRoot
-      .querySelector(".clear-all")
-      .addEventListener("click", () => {
-        if (this.#bus) this.#bus.emit(EVENTS.CLEAR_ALL);
       });
 
     this.shadowRoot.querySelector("ul").addEventListener("click", (e) => {

@@ -107,11 +107,6 @@ vi.mock("../../../src/core/storage/db.js", () => {
       articles.set(article.id, article);
       return { ok: true, value: true };
     }),
-    clearAll: vi.fn(async () => {
-      feeds.clear();
-      articles.clear();
-      return { ok: true, value: true };
-    }),
     _reset: () => {
       feeds.clear();
       orphanUrls.clear();

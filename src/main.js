@@ -5,7 +5,6 @@ import {
   getFeed,
   getArticles,
   updateArticle,
-  clearAll,
 } from "./core/storage/db.js";
 import {
   addFeedFlow,
@@ -101,14 +100,6 @@ async function init() {
     if (articles.ok && articleList) {
       articleList.setArticles(articles.value, feedId);
     }
-  });
-
-  // Handle clear all data
-  bus.on(EVENTS.CLEAR_ALL, async () => {
-    await clearAll();
-    if (feedList) feedList.setFeeds([]);
-    if (articleList) articleList.setArticles([]);
-    articleView?.setArticle(null);
   });
 
   // Keyboard navigation

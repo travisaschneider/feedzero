@@ -23,7 +23,6 @@ export const EVENTS = {
   REFRESH_ALL: "feeds:refresh-all",
   REFRESH_FEED: "feed:refresh",
   FEEDS_REFRESHED: "feeds:refreshed",
-  CLEAR_ALL: "storage:clear-all",
 };
 
 export const SCHEMA_VERSION = 1;
