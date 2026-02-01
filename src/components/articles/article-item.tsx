@@ -1,3 +1,4 @@
+import { decodeEntities } from "@/lib/decode-entities.ts";
 import type { Article } from "@/types/index.ts";
 
 interface ArticleItemProps {
@@ -41,7 +42,7 @@ export function ArticleItem({
       className="px-sm py-sm border-b border-border cursor-pointer hover:bg-accent aria-selected:bg-accent"
     >
       <div className={article.read ? "text-muted-foreground" : "font-semibold"}>
-        {article.title}
+        {decodeEntities(article.title)}
       </div>
       <div className="text-xs text-muted-foreground mt-xs">
         {article.author && <>{article.author} &bull; </>}

@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { decodeEntities } from "@/lib/decode-entities.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
 import {
@@ -76,7 +77,9 @@ export function ReaderPanel() {
 
   return (
     <article className="p-md px-lg">
-      <h2 className="text-2xl font-semibold mb-sm">{article.title}</h2>
+      <h2 className="text-2xl font-semibold mb-sm">
+        {decodeEntities(article.title)}
+      </h2>
 
       <div className="text-sm text-muted-foreground mb-md">
         {article.author && <>{article.author} &bull; </>}

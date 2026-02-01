@@ -47,6 +47,8 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   const removeFeed = useFeedStore((s) => s.removeFeed);
   const refreshAll = useFeedStore((s) => s.refreshAll);
   const refreshSingleFeed = useFeedStore((s) => s.refreshSingleFeed);
+  const isRefreshingAll = useFeedStore((s) => s.isRefreshingAll);
+  const refreshingFeedIds = useFeedStore((s) => s.refreshingFeedIds);
 
   const [addFormOpen, setAddFormOpen] = useState(false);
   const [feedToRemove, setFeedToRemove] = useState<Feed | null>(null);
@@ -76,9 +78,12 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
               size="icon"
               className="size-7"
               title="Refresh all feeds"
+              disabled={isRefreshingAll}
               onClick={refreshAll}
             >
-              <RefreshCw className="size-4" />
+              <RefreshCw
+                className={`size-4 ${isRefreshingAll ? "animate-spin" : ""}`}
+              />
             </Button>
             <Button
               variant="ghost"
@@ -122,6 +127,9 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                       className="group-has-[[data-state=open]]/menu-item:bg-sidebar-accent"
                     >
                       <span className="truncate">{feed.title}</span>
+                      {refreshingFeedIds.has(feed.id) && (
+                        <RefreshCw className="size-3 animate-spin shrink-0 text-muted-foreground" />
+                      )}
                     </SidebarMenuButton>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

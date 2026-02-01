@@ -1,12 +1,22 @@
 import { create } from "zustand";
-import { getFeeds, getFeed, removeFeed as dbRemoveFeed } from "../core/storage/db.ts";
-import { addFeedFlow, refreshFeed, refreshAllFeeds } from "../core/feeds/feed-service.ts";
+import {
+  getFeeds,
+  getFeed,
+  removeFeed as dbRemoveFeed,
+} from "../core/storage/db.ts";
+import {
+  addFeedFlow,
+  refreshFeed,
+  refreshAllFeeds,
+} from "../core/feeds/feed-service.ts";
 import type { Feed } from "../types/index.ts";
 
 interface FeedStore {
   feeds: Feed[];
   selectedFeedId: string | null;
   isLoading: boolean;
+  isRefreshingAll: boolean;
+  refreshingFeedIds: Set<string>;
   error: string | null;
   loadFeeds: () => Promise<void>;
   addFeed: (url: string) => Promise<void>;
@@ -16,12 +26,12 @@ interface FeedStore {
   refreshSingleFeed: (feedId: string) => Promise<void>;
 }
 
-let isRefreshingAll = false;
-
 export const useFeedStore = create<FeedStore>((set, get) => ({
   feeds: [],
   selectedFeedId: null,
   isLoading: false,
+  isRefreshingAll: false,
+  refreshingFeedIds: new Set(),
   error: null,
 
   loadFeeds: async () => {
@@ -62,20 +72,31 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   selectFeed: (feedId) => set({ selectedFeedId: feedId }),
 
   refreshAll: async () => {
-    if (isRefreshingAll) return;
-    isRefreshingAll = true;
+    if (get().isRefreshingAll) return;
+    set({ isRefreshingAll: true });
     try {
       await refreshAllFeeds();
       const allFeeds = await getFeeds();
       if (allFeeds.ok) set({ feeds: allFeeds.value });
     } finally {
-      isRefreshingAll = false;
+      set({ isRefreshingAll: false });
     }
   },
 
   refreshSingleFeed: async (feedId) => {
-    const feedResult = await getFeed(feedId);
-    if (!feedResult.ok) return;
-    await refreshFeed(feedResult.value);
+    const ids = new Set(get().refreshingFeedIds);
+    ids.add(feedId);
+    set({ refreshingFeedIds: ids });
+    try {
+      const feedResult = await getFeed(feedId);
+      if (!feedResult.ok) return;
+      await refreshFeed(feedResult.value);
+      const allFeeds = await getFeeds();
+      if (allFeeds.ok) set({ feeds: allFeeds.value });
+    } finally {
+      const ids = new Set(get().refreshingFeedIds);
+      ids.delete(feedId);
+      set({ refreshingFeedIds: ids });
+    }
   },
 }));
