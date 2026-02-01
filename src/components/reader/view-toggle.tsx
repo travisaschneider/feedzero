@@ -21,7 +21,7 @@ export function ViewToggle({
       onValueChange={(value) => {
         if (value) onModeChange(value as "feed" | "extracted");
       }}
-      className="mb-md"
+      className="mb-md shadow-sm"
     >
       {modes.map((mode) => (
         <ToggleGroupItem key={mode} value={mode}>
