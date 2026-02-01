@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MoreHorizontal, Plus, RefreshCw, Rss, Trash2 } from "lucide-react";
+import { MoreHorizontal, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { Button } from "@/components/ui/button.tsx";
 import {
@@ -69,10 +69,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
     <Sidebar {...props}>
       <SidebarHeader>
         <div className="flex items-center justify-between px-2 py-1">
-          <div className="flex items-center gap-2">
-            <Rss className="size-5" />
-            <span className="font-semibold text-base">FeedZero</span>
-          </div>
+          <span className="text-lg font-semibold tracking-tight">FeedZero</span>
           <div className="flex items-center gap-1">
             <Button
               variant="ghost"

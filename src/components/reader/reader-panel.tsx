@@ -77,7 +77,7 @@ export function ReaderPanel() {
 
   return (
     <article className="p-md px-lg">
-      <h2 className="text-2xl font-semibold mb-sm">
+      <h2 className="text-xl font-semibold mb-sm">
         {decodeEntities(article.title)}
       </h2>
 

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Globe } from "lucide-react";
+import { Rss } from "lucide-react";
 
 interface FeedFaviconProps {
   siteUrl: string;
@@ -7,11 +7,14 @@ interface FeedFaviconProps {
 }
 
 /** Displays a feed's favicon with a fallback globe icon. */
-export function FeedFavicon({ siteUrl, className = "size-4" }: FeedFaviconProps) {
+export function FeedFavicon({
+  siteUrl,
+  className = "size-4",
+}: FeedFaviconProps) {
   const [failed, setFailed] = useState(false);
 
   if (!siteUrl || failed) {
-    return <Globe className={`${className} text-muted-foreground shrink-0`} />;
+    return <Rss className={`${className} text-muted-foreground shrink-0`} />;
   }
 
   let faviconUrl: string;
@@ -19,7 +22,7 @@ export function FeedFavicon({ siteUrl, className = "size-4" }: FeedFaviconProps)
     const url = new URL(siteUrl);
     faviconUrl = `${url.origin}/favicon.ico`;
   } catch {
-    return <Globe className={`${className} text-muted-foreground shrink-0`} />;
+    return <Rss className={`${className} text-muted-foreground shrink-0`} />;
   }
 
   return (
