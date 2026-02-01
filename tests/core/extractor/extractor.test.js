@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { needsExtraction } from "../../../src/core/extractor/extractor.js";
+import { needsExtraction } from "../../../src/core/extractor/extractor.ts";
 
 describe("needsExtraction", () => {
   it("should return false when article has full content", () => {

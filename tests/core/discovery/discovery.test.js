@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { isOk, isErr, unwrap } from "../../../src/utils/result.js";
+import { isOk, isErr, unwrap } from "../../../src/utils/result.ts";
 
 const ATOM_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
@@ -32,7 +32,7 @@ let discoverFeed;
 
 beforeEach(async () => {
   vi.resetModules();
-  const mod = await import("../../../src/core/discovery/discovery.js");
+  const mod = await import("../../../src/core/discovery/discovery.ts");
   discoverFeed = mod.discoverFeed;
 });
 

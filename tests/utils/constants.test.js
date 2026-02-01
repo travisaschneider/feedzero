@@ -5,7 +5,7 @@ import {
   CRYPTO,
   EVENTS,
   SCHEMA_VERSION,
-} from "../../src/utils/constants.js";
+} from "../../src/utils/constants.ts";
 
 describe("Constants", () => {
   it("should define database config", () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { parse } from "../../../src/core/parser/parser.js";
-import { isOk, isErr, unwrap } from "../../../src/utils/result.js";
+import { parse } from "../../../src/core/parser/parser.ts";
+import { isOk, isErr, unwrap } from "../../../src/utils/result.ts";
 
 const RSS_FEED = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">

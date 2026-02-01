@@ -3,7 +3,7 @@ import {
   findFeedLinksInHtml,
   getWellKnownFeedUrls,
   findFeedLinksInAnchors,
-} from "../../../src/core/discovery/strategies.js";
+} from "../../../src/core/discovery/strategies.ts";
 
 const PAGE_WITH_RSS_LINK = `<!DOCTYPE html>
 <html><head>

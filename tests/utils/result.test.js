@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ok, err, isOk, isErr, unwrap, unwrapOr, map, mapErr } from '../../src/utils/result.js';
+import { ok, err, isOk, isErr, unwrap, unwrapOr, map, mapErr } from '../../src/utils/result.ts';
 
 describe('Result', () => {
   describe('ok', () => {

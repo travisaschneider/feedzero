@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { cleanExtractedContent } from "../../../src/core/extractor/cleanup.js";
+import { cleanExtractedContent } from "../../../src/core/extractor/cleanup.ts";
 
 describe("cleanExtractedContent", () => {
   it("should remove empty paragraphs", () => {

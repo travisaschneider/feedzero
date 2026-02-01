@@ -1,5 +1,7 @@
 import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import path from "path";
 
 /**
  * Generic proxy handler for server-side fetches (bypasses CORS).
@@ -67,5 +69,10 @@ export default defineConfig({
   server: {
     port: 3000,
   },
-  plugins: [tailwindcss(), feedProxyPlugin()],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
+  },
+  plugins: [react(), tailwindcss(), feedProxyPlugin()],
 });

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { isOk, isErr, unwrap } from "../../../src/utils/result.js";
-import { normalizeUrl } from "../../../src/core/feeds/feed-service.js";
+import { isOk, isErr, unwrap } from "../../../src/utils/result.ts";
+import { normalizeUrl } from "../../../src/core/feeds/feed-service.ts";
 
 // We'll test feed-service by mocking fetch and the db/parser modules
 const ATOM_XML = `<?xml version="1.0" encoding="UTF-8"?>
@@ -64,7 +64,7 @@ const JSON_FEED_STR = JSON.stringify({
 });
 
 // Mock db module
-vi.mock("../../../src/core/storage/db.js", () => {
+vi.mock("../../../src/core/storage/db.ts", () => {
   const feeds = new Map();
   // URLs that exist in the index but can't be decrypted (orphans)
   const orphanUrls = new Set();
@@ -122,12 +122,12 @@ let addFeedFlow, refreshFeed, refreshAllFeeds;
 let db;
 
 beforeEach(async () => {
-  db = await import("../../../src/core/storage/db.js");
+  db = await import("../../../src/core/storage/db.ts");
   db._reset();
   vi.clearAllMocks();
 
   // Reset module to clear any cached state
-  const mod = await import("../../../src/core/feeds/feed-service.js");
+  const mod = await import("../../../src/core/feeds/feed-service.ts");
   addFeedFlow = mod.addFeedFlow;
   refreshFeed = mod.refreshFeed;
   refreshAllFeeds = mod.refreshAllFeeds;

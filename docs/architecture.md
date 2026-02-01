@@ -2,67 +2,72 @@
 
 ## Overview
 
-FeedZero is a privacy-first RSS reader built with vanilla JavaScript (ES modules) and Web Components. Uses targeted libraries for security-critical code: DOMPurify (sanitization), Dexie.js (IndexedDB), and Defuddle (full-text extraction).
+FeedZero is a privacy-first RSS reader built with React + TypeScript. Core business logic lives in framework-agnostic TypeScript modules (`src/core/`, `src/utils/`). The UI uses React components with Zustand for state management, React Router for navigation, and Tailwind CSS v4 for styling.
+
+See [ADR 005](decisions/005-react-migration.md) for the migration rationale.
 
 ## Data Flow
 
 ```
-User enters feed URL in <feed-list>
+User enters feed URL in AddFeedForm
       │
       ▼
-  Event bus emits feed:added
+  feed-store.addFeed(url) — Zustand action
       │
       ▼
-  main.js calls addFeedFlow(url)
+  feed-service.ts addFeedFlow(url)
       │
       ▼
-  feed-service.js normalizes URL + checks for duplicate in DB
+  Normalizes URL + checks for duplicate in DB
       │
       ▼
   fetch(/api/feed?url=...) via CORS proxy
       │
       ▼
-  validator.js → Detects JSON Feed, RSS 2.0, or Atom 1.0
-  (if parse fails → discovery.js tries autodiscovery, well-known paths, anchor scanning)
+  validator.ts → Detects JSON Feed, RSS 2.0, or Atom 1.0
+  (if parse fails → discovery.ts tries autodiscovery, well-known paths, anchor scanning)
       │
       ▼
-  parser.js → Extracts feed metadata + articles
+  parser.ts → Extracts feed metadata + articles
       │
       ▼
-  sanitizer.js → DOMPurify strips dangerous HTML
+  sanitizer.ts → DOMPurify strips dangerous HTML
       │
       ▼
-  schema.js → Creates Feed/Article objects with UUIDs
+  schema.ts → Creates Feed/Article objects with UUIDs
       │
       ▼
-  crypto.js → Encrypts with AES-GCM-256 (PBKDF2-derived key)
+  crypto.ts → Encrypts with AES-GCM-256 (PBKDF2-derived key)
       │
       ▼
-  db.js → Dexie stores encrypted blobs in IndexedDB
+  db.ts → Dexie stores encrypted blobs in IndexedDB
       │
       ▼
-  main.js refreshes feed list → auto-selects new feed → loads articles
+  Store reloads feeds → auto-selects new feed → navigates to /feeds/:feedId
 ```
 
 ### On-Demand Extraction (user-initiated)
 
 ```
-User clicks "Extracted" in <article-view>
+User clicks "Extracted" in ViewToggle
+      │
+      ▼
+  extraction-store.fetchExtracted(url)
       │
       ▼
   fetch(/api/page?url=...) via CORS proxy
       │
       ▼
-  extractor.js → defuddle-extractor.js (Defuddle parse)
+  extractor.ts → defuddle-extractor.ts (Defuddle parse)
       │
       ▼
-  cleanup.js → Removes empty elements, collapses <br> tags
+  cleanup.ts → Removes empty elements, collapses <br> tags
       │
       ▼
-  sanitizer.js → DOMPurify strips dangerous HTML
+  sanitizer.ts → DOMPurify strips dangerous HTML
       │
       ▼
-  Cached in article-view → displayed (snaps back to Feed if similar)
+  Cached in extraction store → displayed (hidden if not meaningfully richer)
 ```
 
 ### Feed Refresh
@@ -71,68 +76,93 @@ User clicks "Extracted" in <article-view>
 Auto-refresh on app load (non-blocking) OR manual refresh (per-feed / all)
       │
       ▼
-  feed-service.js refreshFeed() → fetch → parse → for each article:
+  feed-service.ts refreshFeed() → fetch → parse → for each article:
       │
       ├── New (guid not in DB) → store
       └── Existing + changed → update
 ```
 
+## State Management
+
+Zustand stores bridge React components and core modules:
+
+```
+React Components
+      │  (subscribe to store slices)
+      ▼
+Zustand Stores (app, feed, article, extraction)
+      │  (call core module functions directly)
+      ▼
+Core Modules (framework-agnostic TypeScript)
+      │
+      ▼
+IndexedDB (encrypted via Dexie + Web Crypto)
+```
+
+- **app-store** — DB initialization, global error state
+- **feed-store** — Feed CRUD, selection, refresh. Debounces concurrent refreshAll calls.
+- **article-store** — Article list for selected feed, selection (auto-marks read), read state
+- **extraction-store** — Extraction cache (link → HTML), view mode toggle, fetch status
+
+## Routing
+
+```
+/feeds                                → Feed list
+/feeds/:feedId                        → Article list (+ feed list on desktop)
+/feeds/:feedId/articles/:articleId    → Reader (+ all panels on desktop)
+```
+
+URL is the source of truth for navigation. `FeedsPage` syncs URL params to Zustand stores. Desktop (≥1024px) shows all 3 panels in a CSS grid. Mobile (<1024px) shows one panel at a time with back navigation.
+
 ## CORS Proxy
 
 Browsers block cross-origin fetches. In development, `vite.config.js` defines a plugin with two proxy endpoints:
 
-- `/api/feed?url=<encoded>` — fetches RSS/Atom/JSON feeds (default content-type: `text/xml`)
-- `/api/page?url=<encoded>` — fetches article web pages for full-text extraction (default content-type: `text/html`)
+- `/api/feed?url=<encoded>` — fetches RSS/Atom/JSON feeds
+- `/api/page?url=<encoded>` — fetches article web pages for full-text extraction
 
 Both use the same `proxyHandler()` function. Production will require a dedicated proxy or server function.
 
 ## Styling
 
-Tailwind CSS v4 via `@tailwindcss/vite` (build-time only, zero runtime cost). Single CSS entry point: `src/ui/styles/app.css`.
+Tailwind CSS v4 via `@tailwindcss/vite` (build-time only, zero runtime cost). Single CSS entry point: `src/index.css`.
 
-- **`@theme`** — Design tokens (colors, spacing, fonts, radius) replacing the former `variables.css`
-- **`@layer base`** — Global resets, layout grid, button/input base styles (formerly `base.css`)
-- **Tailwind utilities** — Available in light DOM (`index.html` elements). Not used inside Web Components yet.
-- **Web Component styles** — Scoped `<style>` blocks in Shadow DOM, using CSS custom properties inherited from the light DOM theme.
+- **`@theme`** — Design tokens (colors, spacing, fonts, radius)
+- **`@layer base`** — Global resets, 3-panel grid layout, button/input base styles
+- **Tailwind utilities** — Used in JSX `className` props via `cn()` helper (clsx + tailwind-merge)
 
-See [ADR 004](decisions/004-tailwind-css.md) for rationale.
+See [ADR 004](decisions/004-tailwind-css.md) for Tailwind rationale.
 
 ## Module Dependency Graph
 
 ```
-main.js
-├── core/events/event-bus.js     (no deps)
-├── core/feeds/feed-service.js
-│   ├── core/discovery/discovery.js
-│   │   └── core/discovery/strategies.js
-│   ├── core/extractor/extractor.js
-│   │   └── core/extractor/defuddle-extractor.js
-│   │       ├── defuddle               (npm)
-│   │       ├── core/extractor/cleanup.js
-│   │       └── core/parser/sanitizer.js
-│   ├── core/parser/parser.js
-│   │   ├── core/parser/validator.js
-│   │   │   └── utils/result.js
-│   │   └── core/parser/sanitizer.js
-│   │       └── dompurify            (npm)
-│   ├── core/storage/schema.js
-│   │   └── utils/result.js
-│   └── core/storage/db.js
-│       ├── dexie                    (npm)
-│       └── core/storage/crypto.js
-│           └── utils/constants.js
-├── core/storage/db.js               (also used directly for getFeeds, getArticles, etc.)
-├── ui/components/feed-list.js
-├── ui/components/article-list.js
-├── ui/components/article-view.js
-└── ui/components/keyboard-nav.js
+main.tsx → app.tsx
+├── stores/app-store.ts → core/storage/db.ts
+├── stores/feed-store.ts
+│   ├── core/feeds/feed-service.ts
+│   │   ├── core/discovery/discovery.ts
+│   │   │   └── core/discovery/strategies.ts
+│   │   ├── core/parser/parser.ts
+│   │   │   ├── core/parser/validator.ts
+│   │   │   └── core/parser/sanitizer.ts (dompurify)
+│   │   ├── core/storage/schema.ts (utils/result.ts)
+│   │   └── core/storage/db.ts
+│   │       ├── dexie (npm)
+│   │       └── core/storage/crypto.ts (utils/constants.ts)
+│   └── core/storage/db.ts
+├── stores/article-store.ts → core/storage/db.ts
+├── stores/extraction-store.ts → core/extractor/extractor.ts
+│   └── core/extractor/defuddle-extractor.ts
+│       ├── defuddle (npm)
+│       ├── core/extractor/cleanup.ts
+│       └── core/parser/sanitizer.ts
+├── pages/feeds-page.tsx
+│   ├── components/feeds/ (feed-list, feed-item, add-feed-form)
+│   ├── components/articles/ (article-list, article-item)
+│   ├── components/reader/ (reader-panel, view-toggle, article-content)
+│   └── hooks/ (use-keyboard-nav, use-media-query)
+└── index.css (Tailwind)
 ```
-
-## Component Communication
-
-All components communicate through the event bus — no direct references between them. `main.js` is the only orchestrator that wires event handlers.
-
-Events: `feed:added`, `feed:selected`, `feed:removed`, `feed:updated`, `article:selected`, `article:read`, `storage:ready`, `storage:error`, `parse:error`, `feeds:refresh-all`, `feed:refresh`, `feeds:refreshed`
 
 ## Encryption Model
 

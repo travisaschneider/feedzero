@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { isOk, isErr, unwrap } from "../../../src/utils/result.js";
-import { extract } from "../../../src/core/extractor/defuddle-extractor.js";
+import { isOk, isErr, unwrap } from "../../../src/utils/result.ts";
+import { extract } from "../../../src/core/extractor/defuddle-extractor.ts";
 
 const ARTICLE_HTML = `<!DOCTYPE html>
 <html>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sanitize } from "../../../src/core/parser/sanitizer.js";
+import { sanitize } from "../../../src/core/parser/sanitizer.ts";
 
 describe("Sanitizer", () => {
   it("should preserve safe HTML", () => {

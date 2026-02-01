@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import "fake-indexeddb/auto";
-import { createEventBus } from "../../src/core/events/event-bus.js";
+import { createEventBus } from "../../src/core/events/event-bus.ts";
 import {
   open,
   close,
@@ -8,11 +8,11 @@ import {
   getFeeds,
   addArticles,
   getArticles,
-} from "../../src/core/storage/db.js";
-import { parse } from "../../src/core/parser/parser.js";
-import { createFeed, createArticle } from "../../src/core/storage/schema.js";
-import { isOk, unwrap } from "../../src/utils/result.js";
-import { EVENTS } from "../../src/utils/constants.js";
+} from "../../src/core/storage/db.ts";
+import { parse } from "../../src/core/parser/parser.ts";
+import { createFeed, createArticle } from "../../src/core/storage/schema.ts";
+import { isOk, unwrap } from "../../src/utils/result.ts";
+import { EVENTS } from "../../src/utils/constants.ts";
 
 describe("App Integration", () => {
   beforeEach(async () => {

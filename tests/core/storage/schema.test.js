@@ -5,8 +5,8 @@ import {
   validateFeed,
   validateArticle,
   SCHEMA_VERSION,
-} from "../../../src/core/storage/schema.js";
-import { isOk, isErr, unwrap } from "../../../src/utils/result.js";
+} from "../../../src/core/storage/schema.ts";
+import { isOk, isErr, unwrap } from "../../../src/utils/result.ts";
 
 describe("Schema", () => {
   describe("SCHEMA_VERSION", () => {

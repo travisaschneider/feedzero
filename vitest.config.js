@@ -1,13 +1,20 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig } from "vitest/config";
+import path from "path";
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src"),
+    },
+  },
   test: {
-    environment: 'happy-dom',
-    include: ['tests/**/*.test.js'],
+    environment: "happy-dom",
+    include: ["tests/**/*.test.{js,ts,tsx}"],
+    setupFiles: ["tests/setup.ts"],
     coverage: {
-      provider: 'v8',
-      include: ['src/**/*.js'],
-      exclude: ['src/workers/**'],
+      provider: "v8",
+      include: ["src/**/*.{js,ts,tsx}"],
+      exclude: ["src/workers/**"],
       thresholds: {
         branches: 90,
         functions: 90,

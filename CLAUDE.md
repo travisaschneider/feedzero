@@ -20,61 +20,90 @@ npm run test:watch    # Run tests in watch mode
 npm run test:coverage # Run with V8 coverage (90% threshold enforced)
 npm run test:e2e      # Run Playwright E2E tests
 npm run dev           # Dev server on http://localhost:3000
+npx tsc --noEmit      # TypeScript type check (strict mode)
 ```
 
 Run a single test file: `npx vitest run tests/core/parser/parser.test.js`
 
 ## Architecture
 
-FeedZero is a privacy-first RSS reader. Vanilla JS (ES modules), Web Components, Tailwind CSS v4 (build-time only), with targeted library use for security-critical code.
+FeedZero is a privacy-first RSS reader. React + TypeScript UI with Zustand state management, React Router for navigation, and Tailwind CSS v4 for styling. Core modules (`src/core/`, `src/utils/`) are framework-agnostic TypeScript — they have zero React/UI imports and serve as the shared backend.
 
 ### Runtime Dependencies
 
+- **React + React DOM** — UI framework (functional components, hooks)
+- **Zustand** — State management (1.2kB, works outside React too). Stores call core modules directly.
+- **React Router** — URL-based routing with responsive layout (mobile single-panel, desktop 3-panel)
 - **DOMPurify** — HTML sanitization (XSS protection). Do not hand-roll sanitizers.
-- **Dexie.js** — IndexedDB wrapper with query API. Used in `db.js` for encrypted storage.
-- **Defuddle** — Full-text extraction from web pages (browser bundle, zero deps). Used in `defuddle-extractor.js`. Pluggable — can be swapped for Readability or other extractors.
+- **Dexie.js** — IndexedDB wrapper with query API. Used in `db.ts` for encrypted storage.
+- **Defuddle** — Full-text extraction from web pages (browser bundle, zero deps). Pluggable — can be swapped for Readability or other extractors.
+- **clsx + tailwind-merge** — Tailwind class merging via `cn()` utility.
 
 ### Data Flow
 
-User adds feed URL → `feed-service.js` (normalize URL, duplicate check) → `fetch` via `/api/feed` CORS proxy → `validator.js` (RSS/Atom/JSON Feed detection) → `parser.js` (extraction) → `sanitizer.js` (DOMPurify) → `schema.js` (object creation with guid) → `crypto.js` (AES-GCM-256 encryption) → `db.js` (Dexie/IndexedDB storage) → event bus notifies UI → auto-selects new feed.
+User adds feed URL → `feed-service.ts` (normalize URL, duplicate check) → `fetch` via `/api/feed` CORS proxy → `validator.ts` (RSS/Atom/JSON Feed detection) → `parser.ts` (extraction) → `sanitizer.ts` (DOMPurify) → `schema.ts` (object creation with guid) → `crypto.ts` (AES-GCM-256 encryption) → `db.ts` (Dexie/IndexedDB storage) → Zustand store updates → React re-renders → auto-selects new feed via URL navigation.
 
-Full-text extraction is user-initiated: in article-view, click "Extracted" → fetch via `/api/page` → `extractor.js` → `defuddle-extractor.js` (Defuddle parse → `cleanup.js` → DOMPurify sanitize) → cached and displayed.
+Full-text extraction is user-initiated: in reader panel, click "Extracted" → fetch via `/api/page` → `extractor.ts` → `defuddle-extractor.ts` (Defuddle parse → `cleanup.ts` → DOMPurify sanitize) → cached in extraction store and displayed.
 
-### Core Modules
+### Core Modules (Framework-Agnostic TypeScript)
 
-- **src/utils/result.js** — Result type (`ok`/`err`) used by all core functions instead of throwing. Check `.ok` before accessing `.value`.
-- **src/utils/constants.js** — DB name, crypto params, event names. Import `EVENTS` for event bus usage.
-- **src/core/events/event-bus.js** — Pub/sub with wildcard `*` support. `createEventBus()` returns `{on, off, emit, clear}`. `on()` returns an unsubscribe function.
-- **src/core/storage/crypto.js** — PBKDF2 key derivation + AES-GCM encrypt/decrypt via Web Crypto API.
-- **src/core/storage/db.js** — Dexie-based storage. All data encrypted at rest. Index fields (url, feedId, publishedAt) stored in plaintext for querying; content fields encrypted. Call `open(passphrase)` before any operations.
-- **src/core/storage/schema.js** — `createFeed()`, `createArticle()` factory functions return Result types.
-- **src/core/discovery/discovery.js** — `discoverFeed(url)` runs a multi-strategy cascade to find a feed from a website URL: HTML `<link>` autodiscovery → well-known paths → anchor scanning.
-- **src/core/discovery/strategies.js** — Pure functions for each discovery strategy: `findFeedLinksInHtml()`, `getWellKnownFeedUrls()`, `findFeedLinksInAnchors()`.
-- **src/core/extractor/extractor.js** — Public API: `extract(html, url)` and `needsExtraction(article)`. Delegates to active extractor implementation.
-- **src/core/extractor/defuddle-extractor.js** — Defuddle-based extraction. Swap this import in `extractor.js` to use a different library.
-- **src/core/extractor/cleanup.js** — `cleanExtractedContent(html)` removes empty elements, collapses consecutive `<br>` tags. Called after Defuddle, before sanitize.
-- **src/core/feeds/feed-service.js** — `addFeedFlow(url)` orchestrates: normalize URL → duplicate check → fetch → parse (on failure: discover feed) → store. `refreshFeed(feed)` and `refreshAllFeeds()` handle feed refresh with guid-based dedup. `normalizeUrl()` handles bare domains, missing scheme, trailing slashes.
-- **src/core/parser/parser.js** — `parse(text, feedUrl)` handles RSS 2.0, Atom 1.0, and JSON Feed 1.1. Returns `{feed, articles}`.
-- **src/core/parser/sanitizer.js** — DOMPurify wrapper with allowlisted tags/attrs. Links get `rel="noopener noreferrer"` automatically.
-- **src/main.js** — App entry point. Only module that wires components together via event bus.
+- **src/utils/result.ts** — Generic `Result<T>` type (`ok`/`err`) used by all core functions instead of throwing. Check `.ok` before accessing `.value`.
+- **src/utils/constants.ts** — DB name, crypto params, event names (legacy, being phased out).
+- **src/core/events/event-bus.ts** — Pub/sub with wildcard `*` support. Legacy — being replaced by Zustand stores. Still used by integration tests.
+- **src/core/storage/crypto.ts** — PBKDF2 key derivation + AES-GCM encrypt/decrypt via Web Crypto API.
+- **src/core/storage/db.ts** — Dexie-based storage. All data encrypted at rest. Index fields (url, feedId, publishedAt) stored in plaintext for querying; content fields encrypted. Call `open(passphrase)` before any operations.
+- **src/core/storage/schema.ts** — `createFeed()`, `createArticle()` factory functions return Result types.
+- **src/core/discovery/discovery.ts** — `discoverFeed(url)` runs a multi-strategy cascade to find a feed from a website URL.
+- **src/core/discovery/strategies.ts** — Pure functions for each discovery strategy.
+- **src/core/extractor/extractor.ts** — Public API: `extract(html, url)` and `needsExtraction(article)`. Delegates to active extractor implementation.
+- **src/core/extractor/defuddle-extractor.ts** — Defuddle-based extraction. Swap this import in `extractor.ts` to use a different library.
+- **src/core/extractor/cleanup.ts** — `cleanExtractedContent(html)` removes empty elements, collapses consecutive `<br>` tags.
+- **src/core/feeds/feed-service.ts** — `addFeedFlow(url)` orchestrates the full add-feed flow. `refreshFeed(feed)` and `refreshAllFeeds()` handle feed refresh with guid-based dedup.
+- **src/core/parser/parser.ts** — `parse(text, feedUrl)` handles RSS 2.0, Atom 1.0, and JSON Feed 1.1.
+- **src/core/parser/sanitizer.ts** — DOMPurify wrapper with allowlisted tags/attrs.
+
+### Zustand Stores
+
+- **src/stores/app-store.ts** — DB initialization, global error state. `initialize(passphrase)` opens the database.
+- **src/stores/feed-store.ts** — `feeds[]`, `selectedFeedId`, CRUD actions. Actions call core modules directly (`addFeedFlow`, `refreshAllFeeds`, etc.).
+- **src/stores/article-store.ts** — `articles[]`, `selectedArticle`, `loadArticles(feedId)`, `selectArticle(article)` (auto-marks as read).
+- **src/stores/extraction-store.ts** — `cache` (link → extracted HTML), `viewMode`, `fetchExtracted(url)`. Extraction is on-demand and cached.
+
+### React Components
+
+- **src/components/layout/** — `header.tsx`, `panel.tsx` (layout primitives)
+- **src/components/feeds/** — `feed-list.tsx`, `feed-item.tsx`, `add-feed-form.tsx`
+- **src/components/articles/** — `article-list.tsx`, `article-item.tsx`
+- **src/components/reader/** — `reader-panel.tsx`, `view-toggle.tsx`, `article-content.tsx`
+- **src/pages/feeds-page.tsx** — Main page component. Desktop: 3-panel CSS grid. Mobile: single panel with back navigation. Syncs URL params to Zustand stores.
+- **src/ui/components/content-modes.ts** — Pure functions for content view modes (Feed/Extracted visibility, summary subheading detection, similarity/completeness heuristics). Used by `reader-panel.tsx`.
+
+### Routing
+
+```
+/feeds                                → Feed list (mobile: full screen)
+/feeds/:feedId                        → Article list (mobile: full screen, desktop: panels 1+2)
+/feeds/:feedId/articles/:articleId    → Reader (mobile: full screen, desktop: all 3 panels)
+```
+
+URL is the source of truth for navigation state. `FeedsPage` syncs URL params to Zustand stores.
+
+### Hooks
+
+- **src/hooks/use-keyboard-nav.ts** — j/k/Enter/Escape navigation. Queries `[role="option"]` elements in the DOM.
+- **src/hooks/use-media-query.ts** — Responsive breakpoint detection. `useIsDesktop()` for ≥1024px.
 
 ### Styling
 
-Single CSS entry point: `src/ui/styles/app.css`. Tailwind CSS v4 via `@tailwindcss/vite` (zero runtime cost).
+Single CSS entry point: `src/index.css`. Tailwind CSS v4 via `@tailwindcss/vite` (zero runtime cost).
 
 - **`@theme`** — Design tokens (colors, spacing, fonts, radius). Use `--color-*`, `--spacing-*`, `--font-*` tokens.
-- **`@layer base`** — Global resets, layout grid, button/input base styles.
-- **Tailwind utilities** — Available in light DOM. Not used inside Web Components (Shadow DOM blocks them).
-- **Web Component styles** — Scoped `<style>` blocks in Shadow DOM, referencing CSS custom properties inherited from the light DOM `@theme`. These still use `--space-*` naming (legacy); Tailwind utilities use `--spacing-*`.
+- **`@layer base`** — Global resets, layout grid (`grid-template-columns: 250px 300px 1fr`), button/input base styles.
+- **Tailwind utilities** — Used in JSX `className` props. Use `cn()` from `src/lib/utils.ts` for conditional classes.
 
-### UI Components (Web Components)
+### Types
 
-`<feed-list>`, `<article-list>`, `<article-view>` — set `.eventBus` property to connect. `keyboard-nav.js` manages j/k/Enter/Escape navigation.
-
-- `<feed-list>` — Add feed form, Refresh All button, per-feed remove button (× on hover with confirm dialog)
-- `<article-list>` — Article list with per-feed refresh button
-- `<article-view>` — Smart content view toggle (Feed/Extracted). Distinct summaries shown as inline subheading above feed content. Modes hidden when redundant (similarity check). Extraction is on-demand and cached. Timestamps show date + time (no seconds).
-- `content-modes.js` — Pure functions for content view modes (Feed/Extracted visibility, summary subheading detection, similarity/completeness heuristics). Used by `<article-view>`.
+- **src/types/index.ts** — Core domain interfaces: `Feed`, `Article`, `CreateFeedInput`, `CreateArticleInput`.
 
 ### Service Worker
 
@@ -82,7 +111,9 @@ Single CSS entry point: `src/ui/styles/app.css`. Tailwind CSS v4 via `@tailwindc
 
 ### Testing
 
-- Vitest with happy-dom environment. `fake-indexeddb` needed for db.js tests.
+- Vitest with happy-dom environment. `fake-indexeddb` needed for db.ts tests.
+- React Testing Library + userEvent for component tests. Setup file: `tests/setup.ts`.
+- Store tests use Zustand's `getState()`/`setState()` directly — no React rendering needed.
 - Test files mirror source structure under `tests/`.
 - Coverage threshold: 90% branches/functions/lines/statements. `src/workers/**` excluded from coverage.
 - E2E tests (Playwright): test dir is `tests/e2e/`, runs on port 3001 (separate from dev server on 3000).
@@ -110,8 +141,8 @@ This project follows **Red-Green-Refactor (RGR)** — the TDD cycle where you wr
 3. **GREEN** — Write the minimum code to make the tests pass. Nothing more. Add JSDoc to all public functions. Add inline comments where intent or "why" is not obvious from the code itself. Do not comment the obvious.
    - ⛔ **STOP: Do not refactor yet. First verify all tests pass.**
 
-4. **VERIFY** — Run full test suite (`npm test`). Confirm zero failures, zero regressions.
-   - ⛔ **STOP: Do not proceed if any test fails. Fix failures first.**
+4. **VERIFY** — Run full test suite (`npm test`) AND type check (`npx tsc --noEmit`). Confirm zero failures, zero regressions, zero type errors.
+   - ⛔ **STOP: Do not proceed if any test fails or types error. Fix first.**
 
 5. **REFACTOR** — This step is **mandatory, not optional**. Clean up the code you wrote and touched:
    - Extract unclear blocks into well-named functions
@@ -136,43 +167,27 @@ Write detailed commit messages. Use conventional commit prefixes (`feat:`, `fix:
 3. **Fix** — How it was fixed (what changed)
 4. **Prevention** — What preventive measures were added (tests, docs, lint rules)
 
-Example:
-```
-fix: use getElementsByTagName for namespaced XML elements
-
-What: Full article content was silently dropped — only the short
-<description> was displayed instead of <content:encoded>.
-
-Why: querySelector fails with namespace-prefixed tags like
-content:encoded because the colon is interpreted as a CSS
-pseudo-class separator. happy-dom (test env) handled it
-differently, masking the bug.
-
-Fix: Switched text() helper from querySelector to
-getElementsByTagName, which takes the literal tag name
-including namespace prefix.
-
-Prevention: Added regression tests with namespaced RSS fixtures
-(content:encoded, dc:creator). Documented happy-dom DOM fidelity
-gaps in CLAUDE.md.
-```
-
 ## Principles
 
 - **Security first** — Encrypt at rest, sanitize all external content, never trust user or feed input. Use production-grade libraries (DOMPurify, Web Crypto) over hand-rolled implementations.
 - **Privacy and anonymity** — No telemetry, no analytics, no external calls except explicit user actions (fetching feeds). No data leaves the browser unless the user initiates it.
-- **Open source first** — Prefer actively maintained OSS libraries where they reduce code and improve correctness. Do not reimplement what a well-maintained library handles better. Evaluate libraries by: active maintenance, small footprint, browser compatibility.
-- **Minimal but clear** — Write the least code that solves the problem. No speculative features, no premature abstractions, no dead code. Three similar lines are better than a premature helper. Delete code that has no callers.
+- **Open source first** — Prefer actively maintained OSS libraries where they reduce code and improve correctness. Do not reimplement what a well-maintained library handles better.
+- **Framework-pragmatic** — Use React, TypeScript, and ecosystem libraries where they improve correctness, developer experience, and code sharing across platforms. Core modules remain framework-agnostic for portability.
+- **Right-sized** — Use abstractions where they genuinely reduce complexity (components, hooks, stores). Avoid premature abstraction, but don't avoid *appropriate* abstraction.
 - **Clean code** — Self-evident naming, small single-responsibility functions, explicit error handling via Result types. Functions should do one thing and their name should say what that thing is. If you need a comment to explain *what* code does, rename or extract instead. Comments only for *why* — never *what*.
 
 ### Key Patterns
 
-- All core functions return Result types — never throw for expected errors
-- Components communicate only through the event bus — no direct references
+- All core functions return `Result<T>` types — never throw for expected errors
+- UI components are functional React with hooks — no class components
+- State lives in Zustand stores — components subscribe to slices
+- URL is the source of truth for navigation state (selected feed, article)
+- Core modules have zero React/UI imports — they are the shared backend
+- Sanitization delegated to DOMPurify — `dangerouslySetInnerHTML` only for pre-sanitized content
+- TypeScript strict mode — no `any` except in type declarations for untyped libraries
 - IndexedDB records store encrypted content + plaintext index fields for Dexie queries
-- Sanitization delegated to DOMPurify — do not bypass or hand-roll
 - Feed format detection tries JSON parse first (for JSON Feed), then XML (for RSS/Atom)
-- XML namespace-prefixed elements (`content:encoded`, `dc:creator`) must use `getElementsByTagName`, never `querySelector` — CSS selectors cannot reliably handle namespace colons
+- XML namespace-prefixed elements (`content:encoded`, `dc:creator`) must use `getElementsByTagName`, never `querySelector`
 
 ---
 

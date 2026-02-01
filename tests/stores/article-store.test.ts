@@ -1,0 +1,90 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { useArticleStore } from "../../src/stores/article-store.ts";
+
+vi.mock("../../src/core/storage/db.ts", () => ({
+  getArticles: vi.fn(),
+  updateArticle: vi.fn(),
+}));
+
+import { getArticles, updateArticle } from "../../src/core/storage/db.ts";
+
+const mockArticle = (id: string, read = false) => ({
+  id, feedId: "f1", guid: id, title: `Article ${id}`,
+  link: `https://example.com/${id}`, content: "<p>content</p>",
+  summary: "summary", author: "author", publishedAt: Date.now(),
+  read, createdAt: Date.now(),
+});
+
+describe("article-store", () => {
+  beforeEach(() => {
+    useArticleStore.setState({
+      articles: [], selectedArticle: null, isLoading: false,
+    });
+    vi.clearAllMocks();
+  });
+
+  describe("loadArticles", () => {
+    it("loads articles for a feed", async () => {
+      const articles = [mockArticle("a1"), mockArticle("a2")];
+      vi.mocked(getArticles).mockResolvedValue({ ok: true, value: articles });
+
+      await useArticleStore.getState().loadArticles("f1");
+
+      expect(getArticles).toHaveBeenCalledWith("f1");
+      expect(useArticleStore.getState().articles).toEqual(articles);
+    });
+
+    it("clears articles on failure", async () => {
+      useArticleStore.setState({ articles: [mockArticle("old")] });
+      vi.mocked(getArticles).mockResolvedValue({ ok: false, error: "fail" });
+
+      await useArticleStore.getState().loadArticles("f1");
+
+      expect(useArticleStore.getState().articles).toEqual([]);
+    });
+  });
+
+  describe("selectArticle", () => {
+    it("sets selected article and marks as read", async () => {
+      const article = mockArticle("a1", false);
+      vi.mocked(updateArticle).mockResolvedValue({ ok: true, value: true });
+
+      await useArticleStore.getState().selectArticle(article);
+
+      const state = useArticleStore.getState();
+      expect(state.selectedArticle).toEqual({ ...article, read: true });
+      expect(updateArticle).toHaveBeenCalled();
+    });
+
+    it("does not update db if already read", async () => {
+      const article = mockArticle("a1", true);
+
+      await useArticleStore.getState().selectArticle(article);
+
+      expect(useArticleStore.getState().selectedArticle).toEqual(article);
+      expect(updateArticle).not.toHaveBeenCalled();
+    });
+
+    it("sets null to deselect", async () => {
+      useArticleStore.setState({ selectedArticle: mockArticle("a1") });
+
+      await useArticleStore.getState().selectArticle(null);
+
+      expect(useArticleStore.getState().selectedArticle).toBeNull();
+    });
+  });
+
+  describe("markAsRead", () => {
+    it("marks article as read in the list", async () => {
+      const articles = [mockArticle("a1", false), mockArticle("a2", false)];
+      useArticleStore.setState({ articles });
+      vi.mocked(updateArticle).mockResolvedValue({ ok: true, value: true });
+
+      await useArticleStore.getState().markAsRead("a1");
+
+      const updated = useArticleStore.getState().articles;
+      expect(updated[0].read).toBe(true);
+      expect(updated[1].read).toBe(false);
+    });
+  });
+});

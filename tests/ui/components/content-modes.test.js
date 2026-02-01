@@ -5,7 +5,7 @@ import {
   getAvailableModes,
   hasSummarySubheading,
   isExtractionMeaningful,
-} from "../../../src/ui/components/content-modes.js";
+} from "../../../src/lib/content-modes.ts";
 
 /** Generate a string with exactly `n` words, starting from offset `from` to avoid prefix overlap. */
 function words(n, from = 0) {

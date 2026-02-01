@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { deriveKey, generateSalt, encrypt, decrypt } from '../../../src/core/storage/crypto.js';
-import { isOk, isErr, unwrap } from '../../../src/utils/result.js';
+import { deriveKey, generateSalt, encrypt, decrypt } from '../../../src/core/storage/crypto.ts';
+import { isOk, isErr, unwrap } from '../../../src/utils/result.ts';
 
 describe('Crypto', () => {
   const passphrase = 'test-passphrase-123';
