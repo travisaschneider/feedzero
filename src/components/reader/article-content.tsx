@@ -15,7 +15,7 @@ export function ArticleContent({ html }: ArticleContentProps) {
 
   return (
     <div
-      className="prose prose-neutral max-w-180"
+      className="leading-relaxed max-w-180 [&_p]:mb-4 [&_blockquote]:border-l-3 [&_blockquote]:border-border [&_blockquote]:pl-4 [&_blockquote]:my-4 [&_img]:max-w-full [&_img]:h-auto [&_pre]:overflow-x-auto [&_pre]:bg-secondary [&_pre]:p-sm [&_pre]:rounded"
       dangerouslySetInnerHTML={{ __html: clean }}
     />
   );
