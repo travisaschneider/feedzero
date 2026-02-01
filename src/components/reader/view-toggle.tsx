@@ -16,6 +16,7 @@ export function ViewToggle({
   return (
     <ToggleGroup
       type="single"
+      variant="outline"
       value={activeMode}
       onValueChange={(value) => {
         if (value) onModeChange(value as "feed" | "extracted");
@@ -23,7 +24,7 @@ export function ViewToggle({
       className="mb-md"
     >
       {modes.map((mode) => (
-        <ToggleGroupItem key={mode} value={mode} className="text-sm">
+        <ToggleGroupItem key={mode} value={mode}>
           {mode === "feed" ? "Feed" : "Extracted"}
         </ToggleGroupItem>
       ))}
