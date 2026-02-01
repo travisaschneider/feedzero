@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Rss, X } from "lucide-react";
+import { MoreHorizontal, Plus, RefreshCw, Rss, Trash2 } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { Button } from "@/components/ui/button.tsx";
 import {
@@ -12,6 +12,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog.tsx";
+import {
+  Collapsible,
+  CollapsibleContent,
+} from "@/components/ui/collapsible.tsx";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu.tsx";
 import {
   Sidebar,
   SidebarContent,
@@ -36,7 +46,9 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
   const removeFeed = useFeedStore((s) => s.removeFeed);
   const refreshAll = useFeedStore((s) => s.refreshAll);
+  const refreshSingleFeed = useFeedStore((s) => s.refreshSingleFeed);
 
+  const [addFormOpen, setAddFormOpen] = useState(false);
   const [feedToRemove, setFeedToRemove] = useState<Feed | null>(null);
 
   function handleSelect(feedId: string) {
@@ -53,28 +65,48 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   return (
     <Sidebar {...props}>
       <SidebarHeader>
-        <div className="flex items-center gap-2 px-2 py-1">
-          <Rss className="size-5" />
-          <span className="font-semibold text-base">FeedZero</span>
+        <div className="flex items-center justify-between px-2 py-1">
+          <div className="flex items-center gap-2">
+            <Rss className="size-5" />
+            <span className="font-semibold text-base">FeedZero</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              title="Refresh all feeds"
+              onClick={refreshAll}
+            >
+              <RefreshCw className="size-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-7"
+              title={addFormOpen ? "Cancel" : "Add feed"}
+              onClick={() => setAddFormOpen(!addFormOpen)}
+            >
+              <Plus
+                className="size-4 transition-transform duration-200"
+                style={{
+                  transform: addFormOpen ? "rotate(45deg)" : "rotate(0deg)",
+                }}
+              />
+            </Button>
+          </div>
         </div>
+
+        <Collapsible open={addFormOpen}>
+          <CollapsibleContent>
+            <AddFeedForm onAdded={() => setAddFormOpen(false)} />
+          </CollapsibleContent>
+        </Collapsible>
       </SidebarHeader>
 
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>
-            <AddFeedForm />
-
-            <div className="px-2 py-1">
-              <Button
-                variant="outline"
-                size="xs"
-                title="Refresh all feeds"
-                onClick={refreshAll}
-              >
-                Refresh All
-              </Button>
-            </div>
-
             {feeds.length === 0 ? (
               <div className="px-2 py-4 text-muted-foreground text-sm">
                 No feeds yet. Add one above.
@@ -87,17 +119,33 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                       isActive={feed.id === selectedFeedId}
                       onClick={() => handleSelect(feed.id)}
                       tooltip={feed.title}
+                      className="group-has-[[data-state=open]]/menu-item:bg-sidebar-accent"
                     >
                       <span className="truncate">{feed.title}</span>
                     </SidebarMenuButton>
-                    <SidebarMenuAction
-                      showOnHover
-                      className="text-destructive hover:text-destructive"
-                      aria-label={`Remove ${feed.title}`}
-                      onClick={() => setFeedToRemove(feed)}
-                    >
-                      <X className="size-3" />
-                    </SidebarMenuAction>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <SidebarMenuAction>
+                          <MoreHorizontal />
+                          <span className="sr-only">More</span>
+                        </SidebarMenuAction>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent side="right" align="start">
+                        <DropdownMenuItem
+                          onClick={() => refreshSingleFeed(feed.id)}
+                        >
+                          <RefreshCw className="size-4" />
+                          Refresh
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive focus:text-destructive"
+                          onClick={() => setFeedToRemove(feed)}
+                        >
+                          <Trash2 className="size-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </SidebarMenuItem>
                 ))}
               </SidebarMenu>
@@ -114,7 +162,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
           if (!open) setFeedToRemove(null);
         }}
       >
-        <AlertDialogContent size="sm">
+        <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove feed</AlertDialogTitle>
             <AlertDialogDescription>
