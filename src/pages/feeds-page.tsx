@@ -118,17 +118,14 @@ export function FeedsPage() {
     <SidebarProvider>
       <AppSidebar onFeedSelect={handleFeedSelect} />
       <SidebarInset>
-        <ResizablePanelGroup
-          orientation="horizontal"
-          className="h-full min-h-0"
-        >
-          <ResizablePanel defaultSize={40} minSize={25} maxSize={60}>
+        <ResizablePanelGroup direction="horizontal" className="h-full min-h-0">
+          <ResizablePanel defaultSize="40%" minSize="300px">
             <ScrollArea className="h-full">
               <ArticleList onArticleSelect={handleArticleSelect} />
             </ScrollArea>
           </ResizablePanel>
           <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={60} minSize={25}>
+          <ResizablePanel defaultSize="60%" minSize="300px">
             <ScrollArea className="h-full">
               <ReaderPanel />
             </ScrollArea>
