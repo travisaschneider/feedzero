@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⚠ Mandatory: Red-Green-Refactor
+
+**Every code change in this project MUST follow the Red-Green-Refactor (RGR) cycle. No exceptions.**
+
+1. Write a failing test BEFORE writing any production code
+2. Write the minimum code to make the test pass
+3. Refactor the code you wrote and touched — this step is NOT optional
+
+**Do not write production code without a failing test. Do not skip refactoring. Do not combine these steps.** If a task has no testable behavior (e.g., config changes, docs), the refactor step still applies to any code you touch. See [Development Workflow](#development-workflow) for the full sequence.
+
 ## Build & Test Commands
 
 ```bash
@@ -90,20 +100,28 @@ Single CSS entry point: `src/ui/styles/app.css`. Tailwind CSS v4 via `@tailwindc
 
 ## Development Workflow
 
-This project follows **Red-Green-Refactor (RGR)** — the TDD cycle where you write a failing test (red), make it pass with minimal code (green), then clean up (refactor). Every feature follows this sequence. **Do not skip the refactor step.**
+This project follows **Red-Green-Refactor (RGR)** — the TDD cycle where you write a failing test (red), make it pass with minimal code (green), then clean up (refactor). Every feature follows this exact sequence. **No step may be skipped or reordered.**
 
 1. **PLAN** — Gherkin-style stories, minimal scope. Confirm with user before proceeding.
-2. **RED** — Write failing tests first. Run them to confirm they fail for the right reasons.
-3. **GREEN** — Write the minimum code to pass the tests. Add JSDoc to all public functions. Add inline comments where intent or "why" is not obvious from the code itself. Do not comment the obvious.
-4. **VERIFY** — Run full test suite, confirm no regressions.
-5. **REFACTOR** — This step is mandatory, not optional. Clean up the code you wrote and touched:
+
+2. **RED** — Write failing tests first. Run them. They MUST fail. If they pass, the test is wrong — fix it before proceeding.
+   - ⛔ **STOP: Do not write any production code until you have a failing test.**
+
+3. **GREEN** — Write the minimum code to make the tests pass. Nothing more. Add JSDoc to all public functions. Add inline comments where intent or "why" is not obvious from the code itself. Do not comment the obvious.
+   - ⛔ **STOP: Do not refactor yet. First verify all tests pass.**
+
+4. **VERIFY** — Run full test suite (`npm test`). Confirm zero failures, zero regressions.
+   - ⛔ **STOP: Do not proceed if any test fails. Fix failures first.**
+
+5. **REFACTOR** — This step is **mandatory, not optional**. Clean up the code you wrote and touched:
    - Extract unclear blocks into well-named functions
    - Remove duplication (DRY, but not at the cost of clarity)
    - Ensure each function does one thing (Single Responsibility)
    - Use intention-revealing names for variables, functions, and parameters
    - Keep functions short — if a function needs a comment to explain what it does, extract and name it instead
    - Apply the Boy Scout Rule: leave every file you touched cleaner than you found it
-   - Re-run tests after refactoring to confirm no regressions
+   - ⛔ **STOP: Re-run `npm test` after refactoring. All tests must still pass.**
+
 6. **DOCUMENT** — Review the `docs/` folder. Update `docs/architecture.md`, `docs/data-schema.md`, and relevant feature docs in `docs/features/` to reflect what changed. Create a new feature doc from `docs/features/TEMPLATE.md` for any new feature. Update ADRs in `docs/decisions/` if architectural decisions were made.
 
 ## Commit Messages
@@ -155,3 +173,7 @@ gaps in CLAUDE.md.
 - Sanitization delegated to DOMPurify — do not bypass or hand-roll
 - Feed format detection tries JSON parse first (for JSON Feed), then XML (for RSS/Atom)
 - XML namespace-prefixed elements (`content:encoded`, `dc:creator`) must use `getElementsByTagName`, never `querySelector` — CSS selectors cannot reliably handle namespace colons
+
+---
+
+**Reminder: Every code change follows Red-Green-Refactor. No test, no code. No refactor, no commit.**
