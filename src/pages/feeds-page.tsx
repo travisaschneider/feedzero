@@ -122,13 +122,13 @@ export function FeedsPage() {
           orientation="horizontal"
           className="h-full min-h-0"
         >
-          <ResizablePanel defaultSize={25} minSize={15} maxSize={40}>
+          <ResizablePanel defaultSize={30} minSize={20} maxSize={50}>
             <ScrollArea className="h-full">
               <ArticleList onArticleSelect={handleArticleSelect} />
             </ScrollArea>
           </ResizablePanel>
           <ResizableHandle />
-          <ResizablePanel defaultSize={75}>
+          <ResizablePanel defaultSize={70} minSize={30}>
             <ScrollArea className="h-full">
               <ReaderPanel />
             </ScrollArea>
