@@ -13,7 +13,7 @@ function renderInDialog(ui: React.ReactNode) {
   return render(
     <Dialog open={true} onOpenChange={() => {}}>
       <DialogContent>{ui}</DialogContent>
-    </Dialog>
+    </Dialog>,
   );
 }
 
@@ -30,15 +30,13 @@ describe("StorageChoiceStep", () => {
 
   it("renders heading", () => {
     renderInDialog(<StorageChoiceStep />);
-    expect(
-      screen.getByText(/where should we store/i)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/where should we store/i)).toBeInTheDocument();
   });
 
   it("renders browser storage warning", () => {
     renderInDialog(<StorageChoiceStep />);
     expect(
-      screen.getByText(/your data lives in this browser/i)
+      screen.getByText(/your data lives in this browser/i),
     ).toBeInTheDocument();
   });
 
@@ -48,10 +46,11 @@ describe("StorageChoiceStep", () => {
     expect(screen.getByText(/quick start, single device/i)).toBeInTheDocument();
   });
 
-  it("renders Set up sync option", () => {
+  it("renders Sync across devices option with security messaging", () => {
     renderInDialog(<StorageChoiceStep />);
-    expect(screen.getByText(/set up sync/i)).toBeInTheDocument();
-    expect(screen.getByText(/access from any device/i)).toBeInTheDocument();
+    expect(screen.getByText(/sync across devices/i)).toBeInTheDocument();
+    expect(screen.getByText(/zero-knowledge/i)).toBeInTheDocument();
+    expect(screen.getByText(/no account needed/i)).toBeInTheDocument();
   });
 
   it("choosing Local only sets mode and goes to initializing", async () => {
@@ -66,11 +65,13 @@ describe("StorageChoiceStep", () => {
     expect(state.generatedPassphrase).toBe("carbon mango velvet prism");
   });
 
-  it("choosing Set up sync sets mode and goes to passphrase-display", async () => {
+  it("choosing Sync across devices sets mode and goes to passphrase-display", async () => {
     const user = userEvent.setup();
     renderInDialog(<StorageChoiceStep />);
 
-    await user.click(screen.getByRole("button", { name: /set up sync/i }));
+    await user.click(
+      screen.getByRole("button", { name: /sync across devices/i }),
+    );
 
     const state = useOnboardingStore.getState();
     expect(state.storageMode).toBe("sync");

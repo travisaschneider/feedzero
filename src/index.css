@@ -78,6 +78,11 @@
     --sidebar-accent-foreground: oklch(0.205 0.024 285.823);
     --sidebar-border: oklch(0.917 0.007 285.823);
     --sidebar-ring: oklch(0.205 0.024 285.823);
+
+    /* Sync status colors */
+    --sync-local: oklch(0.75 0.15 85);
+    --sync-synced: oklch(0.55 0.2 145);
+    --sync-error: oklch(0.65 0.25 25);
 }
 
 @layer base {

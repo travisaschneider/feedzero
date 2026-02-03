@@ -34,13 +34,12 @@ describe("WelcomeStep", () => {
     expect(screen.getByText(/your feeds, your privacy/i)).toBeInTheDocument();
   });
 
-  it("renders feature list", () => {
+  it("renders numbered feature list with icons", () => {
     renderInDialog(<WelcomeStep />);
-    expect(screen.getByText(/no tracking or analytics/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/everything encrypted locally/i),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/no account required/i)).toBeInTheDocument();
+    // Check for the numbered items with new copy
+    expect(screen.getByText(/add your favorite/i)).toBeInTheDocument();
+    expect(screen.getByText(/read distraction-free/i)).toBeInTheDocument();
+    expect(screen.getByText(/your data stays private/i)).toBeInTheDocument();
   });
 
   it("renders Get Started button", () => {

@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { OnboardingModal } from "@/components/onboarding/onboarding-modal";
 import { useOnboardingStore } from "@/stores/onboarding-store";
 import { useAppStore } from "@/stores/app-store";
+import { useSyncStore } from "@/stores/sync-store";
 
 vi.mock("@/core/storage/db.ts", () => ({
   open: vi.fn().mockResolvedValue({ ok: true, value: true }),
@@ -50,6 +51,13 @@ describe("OnboardingModal", () => {
       error: null,
       hasCompletedOnboarding: false,
     });
+    useSyncStore.setState({
+      status: "local-only",
+      lastSyncedAt: null,
+      error: null,
+      passphrase: null,
+      dialogOpen: false,
+    });
   });
 
   afterEach(() => {
@@ -89,7 +97,9 @@ describe("OnboardingModal", () => {
     render(<OnboardingModal />);
 
     await user.click(screen.getByRole("button", { name: /get started/i }));
-    await user.click(screen.getByRole("button", { name: /set up sync/i }));
+    await user.click(
+      screen.getByRole("button", { name: /sync across devices/i }),
+    );
 
     expect(screen.getByText(/your secret key/i)).toBeInTheDocument();
     expect(screen.getByText("carbon mango velvet prism")).toBeInTheDocument();
@@ -100,7 +110,9 @@ describe("OnboardingModal", () => {
     render(<OnboardingModal />);
 
     await user.click(screen.getByRole("button", { name: /get started/i }));
-    await user.click(screen.getByRole("button", { name: /set up sync/i }));
+    await user.click(
+      screen.getByRole("button", { name: /sync across devices/i }),
+    );
     await user.click(
       screen.getByRole("checkbox", { name: /i've saved my secret key/i }),
     );
@@ -129,7 +141,9 @@ describe("OnboardingModal", () => {
     // Welcome -> Storage Choice
     await user.click(screen.getByRole("button", { name: /get started/i }));
     // Storage Choice -> Passphrase Display
-    await user.click(screen.getByRole("button", { name: /set up sync/i }));
+    await user.click(
+      screen.getByRole("button", { name: /sync across devices/i }),
+    );
     // Check saved checkbox
     await user.click(
       screen.getByRole("checkbox", { name: /i've saved my secret key/i }),
@@ -146,6 +160,58 @@ describe("OnboardingModal", () => {
 
     await waitFor(() => {
       expect(useOnboardingStore.getState().step).toBe("initializing");
+    });
+  });
+
+  describe("sync store integration", () => {
+    it("sets sync store to synced after sync onboarding completes", async () => {
+      const user = userEvent.setup();
+      render(<OnboardingModal />);
+
+      // Complete sync onboarding flow
+      await user.click(screen.getByRole("button", { name: /get started/i }));
+      await user.click(
+        screen.getByRole("button", { name: /sync across devices/i }),
+      );
+      await user.click(
+        screen.getByRole("checkbox", { name: /i've saved my secret key/i }),
+      );
+      await user.click(screen.getByRole("button", { name: /continue/i }));
+      await user.type(
+        screen.getByPlaceholderText(/enter your secret key/i),
+        "carbon mango velvet prism",
+      );
+      await user.click(screen.getByRole("button", { name: /confirm/i }));
+
+      // Wait for onboarding to complete
+      await waitFor(() => {
+        expect(useAppStore.getState().hasCompletedOnboarding).toBe(true);
+      });
+
+      // Sync store should be updated
+      const syncState = useSyncStore.getState();
+      expect(syncState.status).toBe("synced");
+      expect(syncState.passphrase).toBe("carbon mango velvet prism");
+      expect(syncState.lastSyncedAt).not.toBeNull();
+    });
+
+    it("keeps sync store as local-only after local onboarding", async () => {
+      const user = userEvent.setup();
+      render(<OnboardingModal />);
+
+      // Complete local-only onboarding flow
+      await user.click(screen.getByRole("button", { name: /get started/i }));
+      await user.click(screen.getByRole("button", { name: /local only/i }));
+
+      // Wait for onboarding to complete
+      await waitFor(() => {
+        expect(useAppStore.getState().hasCompletedOnboarding).toBe(true);
+      });
+
+      // Sync store should remain local-only
+      const syncState = useSyncStore.getState();
+      expect(syncState.status).toBe("local-only");
+      expect(syncState.passphrase).toBeNull();
     });
   });
 });

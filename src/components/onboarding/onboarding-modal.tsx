@@ -3,6 +3,7 @@ import { Loader2 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useAppStore } from "@/stores/app-store";
 import { useOnboardingStore } from "@/stores/onboarding-store";
+import { useSyncStore } from "@/stores/sync-store";
 import { WelcomeStep } from "./steps/welcome-step";
 import { StorageChoiceStep } from "./steps/storage-choice-step";
 import { PassphraseDisplayStep } from "./steps/passphrase-display-step";
@@ -22,17 +23,32 @@ export function OnboardingModal() {
   const completeOnboarding = useAppStore((s) => s.completeOnboarding);
   const initialize = useAppStore((s) => s.initialize);
   const step = useOnboardingStore((s) => s.step);
+  const storageMode = useOnboardingStore((s) => s.storageMode);
   const generatedPassphrase = useOnboardingStore((s) => s.generatedPassphrase);
+  const enableSync = useSyncStore((s) => s.enableSync);
+  const setSynced = useSyncStore((s) => s.setSynced);
 
   const isOpen = !hasCompleted;
 
   useEffect(() => {
     if (step === "initializing" && generatedPassphrase) {
       initialize(generatedPassphrase).then(() => {
+        if (storageMode === "sync") {
+          enableSync(generatedPassphrase);
+          setSynced(Date.now());
+        }
         completeOnboarding();
       });
     }
-  }, [step, generatedPassphrase, initialize, completeOnboarding]);
+  }, [
+    step,
+    generatedPassphrase,
+    storageMode,
+    initialize,
+    enableSync,
+    setSynced,
+    completeOnboarding,
+  ]);
 
   if (!isOpen) {
     return null;
@@ -40,7 +56,7 @@ export function OnboardingModal() {
 
   return (
     <Dialog open={isOpen} onOpenChange={() => {}}>
-      <DialogContent showCloseButton={false}>
+      <DialogContent showCloseButton={false} className="sm:max-w-xl">
         {step === "welcome" && <WelcomeStep />}
         {step === "storage-choice" && <StorageChoiceStep />}
         {step === "passphrase-display" && <PassphraseDisplayStep />}

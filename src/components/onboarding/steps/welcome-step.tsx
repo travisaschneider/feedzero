@@ -1,3 +1,4 @@
+import { Rss, Plus, BookOpen, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DialogDescription,
@@ -7,24 +8,58 @@ import {
 } from "@/components/ui/dialog";
 import { useOnboardingStore } from "@/stores/onboarding-store";
 
+const FEATURES = [
+  {
+    number: 1,
+    icon: Plus,
+    text: "Add your favorite RSS feeds",
+  },
+  {
+    number: 2,
+    icon: BookOpen,
+    text: "Read distraction-free, no algorithms",
+  },
+  {
+    number: 3,
+    icon: ShieldCheck,
+    text: "Your data stays private, always",
+  },
+] as const;
+
 export function WelcomeStep() {
   const setStep = useOnboardingStore((s) => s.setStep);
 
   return (
     <>
-      <DialogHeader>
-        <DialogTitle>Welcome to FeedZero</DialogTitle>
+      <div className="flex justify-center py-4">
+        <div className="flex size-16 items-center justify-center rounded-full bg-primary/10">
+          <Rss className="size-8 text-primary" />
+        </div>
+      </div>
+
+      <DialogHeader className="text-center sm:text-center">
+        <DialogTitle className="text-xl">Welcome to FeedZero</DialogTitle>
         <DialogDescription>Your feeds, your privacy.</DialogDescription>
       </DialogHeader>
 
-      <ul className="space-y-2 text-sm text-muted-foreground">
-        <li>No tracking or analytics</li>
-        <li>Everything encrypted locally</li>
-        <li>No account required</li>
-      </ul>
+      <div className="space-y-4 py-2">
+        {FEATURES.map(({ number, icon: Icon, text }) => (
+          <div key={number} className="flex items-center gap-4">
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium">
+              {number}
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <Icon className="size-4 text-muted-foreground" />
+              <span>{text}</span>
+            </div>
+          </div>
+        ))}
+      </div>
 
-      <DialogFooter>
-        <Button onClick={() => setStep("storage-choice")}>Get Started</Button>
+      <DialogFooter className="sm:justify-center">
+        <Button size="lg" onClick={() => setStep("storage-choice")}>
+          Get Started
+        </Button>
       </DialogFooter>
     </>
   );

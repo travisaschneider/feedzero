@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-type SyncStatus = "local-only" | "syncing" | "synced" | "error";
+export type SyncStatus = "local-only" | "syncing" | "synced" | "error";
 
 interface SyncStore {
   status: SyncStatus;
