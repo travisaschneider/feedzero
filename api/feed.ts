@@ -101,7 +101,15 @@ async function handleProxyRequest(
   }
 
   try {
-    const response = await fetch(validation.value.href);
+    // Fetch with 10-second timeout to prevent hanging on slow/unresponsive URLs
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    const response = await fetch(validation.value.href, {
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
     const body = await response.text();
     return new Response(body, {
       status: response.status,
@@ -111,6 +119,14 @@ async function handleProxyRequest(
       },
     });
   } catch (e) {
+    if (e instanceof Error && e.name === "AbortError") {
+      return new Response(
+        "Request timeout: The feed took too long to respond",
+        {
+          status: 504,
+        },
+      );
+    }
     const message = e instanceof Error ? e.message : "Unknown error";
     return new Response(`Proxy error: ${message}`, { status: 502 });
   }
