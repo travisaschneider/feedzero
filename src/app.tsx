@@ -32,8 +32,12 @@ function AppInit({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!hasCompletedOnboarding) {
+  if (hasCompletedOnboarding === null) {
     return <div className="p-4 text-muted-foreground">Loading…</div>;
+  }
+
+  if (hasCompletedOnboarding === false) {
+    return null;
   }
 
   if (!isDbReady) {

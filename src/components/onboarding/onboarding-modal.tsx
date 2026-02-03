@@ -28,7 +28,7 @@ export function OnboardingModal() {
   const enableSync = useSyncStore((s) => s.enableSync);
   const setSynced = useSyncStore((s) => s.setSynced);
 
-  const isOpen = !hasCompleted;
+  const isOpen = hasCompleted === false;
 
   useEffect(() => {
     if (step === "initializing" && generatedPassphrase) {

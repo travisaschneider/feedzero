@@ -6,7 +6,7 @@ const ONBOARDING_KEY = "feedzero:onboarding-complete";
 interface AppStore {
   isDbReady: boolean;
   error: string | null;
-  hasCompletedOnboarding: boolean;
+  hasCompletedOnboarding: boolean | null;
   initialize: (passphrase: string) => Promise<void>;
   setError: (error: string | null) => void;
   completeOnboarding: () => void;
@@ -16,7 +16,7 @@ interface AppStore {
 export const useAppStore = create<AppStore>((set) => ({
   isDbReady: false,
   error: null,
-  hasCompletedOnboarding: false,
+  hasCompletedOnboarding: null,
 
   initialize: async (passphrase) => {
     const result = await open(passphrase);
