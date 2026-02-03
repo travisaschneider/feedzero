@@ -131,29 +131,26 @@ The Vite plugin calls `handleProxyRequest()` from `src/core/proxy/proxy-handler.
 
 Vercel automatically handles TypeScript in the `api/` directory as serverless functions:
 
-- `api/feed.ts` → `/api/feed` endpoint (Node.js 20.x runtime)
-- `api/page.ts` → `/api/page` endpoint (Node.js 20.x runtime)
+- `api/feed.ts` → `/api/feed` endpoint
+- `api/page.ts` → `/api/page` endpoint
 
-Both import and delegate to the shared `handleProxyRequest()` function.
+**Implementation**: Both functions have all proxy logic **inlined** (no external imports). Vercel transpiles TypeScript but doesn't bundle dependencies, so importing from `../src/core/proxy/` would fail at runtime. Each function is self-contained (~130 lines including SSRF validation and error handling).
 
 ### TypeScript Configuration
 
-- **`tsconfig.json`** — Main config for frontend (`src/`, `tests/`)
-- **`tsconfig.api.json`** — Extends main config, includes `api/` directory for Vercel build
-
-The dual-config setup ensures:
-- Frontend uses bundler module resolution (Vite)
-- API functions compile correctly for Node.js ESM runtime
-- Both configs enforce strict type checking
+- **`tsconfig.json`** — Config for frontend (`src/`) and tests (`tests/`)
+- Serverless functions don't need separate config - Vercel handles TypeScript automatically
 
 ### SSRF Protection
 
-All proxy requests are validated by `validateProxyUrl()` in `src/core/proxy/validate-url.ts`:
+All proxy requests are validated (logic inlined in both `api/feed.ts` and `api/page.ts`):
 
 - Blocks `localhost`, `127.0.0.1`, `::1`, `0.0.0.0`
 - Blocks private IP ranges: `10.x`, `192.168.x`, `172.16-31.x`
 - Blocks AWS metadata endpoint: `169.254.169.254`
 - Only allows `http://` and `https://` protocols
+
+**Note**: The original validation logic is in `src/core/proxy/validate-url.ts`, used by the Vite dev server. The production functions have this same logic inlined to avoid import dependencies.
 
 ## Styling
 

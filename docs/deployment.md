@@ -32,13 +32,9 @@ FeedZero is configured for deployment on Vercel with serverless functions.
 **`vercel.json`** — Deployment configuration:
 - `buildCommand`: Runs Vite production build
 - `outputDirectory`: Static assets output to `dist/`
-- `functions`: Configures Node.js 20.x runtime for `api/**/*.ts`
 - `rewrites`: Routes `/api/*` to serverless functions, all other routes to SPA
 
-**`tsconfig.api.json`** — TypeScript config for serverless functions:
-- Extends main `tsconfig.json`
-- Includes `api/` directory
-- Used by Vercel's build process to transpile API functions
+Vercel automatically detects and transpiles TypeScript files in the `api/` directory. No explicit `functions` configuration needed.
 
 ### Serverless Functions
 
@@ -53,32 +49,21 @@ FeedZero is configured for deployment on Vercel with serverless functions.
 - Used by: Full-text article extraction
 
 Both functions:
-- Import from `src/core/proxy/proxy-handler.ts` (shared logic)
+- **Self-contained** — All logic is inlined (no external imports)
 - Validate URLs with SSRF protection
 - Return 400/403/502 status codes on errors
-- Require `.ts` extensions in import paths for Node.js ESM compatibility
+- ~130 lines each including comments and SSRF validation
 
-### Import Path Requirements
+### Why Inlined Code?
 
-Node.js ESM requires explicit file extensions in imports. The serverless functions use:
+Vercel's default TypeScript support transpiles `api/*.ts` files but **does not bundle external dependencies**. If the serverless functions imported from `../src/core/proxy/`, those modules wouldn't be included in the deployment, causing import failures and timeouts.
 
-```typescript
-// ✓ Correct
-import { handleProxyRequest } from "../src/core/proxy/proxy-handler.ts";
+**Solution**: Inline all proxy logic directly in each function file. This includes:
+- Result type helpers (`ok`, `err`)
+- URL validation with SSRF protection (`validateProxyUrl`)
+- Proxy request handler (`handleProxyRequest`)
 
-// ✗ Wrong (works in Vite/bundlers but fails in Node.js)
-import { handleProxyRequest } from "../src/core/proxy/proxy-handler";
-```
-
-Additionally, path aliases (`@/`) don't resolve in Node.js runtime. Use relative paths:
-
-```typescript
-// ✓ Correct
-import { ok, err } from "../../utils/result.ts";
-
-// ✗ Wrong (fails in Vercel serverless runtime)
-import { ok, err } from "@/utils/result.ts";
-```
+The code duplication (~100 lines) is acceptable compared to the complexity of configuring a bundler like `@vercel/ncc` or esbuild.
 
 ### Environment Variables
 
@@ -113,9 +98,11 @@ vercel logs
 Or via Vercel dashboard → Project → Functions tab.
 
 Common issues:
-- **500 errors**: Import path issues (missing `.ts` extensions or path aliases)
+- **Timeouts/Hangs**: Function takes >10s to respond (Vercel's default timeout)
 - **403 errors**: SSRF protection blocking legitimate URLs (verify URL is public)
 - **502 errors**: Upstream fetch failed (network issues, invalid URL, timeout)
+
+**Note**: If you see import errors in logs, the serverless functions may have external dependencies. Ensure all code is inlined or use a bundler.
 
 ## Alternative Platforms
 
