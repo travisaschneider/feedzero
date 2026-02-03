@@ -17,7 +17,7 @@ function AppInit({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     checkOnboardingStatus();
-  }, [checkOnboardingStatus]);
+  }, []);
 
   useEffect(() => {
     if (isDbReady) {
