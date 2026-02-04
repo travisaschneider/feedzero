@@ -5,31 +5,34 @@ import { resolve, join } from "node:path";
 import { SUPPORTED_METHODS } from "@/core/sync/sync-handler";
 
 const apiDir = resolve("api");
-const bundledFiles = () =>
-  readdirSync(apiDir).filter((f: string) => f.endsWith(".js"));
 
 describe("API bundle contract", () => {
   beforeAll(() => {
+    // Restore .ts source files from git before building (build script deletes them)
+    execSync("git checkout -- api/", { stdio: "pipe" });
     execSync("node scripts/build-api.js", { stdio: "pipe" });
   });
 
   afterAll(() => {
-    for (const file of bundledFiles()) {
+    // Clean up .js bundles and restore .ts source files
+    const jsFiles = readdirSync(apiDir).filter((f: string) =>
+      f.endsWith(".js"),
+    );
+    for (const file of jsFiles) {
       unlinkSync(join(apiDir, file));
     }
+    execSync("git checkout -- api/", { stdio: "pipe" });
   });
 
-  it("produces a .js bundle for each .ts source file", () => {
-    const tsFiles = readdirSync(apiDir)
-      .filter((f: string) => f.endsWith(".ts"))
-      .map((f: string) => f.replace(".ts", ".js"));
+  it("produces a .js bundle for each .ts source file and removes .ts files", () => {
+    expect(existsSync(join(apiDir, "feed.js"))).toBe(true);
+    expect(existsSync(join(apiDir, "page.js"))).toBe(true);
+    expect(existsSync(join(apiDir, "sync.js"))).toBe(true);
 
-    for (const expected of tsFiles) {
-      expect(
-        existsSync(join(apiDir, expected)),
-        `Missing bundle: ${expected}`,
-      ).toBe(true);
-    }
+    // .ts files should have been removed by the build script
+    expect(existsSync(join(apiDir, "feed.ts"))).toBe(false);
+    expect(existsSync(join(apiDir, "page.ts"))).toBe(false);
+    expect(existsSync(join(apiDir, "sync.ts"))).toBe(false);
   });
 
   it("feed.js exports GET", async () => {
