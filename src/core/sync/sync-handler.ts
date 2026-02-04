@@ -86,6 +86,29 @@ async function handleDelete(
   return jsonResponse({ ok: true });
 }
 
+type MethodHandler = (
+  request: Request,
+  adapter: SyncStorageAdapter,
+) => Promise<Response>;
+
+/**
+ * Maps each supported HTTP method to its handler function.
+ * This is the single source of truth — SUPPORTED_METHODS is derived from it
+ * so the two cannot drift apart.
+ */
+const methodHandlers: Record<string, MethodHandler> = {
+  GET: handleGet,
+  PUT: handlePut,
+  DELETE: handleDelete,
+};
+
+/**
+ * HTTP methods supported by the sync endpoint.
+ * Every routing layer (Vercel exports, Hono, etc.) must expose handlers
+ * for each of these methods. Tested by the routing contract in server.test.ts.
+ */
+export const SUPPORTED_METHODS: readonly string[] = Object.keys(methodHandlers);
+
 /**
  * Shared sync request handler using the Web standard Request/Response API.
  * Can be used by Vercel serverless functions, Hono, or any Web-compatible server.
@@ -94,14 +117,7 @@ export async function handleSyncRequest(
   request: Request,
   adapter: SyncStorageAdapter,
 ): Promise<Response> {
-  switch (request.method) {
-    case "GET":
-      return handleGet(request, adapter);
-    case "PUT":
-      return handlePut(request, adapter);
-    case "DELETE":
-      return handleDelete(request, adapter);
-    default:
-      return errorResponse("Method not allowed", 405);
-  }
+  const handler = methodHandlers[request.method];
+  if (!handler) return errorResponse("Method not allowed", 405);
+  return handler(request, adapter);
 }

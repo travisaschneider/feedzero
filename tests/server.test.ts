@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createApp } from "../server";
+import { SUPPORTED_METHODS } from "../src/core/sync/sync-handler";
+import * as vercelSyncExports from "../api/sync";
 
 // Mock fetch globally for proxy handler tests
 const mockFetch = vi.fn();
@@ -110,6 +112,61 @@ describe("server", () => {
     it("returns 405 for unsupported method", async () => {
       const res = await createApp().request("/api/sync", { method: "PATCH" });
       expect(res.status).toBe(405);
+    });
+  });
+
+  describe("sync routing contract", () => {
+    it("SUPPORTED_METHODS lists every method the handler accepts", () => {
+      expect(SUPPORTED_METHODS).toContain("GET");
+      expect(SUPPORTED_METHODS).toContain("PUT");
+      expect(SUPPORTED_METHODS).toContain("DELETE");
+    });
+
+    it("Vercel serverless function exports a handler for every supported method", () => {
+      for (const method of SUPPORTED_METHODS) {
+        expect(
+          vercelSyncExports,
+          `api/sync.ts is missing export for ${method}`,
+        ).toHaveProperty(method);
+        expect(
+          typeof (vercelSyncExports as Record<string, unknown>)[method],
+        ).toBe("function");
+      }
+    });
+
+    it("Vercel serverless function does not export unsupported methods", () => {
+      const allHttpMethods = [
+        "GET",
+        "POST",
+        "PUT",
+        "PATCH",
+        "DELETE",
+        "HEAD",
+        "OPTIONS",
+      ];
+      const unsupported = allHttpMethods.filter(
+        (m) => !SUPPORTED_METHODS.includes(m),
+      );
+      for (const method of unsupported) {
+        expect(
+          vercelSyncExports,
+          `api/sync.ts should not export ${method}`,
+        ).not.toHaveProperty(method);
+      }
+    });
+
+    it("Hono server accepts every supported method", async () => {
+      const app = createApp();
+      for (const method of SUPPORTED_METHODS) {
+        const vaultId = "a".repeat(64);
+        const res = await app.request(`/api/sync?vaultId=${vaultId}`, {
+          method,
+        });
+        expect(
+          res.status,
+          `Hono server returned unexpected status for ${method}`,
+        ).not.toBe(405);
+      }
     });
   });
 });
