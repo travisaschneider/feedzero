@@ -1,29 +1,26 @@
 /**
- * Bundles each src/api/*.ts serverless function into a self-contained api/*.js file.
+ * Bundles each api/*.ts serverless function into a self-contained api/*.js file.
  *
- * Vercel's Node.js builder does NOT bundle imports from src/ — it compiles
- * each api/*.ts file individually. This script uses esbuild to inline all
- * dependencies so the output files are self-contained and work in any
- * serverless runtime (Vercel, Cloudflare, plain Node.js).
+ * Vercel's Node.js builder compiles api/*.ts individually without bundling
+ * imports from src/. This script uses esbuild to produce self-contained .js
+ * bundles with all dependencies inlined. Vercel prefers .js over .ts when
+ * both exist in the api/ directory.
  *
- * Source: src/api/*.ts (tracked in git)
- * Output: api/*.js (gitignored build artifacts)
+ * Output files (api/*.js) are gitignored build artifacts.
  */
 import esbuild from "esbuild";
 import { readdirSync } from "fs";
 import path from "path";
 
-const srcDir = path.resolve("src/api");
-const outDir = path.resolve("api");
-
-const entryPoints = readdirSync(srcDir)
+const apiDir = path.resolve("api");
+const entryPoints = readdirSync(apiDir)
   .filter((f) => f.endsWith(".ts"))
-  .map((f) => path.join(srcDir, f));
+  .map((f) => path.join(apiDir, f));
 
 await esbuild.build({
   entryPoints,
   bundle: true,
-  outdir: outDir,
+  outdir: apiDir,
   format: "esm",
   platform: "node",
   target: "node20",
