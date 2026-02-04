@@ -76,10 +76,16 @@ User clicks "Extracted" in ViewToggle
 Auto-refresh on app load (non-blocking) OR manual refresh (per-feed / all)
       │
       ▼
+  [Sync users only] Pull vault from server → reload feeds from DB
+      │
+      ▼
   feed-service.ts refreshFeed() → fetch → parse → for each article:
       │
       ├── New (guid not in DB) → store
       └── Existing + changed → update
+      │
+      ▼
+  [Sync users only] Schedule debounced push
 ```
 
 ## State Management
@@ -103,7 +109,7 @@ IndexedDB (encrypted via Dexie + Web Crypto)
 - **feed-store** — Feed CRUD, selection, refresh. Debounces concurrent refreshAll calls. Triggers sync push after mutations.
 - **article-store** — Article list for selected feed, selection (auto-marks read), read state. Triggers sync push after mark-as-read.
 - **extraction-store** — Extraction cache (link → HTML), view mode toggle, fetch status
-- **sync-store** — Cloud sync state: `enableSync`, `restoreSync`, `push`, `pull`, `scheduleSyncPush` (5s debounce), `disableSync` (deletes server vault + clears local state). Passphrase persistence in localStorage.
+- **sync-store** — Cloud sync state: `enableSync`, `restoreSync`, `push`, `pull`, `scheduleSyncPush` (5s debounce), `disableSync` (deletes server vault + clears local state), `logout` (clears local data, preserves cloud vault). Passphrase persistence in localStorage.
 
 ## Routing
 

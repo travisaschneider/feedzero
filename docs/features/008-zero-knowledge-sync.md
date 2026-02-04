@@ -43,6 +43,23 @@ Feature: Zero-knowledge cloud sync
     And local data is preserved
     And the sync status chip turns amber
 
+  Scenario: User logs out (clear local, keep cloud)
+    Given a sync-enabled user
+    When they click "Log out of this device" from the Data & Storage dialog
+    And confirm the action
+    Then all local data is deleted (IndexedDB, localStorage)
+    And the encrypted cloud vault is NOT deleted
+    And the app returns to the onboarding screen
+    And they can later recover by entering their passphrase
+
+  Scenario: Refresh pulls cross-device changes first
+    Given a sync-enabled user with feeds on multiple devices
+    When they refresh all feeds on device B
+    Then device B first pulls the latest vault from the server
+    And imports any new feeds or changes from device A
+    And then refreshes all feeds (including newly imported ones)
+    And pushes the updated vault back to the server
+
   Scenario: Local-only user enables sync later
     Given a local-only user
     When they click Enable sync in the Data & Storage dialog
@@ -79,8 +96,10 @@ Same passphrase always produces same vault ID and same encryption key. No extern
 2. **Pull**: GET `/api/sync?vaultId=<hex>` -> `decryptVault()` -> `importAll()` into IndexedDB
 3. **Delete**: DELETE `/api/sync?vaultId=<hex>` -> removes encrypted blob from server
 4. **Startup (sync user)**: Pull first, then load from local DB
-5. **After mutations**: Debounced push (5s after last change)
-6. **Disable sync**: Delete server vault -> clear localStorage keys -> reset store to local-only
+5. **Refresh all (sync user)**: Pull vault -> reload feeds from DB -> refresh all feeds -> reload feeds -> push
+6. **After mutations**: Debounced push (5s after last change)
+7. **Disable sync**: Delete server vault -> clear localStorage keys -> reset store to local-only
+8. **Logout**: Delete local DB -> clear all localStorage keys -> reset to onboarding (cloud vault preserved)
 
 ### Storage Adapter Pattern
 
@@ -113,7 +132,7 @@ All API handlers use the Web standard `Request -> Response` pattern. Three entry
 | `src/core/sync/adapters/filesystem-adapter.ts` | Filesystem storage adapter |
 | `src/core/sync/adapters/vercel-blob-adapter.ts` | Vercel Blob storage adapter |
 | `src/core/sync/adapters/resolve-adapter.ts` | Reads `SYNC_STORAGE` env var, returns adapter |
-| `src/stores/sync-store.ts` | Zustand store: `enableSync`, `push`, `pull`, `scheduleSyncPush` |
+| `src/stores/sync-store.ts` | Zustand store: `enableSync`, `push`, `pull`, `scheduleSyncPush`, `logout` |
 | `server.ts` | Hono standalone server |
 | `api/sync.ts` | Vercel serverless wrapper (pre-bundled during build, ADR 007) |
 

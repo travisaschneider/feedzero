@@ -83,11 +83,11 @@ Full-text extraction is user-initiated: in reader panel, click "Extracted" → f
 ### Zustand Stores
 
 - **src/stores/app-store.ts** — DB initialization, global error state, onboarding status. `initialize(passphrase)` opens the database. `checkOnboardingStatus()` reads from localStorage. `initializeReturningUser()` handles the full returning-user init flow (detect storage mode, open DB, optionally pull sync).
-- **src/stores/feed-store.ts** — `feeds[]`, `selectedFeedId`, CRUD actions. Actions call core modules directly (`addFeedFlow`, `refreshAllFeeds`, etc.).
+- **src/stores/feed-store.ts** — `feeds[]`, `selectedFeedId`, CRUD actions. Actions call core modules directly (`addFeedFlow`, `refreshAllFeeds`, etc.). `refreshAll()` pulls the sync vault first for sync users (cross-device feed discovery).
 - **src/stores/article-store.ts** — `articles[]`, `selectedArticle`, `loadArticles(feedId)`, `selectArticle(article)` (auto-marks as read).
 - **src/stores/extraction-store.ts** — `cache` (link → extracted HTML), `viewMode`, `fetchExtracted(url)`. Extraction is on-demand and cached.
 - **src/stores/onboarding-store.ts** — Onboarding flow state machine: `welcome` → `storage-choice` → `passphrase-display` → `passphrase-confirm` → `initializing` (or `recovery` for returning users). Storage modes: `local` (client-only, skips passphrase confirmation) vs `sync` (cloud-enabled, requires passphrase confirmation). Generates passphrases via `passphrase-generator.ts`.
-- **src/stores/sync-store.ts** — Cloud sync state and actions. Status: `local-only` | `syncing` | `synced` | `error`. Actions: `enableSync(passphrase)`, `restoreSync(passphrase)` (returning sync users), `push()`, `pull()`, `scheduleSyncPush()` (5s debounce), `disableSync()` (deletes server vault + clears local state). Persists passphrase and storage mode to localStorage.
+- **src/stores/sync-store.ts** — Cloud sync state and actions. Status: `local-only` | `syncing` | `synced` | `error`. Actions: `enableSync(passphrase)`, `restoreSync(passphrase)` (returning sync users), `push()`, `pull()`, `scheduleSyncPush()` (5s debounce), `disableSync()` (deletes server vault + clears local state), `logout()` (clears local data + resets to onboarding, preserves cloud vault). Persists passphrase and storage mode to localStorage.
 
 ### React Components
 
