@@ -12,9 +12,14 @@ import {
 interface AddFeedFormProps {
   onAdded: () => void;
   onCancel?: () => void;
+  onFeedSelect?: (feedId: string) => void;
 }
 
-export function AddFeedForm({ onAdded, onCancel }: AddFeedFormProps) {
+export function AddFeedForm({
+  onAdded,
+  onCancel,
+  onFeedSelect,
+}: AddFeedFormProps) {
   const [url, setUrl] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const addFeed = useFeedStore((s) => s.addFeed);
@@ -39,6 +44,8 @@ export function AddFeedForm({ onAdded, onCancel }: AddFeedFormProps) {
       toast.error(error, { id: toastId });
     } else {
       toast.success("Feed added", { id: toastId });
+      const newFeedId = useFeedStore.getState().selectedFeedId;
+      if (newFeedId && onFeedSelect) onFeedSelect(newFeedId);
       onAdded();
     }
   }

@@ -193,6 +193,25 @@ describe("AddFeedForm", () => {
     expect(onCancel).not.toHaveBeenCalled();
   });
 
+  it("calls onFeedSelect with new feed ID after successful add", async () => {
+    const user = userEvent.setup();
+    const onFeedSelect = vi.fn();
+    useFeedStore.setState({
+      addFeed: vi.fn().mockImplementation(async () => {
+        useFeedStore.setState({ selectedFeedId: "new-feed-123" });
+      }),
+      error: null,
+    });
+
+    render(<AddFeedForm onAdded={onAdded} onFeedSelect={onFeedSelect} />);
+    await user.type(screen.getByLabelText("Feed URL"), "https://example.com");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() => {
+      expect(onFeedSelect).toHaveBeenCalledWith("new-feed-123");
+    });
+  });
+
   it("calls onAdded callback on success", async () => {
     const user = userEvent.setup();
     useFeedStore.setState({

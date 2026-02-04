@@ -101,7 +101,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                 <span className="truncate">
                   {isRefreshingAll ? "Refreshing…" : "Refresh"}
                 </span>
-                <Kbd className="ml-auto shrink-0">R</Kbd>
+                {!isRefreshingAll && <Kbd className="ml-auto shrink-0">R</Kbd>}
               </Button>
               <Button
                 variant="outline"
@@ -120,6 +120,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
               <AddFeedForm
                 onAdded={() => setAddFormOpen(false)}
                 onCancel={() => setAddFormOpen(false)}
+                onFeedSelect={onFeedSelect}
               />
             </CollapsibleContent>
           </Collapsible>
@@ -128,7 +129,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
         <SidebarContent>
           <SidebarGroup>
             <SidebarGroupContent>
-              {feeds.length > 0 && (
+              {feeds.length >= 2 && (
                 <div className="flex items-center gap-1 px-2 py-2 text-xs text-muted-foreground border-b border-border font-mono">
                   <Kbd>U</Kbd>
                   <Kbd>I</Kbd> next/prev feed

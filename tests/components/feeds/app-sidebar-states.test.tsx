@@ -162,9 +162,9 @@ describe("AppSidebar states", () => {
     );
   });
 
-  it("shows u/i keyboard hints when feeds are present", () => {
+  it("shows u/i keyboard hints when 2+ feeds are present", () => {
     useFeedStore.setState({
-      feeds: [mockFeed("a", "Alpha Feed")],
+      feeds: [mockFeed("a", "Alpha Feed"), mockFeed("b", "Beta Feed")],
     });
     const { container } = renderSidebar();
     const kbds = container.querySelectorAll("kbd");
@@ -173,12 +173,31 @@ describe("AppSidebar states", () => {
     expect(keys).toContain("I");
   });
 
+  it("does not show u/i hints when only 1 feed", () => {
+    useFeedStore.setState({
+      feeds: [mockFeed("a", "Alpha Feed")],
+    });
+    const { container } = renderSidebar();
+    const kbds = container.querySelectorAll("kbd");
+    const keys = Array.from(kbds).map((kbd) => kbd.textContent);
+    expect(keys).not.toContain("U");
+    expect(keys).not.toContain("I");
+  });
+
   it("does not show u/i hints when no feeds", () => {
     const { container } = renderSidebar();
     const kbds = container.querySelectorAll("kbd");
     const keys = Array.from(kbds).map((kbd) => kbd.textContent);
     expect(keys).not.toContain("U");
     expect(keys).not.toContain("I");
+  });
+
+  it("hides R kbd hint while refreshing", () => {
+    useFeedStore.setState({ isRefreshingAll: true });
+    const { container } = renderSidebar();
+    const kbds = container.querySelectorAll("kbd");
+    const keys = Array.from(kbds).map((kbd) => kbd.textContent);
+    expect(keys).not.toContain("R");
   });
 
   it("shows R keyboard hint in refresh button", () => {
