@@ -30,9 +30,9 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   return (
     <>
       {selectedFeedId && articles.length > 0 && (
-        <div className="flex items-center gap-1 px-2 py-2 text-xs text-muted-foreground border-b border-border">
+        <div className="flex items-center gap-1 px-2 py-2 text-xs text-muted-foreground border-b border-border font-mono">
           <Kbd>J</Kbd>
-          <Kbd>K</Kbd> navigate
+          <Kbd>K</Kbd> next/prev article
         </div>
       )}
       {articles.length === 0 ? (

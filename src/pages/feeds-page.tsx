@@ -28,6 +28,7 @@ import {
 import { Separator } from "@/components/ui/separator.tsx";
 import { AppSidebar } from "@/components/layout/app-sidebar.tsx";
 import { HeaderBreadcrumbs } from "@/components/layout/header-breadcrumbs.tsx";
+import { Kbd } from "@/components/ui/kbd.tsx";
 import { ArticleList } from "@/components/articles/article-list.tsx";
 import { ReaderPanel } from "@/components/reader/reader-panel.tsx";
 
@@ -115,6 +116,7 @@ export function FeedsPage() {
         <SidebarInset>
           <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
             <SidebarTrigger />
+            <Kbd>[</Kbd>
             <Separator
               orientation="vertical"
               className="mr-2 data-[orientation=vertical]:h-4"
@@ -157,6 +159,7 @@ export function FeedsPage() {
       <SidebarInset className="overflow-hidden">
         <header className="flex h-10 shrink-0 items-center border-b px-2 gap-2">
           <SidebarTrigger />
+          <Kbd>[</Kbd>
           <Separator
             orientation="vertical"
             className="data-[orientation=vertical]:h-4"

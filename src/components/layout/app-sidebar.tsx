@@ -90,25 +90,27 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
             <span className="text-lg font-semibold tracking-tight">
               FeedZero
             </span>
-            <div className="flex items-center gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 disabled={isRefreshingAll}
                 onClick={refreshAll}
-                className="flex-1 font-mono"
+                className="min-w-0 font-mono text-xs"
               >
-                {isRefreshingAll ? "Refreshing…" : "Refresh"}
-                <Kbd className="ml-auto">R</Kbd>
+                <span className="truncate">
+                  {isRefreshingAll ? "Refreshing…" : "Refresh"}
+                </span>
+                <Kbd className="ml-auto shrink-0">R</Kbd>
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setAddFormOpen(!addFormOpen)}
-                className="flex-1 font-mono"
+                className="min-w-0 font-mono text-xs"
               >
-                Add Feed
-                <Kbd className="ml-auto">N</Kbd>
+                <span className="truncate">Add Feed</span>
+                <Kbd className="ml-auto shrink-0">N</Kbd>
               </Button>
             </div>
           </div>
@@ -127,9 +129,9 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
           <SidebarGroup>
             <SidebarGroupContent>
               {feeds.length > 0 && (
-                <div className="flex items-center gap-1 px-2 py-2 text-xs text-muted-foreground border-b border-border">
+                <div className="flex items-center gap-1 px-2 py-2 text-xs text-muted-foreground border-b border-border font-mono">
                   <Kbd>U</Kbd>
-                  <Kbd>I</Kbd> navigate
+                  <Kbd>I</Kbd> next/prev feed
                 </div>
               )}
               {feeds.length === 0 ? (
