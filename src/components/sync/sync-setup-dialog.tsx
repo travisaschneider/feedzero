@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   Copy,
   Check,
@@ -193,6 +193,14 @@ function StatusDialog({ open, onOpenChange, status }: StatusDialogProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const resetApp = useAppStore((s) => s.resetApp);
   const disableSync = useSyncStore((s) => s.disableSync);
+
+  // Reset internal state when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setShowConfirm(false);
+      setIsDeleting(false);
+    }
+  }, [open]);
 
   const handleDelete = async () => {
     setIsDeleting(true);
