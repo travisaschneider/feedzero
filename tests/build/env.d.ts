@@ -8,7 +8,7 @@ declare module "node:child_process" {
 
 declare module "node:fs" {
   export function existsSync(path: string): boolean;
-  export function unlinkSync(path: string): void;
+  export function readFileSync(path: string, encoding: string): string;
   export function readdirSync(path: string): string[];
 }
 

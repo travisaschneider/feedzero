@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { execSync } from "node:child_process";
-import { existsSync, unlinkSync, readdirSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { SUPPORTED_METHODS } from "@/core/sync/sync-handler";
 
@@ -8,54 +8,59 @@ const apiDir = resolve("api");
 
 describe("API bundle contract", () => {
   beforeAll(() => {
-    // Restore .ts source files from git before building (build script deletes them)
+    // Restore original .ts source from git, then run the build script
     execSync("git checkout -- api/", { stdio: "pipe" });
     execSync("node scripts/build-api.js", { stdio: "pipe" });
   });
 
   afterAll(() => {
-    // Clean up .js bundles and restore .ts source files
-    const jsFiles = readdirSync(apiDir).filter((f: string) =>
-      f.endsWith(".js"),
-    );
-    for (const file of jsFiles) {
-      unlinkSync(join(apiDir, file));
-    }
+    // Restore original .ts source files
     execSync("git checkout -- api/", { stdio: "pipe" });
   });
 
-  it("produces a .js bundle for each .ts source file and removes .ts files", () => {
-    expect(existsSync(join(apiDir, "feed.js"))).toBe(true);
-    expect(existsSync(join(apiDir, "page.js"))).toBe(true);
-    expect(existsSync(join(apiDir, "sync.js"))).toBe(true);
+  it("replaces api/*.ts with self-contained bundles (no external imports)", () => {
+    for (const name of ["feed.ts", "page.ts", "sync.ts"]) {
+      expect(existsSync(join(apiDir, name)), `${name} should still exist`).toBe(
+        true,
+      );
 
-    // .ts files should have been removed by the build script
-    expect(existsSync(join(apiDir, "feed.ts"))).toBe(false);
-    expect(existsSync(join(apiDir, "page.ts"))).toBe(false);
-    expect(existsSync(join(apiDir, "sync.ts"))).toBe(false);
+      const content = readFileSync(join(apiDir, name), "utf-8");
+
+      // Bundled output should NOT contain imports from ../src/
+      expect(content).not.toMatch(/from\s+["']\.\.\/src\//);
+
+      // Bundled output should contain actual function logic (not just re-exports)
+      expect(content.length).toBeGreaterThan(200);
+    }
   });
 
-  it("feed.js exports GET", async () => {
-    const mod = await import(join(apiDir, "feed.js"));
+  it("no .js files are produced in api/", () => {
+    expect(existsSync(join(apiDir, "feed.js"))).toBe(false);
+    expect(existsSync(join(apiDir, "page.js"))).toBe(false);
+    expect(existsSync(join(apiDir, "sync.js"))).toBe(false);
+  });
+
+  it("bundled feed.ts exports GET", async () => {
+    const mod = await import(join(apiDir, "feed.ts"));
     expect(typeof mod.GET).toBe("function");
   });
 
-  it("page.js exports GET", async () => {
-    const mod = await import(join(apiDir, "page.js"));
+  it("bundled page.ts exports GET", async () => {
+    const mod = await import(join(apiDir, "page.ts"));
     expect(typeof mod.GET).toBe("function");
   });
 
-  it("sync.js exports every supported method", async () => {
-    const mod = await import(join(apiDir, "sync.js"));
+  it("bundled sync.ts exports every supported method", async () => {
+    const mod = await import(join(apiDir, "sync.ts"));
     for (const method of SUPPORTED_METHODS) {
-      expect(typeof mod[method], `sync.js missing export for ${method}`).toBe(
+      expect(typeof mod[method], `sync.ts missing export for ${method}`).toBe(
         "function",
       );
     }
   });
 
   it("bundled feed handler returns a response", async () => {
-    const mod = await import(join(apiDir, "feed.js"));
+    const mod = await import(join(apiDir, "feed.ts"));
     const req = new Request("http://localhost/api/feed");
     const res = await mod.GET(req);
     expect(res).toBeInstanceOf(Response);

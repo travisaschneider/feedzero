@@ -1,17 +1,23 @@
 /**
- * Bundles each api/*.ts serverless function into a self-contained api/*.js file,
- * then removes the .ts source files so Vercel uses only the pre-bundled output.
+ * Replaces each api/*.ts with a self-contained esbuild bundle (keeping .ts extension).
  *
- * Why: Vercel's Node.js builder compiles api/*.ts individually without bundling
- * imports from src/. If both .ts and .js exist, Vercel re-compiles the .ts and
- * OVERWRITES the .js. By removing .ts after bundling, Vercel finds only the
- * self-contained .js files.
+ * Why: Vercel discovers api/*.ts pre-build and expects them post-build. If we delete
+ * them, Vercel errors with "File not found". If we output .js alongside .ts, Vercel
+ * re-compiles .ts and overwrites .js. By replacing .ts content with the bundled output
+ * (all dependencies inlined, no external imports), Vercel compiles them trivially.
  *
- * Source files are tracked in git; only the build step deletes them temporarily.
- * Output files (api/*.js) are gitignored build artifacts.
+ * The original .ts source is tracked in git. This script only modifies the build
+ * working copy — git source is not affected.
  */
 import esbuild from "esbuild";
-import { readdirSync, unlinkSync } from "fs";
+import {
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+  mkdtempSync,
+  rmSync,
+} from "fs";
+import { tmpdir } from "os";
 import path from "path";
 
 const apiDir = path.resolve("api");
@@ -19,22 +25,33 @@ const tsFiles = readdirSync(apiDir)
   .filter((f) => f.endsWith(".ts"))
   .map((f) => path.join(apiDir, f));
 
+// Bundle to a temp directory to avoid overwriting source mid-build
+const tempOut = mkdtempSync(path.join(tmpdir(), "feedzero-api-"));
+
 await esbuild.build({
   entryPoints: tsFiles,
   bundle: true,
-  outdir: apiDir,
+  outdir: tempOut,
   format: "esm",
   platform: "node",
   target: "node20",
   external: ["@vercel/blob"],
 });
 
-// Remove .ts source files so Vercel doesn't re-compile them over the bundles
-for (const file of tsFiles) {
-  unlinkSync(file);
+// Overwrite api/*.ts with bundled .js content (Vercel expects .ts extension)
+for (const tsFile of tsFiles) {
+  const baseName = path.basename(tsFile, ".ts");
+  const bundledContent = readFileSync(
+    path.join(tempOut, baseName + ".js"),
+    "utf-8",
+  );
+  writeFileSync(tsFile, bundledContent);
 }
 
+// Clean up temp directory
+rmSync(tempOut, { recursive: true });
+
 console.log(
-  `Bundled ${tsFiles.length} API functions:`,
-  tsFiles.map((f) => path.basename(f, ".ts") + ".js").join(", "),
+  `Bundled ${tsFiles.length} API functions (in-place):`,
+  tsFiles.map((f) => path.basename(f)).join(", "),
 );
