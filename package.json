@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite --port 3000",
     "build": "vite build",
+    "build:api": "node scripts/build-api.js",
+    "build:all": "vite build && node scripts/build-api.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
