@@ -34,7 +34,9 @@ describe("vercel-blob-adapter", () => {
     });
 
     it("returns null when fetch response is not ok", async () => {
-      mockHead.mockResolvedValue({ url: "https://blob.vercel-storage.com/vaults/test.json" });
+      mockHead.mockResolvedValue({
+        url: "https://blob.vercel-storage.com/vaults/test.json",
+      });
       mockFetch.mockResolvedValue({ ok: false });
       const adapter = createVercelBlobAdapter();
 
@@ -46,8 +48,13 @@ describe("vercel-blob-adapter", () => {
 
     it("returns vault data on success", async () => {
       const vaultData = '{"version":1}';
-      mockHead.mockResolvedValue({ url: "https://blob.vercel-storage.com/vaults/test.json" });
-      mockFetch.mockResolvedValue({ ok: true, text: () => Promise.resolve(vaultData) });
+      mockHead.mockResolvedValue({
+        url: "https://blob.vercel-storage.com/vaults/test.json",
+      });
+      mockFetch.mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(vaultData),
+      });
       const adapter = createVercelBlobAdapter();
 
       const result = await adapter.get("c".repeat(64));
@@ -57,7 +64,9 @@ describe("vercel-blob-adapter", () => {
     });
 
     it("returns error when fetch throws", async () => {
-      mockHead.mockResolvedValue({ url: "https://blob.vercel-storage.com/vaults/test.json" });
+      mockHead.mockResolvedValue({
+        url: "https://blob.vercel-storage.com/vaults/test.json",
+      });
       mockFetch.mockRejectedValue(new Error("Network failure"));
       const adapter = createVercelBlobAdapter();
 
@@ -69,7 +78,9 @@ describe("vercel-blob-adapter", () => {
 
   describe("put", () => {
     it("stores data via vercel blob put", async () => {
-      mockPut.mockResolvedValue({ url: "https://blob.vercel-storage.com/vaults/test.json" });
+      mockPut.mockResolvedValue({
+        url: "https://blob.vercel-storage.com/vaults/test.json",
+      });
       const adapter = createVercelBlobAdapter();
       const vaultId = "e".repeat(64);
 
@@ -79,7 +90,12 @@ describe("vercel-blob-adapter", () => {
       expect(mockPut).toHaveBeenCalledWith(
         `vaults/${vaultId}.json`,
         '{"version":1}',
-        { access: "public", addRandomSuffix: false, contentType: "application/json" },
+        {
+          access: "public",
+          addRandomSuffix: false,
+          allowOverwrite: true,
+          contentType: "application/json",
+        },
       );
     });
 

@@ -37,6 +37,7 @@ export function createVercelBlobAdapter(): SyncStorageAdapter {
         await put(pathname, data, {
           access: "public",
           addRandomSuffix: false,
+          allowOverwrite: true,
           contentType: "application/json",
         });
         return ok(true);
