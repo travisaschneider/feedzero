@@ -177,5 +177,21 @@ describe("app-store", () => {
       expect(useAppStore.getState().isDbReady).toBe(true);
       expect(useSyncStore.getState().passphrase).toBe("test phrase");
     });
+
+    it("preserves error status when sync pull fails instead of overriding to synced", async () => {
+      localStorageMock.setItem("feedzero:storage-mode", "sync");
+      localStorageMock.setItem("feedzero:sync-passphrase", "test phrase");
+      vi.mocked(open).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(pullVault).mockResolvedValue({
+        ok: false,
+        error: "Sync pull failed (404): Vault not found",
+      });
+
+      await useAppStore.getState().initializeReturningUser();
+
+      const syncState = useSyncStore.getState();
+      expect(syncState.status).toBe("error");
+      expect(syncState.error).toBe("Sync pull failed (404): Vault not found");
+    });
   });
 });

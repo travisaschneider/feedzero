@@ -53,7 +53,9 @@ export const useAppStore = create<AppStore>((set) => ({
 
     if (isSyncUser) {
       await useSyncStore.getState().pull();
-      useSyncStore.setState({ status: "synced", lastSyncedAt: Date.now() });
+      if (useSyncStore.getState().status !== "error") {
+        useSyncStore.setState({ status: "synced", lastSyncedAt: Date.now() });
+      }
     }
   },
 

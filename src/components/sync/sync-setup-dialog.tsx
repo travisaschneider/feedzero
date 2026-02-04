@@ -106,6 +106,7 @@ function ConfirmationView({
 
 export function SyncSetupDialog() {
   const status = useSyncStore((s) => s.status);
+  const syncError = useSyncStore((s) => s.error);
   const enableSync = useSyncStore((s) => s.enableSync);
   const disableSync = useSyncStore((s) => s.disableSync);
   const logout = useSyncStore((s) => s.logout);
@@ -188,7 +189,9 @@ export function SyncSetupDialog() {
       case "syncing":
         return "Sync is in progress...";
       case "error":
-        return "There was a sync error. Please try again.";
+        return syncError
+          ? `Sync error: ${syncError}`
+          : "There was a sync error. Please try again.";
     }
   };
 
