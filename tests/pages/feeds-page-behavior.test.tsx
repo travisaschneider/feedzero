@@ -148,12 +148,16 @@ describe("FeedsPage behavior — desktop", () => {
     expect(mockSelectArticle).toHaveBeenCalledWith(article);
   });
 
-  it("does not call selectArticle when articleId does not match", () => {
+  it("does not select an article when articleId does not match", () => {
     useArticleStore.setState({ articles: [makeArticle("art-1")] });
 
     renderPage("/feeds/feed-1/articles/nonexistent");
 
-    expect(mockSelectArticle).not.toHaveBeenCalled();
+    // selectArticle(null) is called to clear stale article on feed change,
+    // but no article object should be selected
+    expect(mockSelectArticle).not.toHaveBeenCalledWith(
+      expect.objectContaining({ id: expect.any(String) }),
+    );
   });
 
   it("auto-navigates to first article when feed has articles but no articleId", async () => {
@@ -213,10 +217,11 @@ describe("FeedsPage behavior — mobile", () => {
     expect(screen.getByText("Articles")).toBeInTheDocument();
   });
 
-  it("shows 'Article' in header when articleId is present", () => {
+  it("shows 'Articles' fallback in header when articleId present but no feed in store", () => {
     useArticleStore.setState({ articles: [makeArticle("art-1")] });
     renderPage("/feeds/feed-1/articles/art-1");
-    expect(screen.getByText("Article")).toBeInTheDocument();
+    // With breadcrumbs, mobile header shows fallback "Articles" when feed isn't in store
+    expect(screen.getByText("Articles")).toBeInTheDocument();
   });
 
   it("shows open-sidebar prompt at /feeds root", () => {

@@ -1,4 +1,5 @@
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group.tsx";
+import { Kbd } from "@/components/ui/kbd.tsx";
 
 interface ViewToggleProps {
   modes: string[];
@@ -14,20 +15,23 @@ export function ViewToggle({
   if (modes.length <= 1) return null;
 
   return (
-    <ToggleGroup
-      type="single"
-      variant="outline"
-      value={activeMode}
-      onValueChange={(value) => {
-        if (value) onModeChange(value as "feed" | "extracted");
-      }}
-      className="mb-4 shadow-sm"
-    >
-      {modes.map((mode) => (
-        <ToggleGroupItem key={mode} value={mode}>
-          {mode === "feed" ? "Feed" : "Extracted"}
-        </ToggleGroupItem>
-      ))}
-    </ToggleGroup>
+    <div className="flex items-center gap-2 mb-4">
+      <ToggleGroup
+        type="single"
+        variant="outline"
+        value={activeMode}
+        onValueChange={(value) => {
+          if (value) onModeChange(value as "feed" | "extracted");
+        }}
+        className="shadow-sm"
+      >
+        {modes.map((mode) => (
+          <ToggleGroupItem key={mode} value={mode}>
+            {mode === "feed" ? "Feed" : "Extracted"}
+          </ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+      <Kbd>E</Kbd>
+    </div>
   );
 }

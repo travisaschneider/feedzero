@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AppSidebar } from "@/components/layout/app-sidebar.tsx";
 import { SidebarProvider } from "@/components/ui/sidebar.tsx";
@@ -47,11 +47,21 @@ describe("AppSidebar states", () => {
     });
   });
 
-  it("shows empty state when no feeds", () => {
+  it("shows empty state with title when no feeds", () => {
+    renderSidebar();
+    expect(screen.getByText("No feeds yet")).toBeInTheDocument();
+  });
+
+  it("shows empty state with description when no feeds", () => {
     renderSidebar();
     expect(
-      screen.getByText("No feeds yet. Add one above."),
+      screen.getByText("Add your first RSS feed to get started"),
     ).toBeInTheDocument();
+  });
+
+  it("renders empty component container when no feeds", () => {
+    const { container } = renderSidebar();
+    expect(container.querySelector("[data-slot='empty']")).toBeInTheDocument();
   });
 
   it("renders feed items with titles", () => {
@@ -63,16 +73,11 @@ describe("AppSidebar states", () => {
     expect(screen.getByText("Beta Feed")).toBeInTheDocument();
   });
 
-  it("refresh all button shows spinner during refresh", () => {
+  it("refresh all button is disabled and shows text during refresh", () => {
     useFeedStore.setState({ isRefreshingAll: true });
     renderSidebar();
-    const refreshBtn = screen.getByTitle("Refresh all feeds");
+    const refreshBtn = screen.getByRole("button", { name: /refreshing/i });
     expect(refreshBtn).toBeDisabled();
-    // The icon inside should have animate-spin class
-    const svg = refreshBtn.querySelector("svg");
-    expect(
-      svg?.className.baseVal || svg?.getAttribute("class") || "",
-    ).toContain("animate-spin");
   });
 
   it("add form toggles open and closed", async () => {
@@ -86,8 +91,8 @@ describe("AppSidebar states", () => {
     await user.click(screen.getByRole("button", { name: /add feed/i }));
     expect(screen.getByLabelText("Feed URL")).toBeInTheDocument();
 
-    // Click again to close
-    await user.click(screen.getByRole("button", { name: /cancel/i }));
+    // Click again to close (same button toggles)
+    await user.click(screen.getByRole("button", { name: /add feed/i }));
     // The collapsible closes; the input should no longer be visible
     // (Radix Collapsible may still have it in DOM but hidden)
   });
@@ -141,5 +146,59 @@ describe("AppSidebar states", () => {
     await user.click(screen.getByRole("button", { name: "Remove" }));
 
     expect(removeFeed).toHaveBeenCalledWith("a");
+  });
+
+  it("active feed has left border indicator", () => {
+    useFeedStore.setState({
+      feeds: [mockFeed("a", "Alpha Feed")],
+      selectedFeedId: "a",
+    });
+    renderSidebar();
+
+    const feedButton = screen.getByText("Alpha Feed").closest("button");
+    expect(feedButton?.className).toContain("data-[active=true]:border-l-2");
+    expect(feedButton?.className).toContain(
+      "data-[active=true]:border-primary",
+    );
+  });
+
+  it("shows u/i keyboard hints when feeds are present", () => {
+    useFeedStore.setState({
+      feeds: [mockFeed("a", "Alpha Feed")],
+    });
+    const { container } = renderSidebar();
+    const kbds = container.querySelectorAll("kbd");
+    const keys = Array.from(kbds).map((kbd) => kbd.textContent);
+    expect(keys).toContain("U");
+    expect(keys).toContain("I");
+  });
+
+  it("does not show u/i hints when no feeds", () => {
+    const { container } = renderSidebar();
+    const kbds = container.querySelectorAll("kbd");
+    const keys = Array.from(kbds).map((kbd) => kbd.textContent);
+    expect(keys).not.toContain("U");
+    expect(keys).not.toContain("I");
+  });
+
+  it("shows R keyboard hint in refresh button", () => {
+    const { container } = renderSidebar();
+    const kbds = container.querySelectorAll("kbd");
+    const keys = Array.from(kbds).map((kbd) => kbd.textContent);
+    expect(keys).toContain("R");
+  });
+
+  it("opens add form when feedzero:add-feed event is dispatched", () => {
+    renderSidebar();
+
+    // Initially no input visible
+    expect(screen.queryByLabelText("Feed URL")).not.toBeInTheDocument();
+
+    // Dispatch the custom event
+    act(() => {
+      document.dispatchEvent(new CustomEvent("feedzero:add-feed"));
+    });
+
+    expect(screen.getByLabelText("Feed URL")).toBeInTheDocument();
   });
 });

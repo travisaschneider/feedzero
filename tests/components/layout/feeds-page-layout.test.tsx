@@ -47,11 +47,21 @@ function renderPage(route = "/feeds") {
   );
 }
 
+const defaultFeed = {
+  id: "f1",
+  url: "https://example.com/feed",
+  title: "Test Feed",
+  description: "",
+  siteUrl: "https://example.com",
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
+};
+
 describe("FeedsPage layout — desktop", () => {
   beforeEach(() => {
     mockIsDesktop = true;
     useFeedStore.setState({
-      feeds: [],
+      feeds: [defaultFeed],
       selectedFeedId: null,
       isLoading: false,
       error: null,
@@ -63,6 +73,27 @@ describe("FeedsPage layout — desktop", () => {
       selectedArticle: null,
       isLoading: false,
     });
+  });
+
+  it("shows empty state instead of panels when no feeds", () => {
+    useFeedStore.setState({ feeds: [] });
+    const { container } = renderPage();
+    // Should NOT have resizable panels
+    const panelGroup = container.querySelector(
+      "[data-slot='resizable-panel-group']",
+    );
+    expect(panelGroup).toBeNull();
+    // Should have the empty component
+    expect(container.querySelector("[data-slot='empty']")).not.toBeNull();
+  });
+
+  it("shows panels when feeds exist", () => {
+    const { container } = renderPage();
+    const panelGroup = container.querySelector(
+      "[data-slot='resizable-panel-group']",
+    );
+    expect(panelGroup).not.toBeNull();
+    expect(container.querySelector("[data-slot='empty']")).toBeNull();
   });
 
   it("SidebarProvider wrapper has h-svh and overflow-hidden", () => {

@@ -132,4 +132,18 @@ describe("ReaderPanel", () => {
       screen.getByRole("radio", { name: "Extracted" }),
     ).toBeInTheDocument();
   });
+
+  it("shows Kbd O hint next to the Original link", () => {
+    useArticleStore.setState({
+      selectedArticle: mockArticle(),
+      articles: [],
+      isLoading: false,
+    });
+
+    render(<ReaderPanel />);
+    const originalLink = screen.getByText("Original").closest("a");
+    const kbd = originalLink?.querySelector("kbd");
+    expect(kbd).toBeTruthy();
+    expect(kbd?.textContent).toBe("O");
+  });
 });

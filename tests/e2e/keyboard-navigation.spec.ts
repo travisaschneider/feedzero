@@ -14,50 +14,25 @@ async function setupFeed(page: import("@playwright/test").Page) {
     .getByPlaceholder("Feed or site URL")
     .fill("https://example.com/feed");
   await page.getByRole("button", { name: "Add" }).click();
-  await expect(page.getByText("Test Feed")).toBeVisible({ timeout: 10000 });
-  await page.getByText("Test Feed").click();
+  const sidebarFeed = page.getByRole("button", { name: "Test Feed" });
+  await expect(sidebarFeed).toBeVisible({ timeout: 10000 });
+  await sidebarFeed.click();
   await expect(articleOption(page, "First Article")).toBeVisible({
     timeout: 10000,
   });
 }
 
 test.describe("Keyboard navigation", () => {
-  test("j moves focus to next article", async ({ feedPage: page }) => {
+  test("j opens next article", async ({ feedPage: page }) => {
     await setupFeed(page);
 
-    // Focus the first article item
-    await articleOption(page, "First Article").focus();
+    // First article is auto-selected, reader shows it
+    await expect(
+      page.getByRole("heading", { name: "First Article" }),
+    ).toBeVisible({ timeout: 10000 });
 
-    // Press j to move down
+    // Press j to open next article
     await page.keyboard.press("j");
-
-    // Second article should now be focused
-    const focused = page.locator('[role="option"]:focus');
-    await expect(focused).toContainText("Second Article");
-  });
-
-  test("k moves focus to previous article", async ({ feedPage: page }) => {
-    await setupFeed(page);
-
-    // Focus the second article
-    await articleOption(page, "Second Article").focus();
-
-    // Press k to move up
-    await page.keyboard.press("k");
-
-    // First article should now be focused
-    const focused = page.locator('[role="option"]:focus');
-    await expect(focused).toContainText("First Article");
-  });
-
-  test("Enter activates focused article", async ({ feedPage: page }) => {
-    await setupFeed(page);
-
-    // Focus the second article
-    await articleOption(page, "Second Article").focus();
-
-    // Press Enter to select it
-    await page.keyboard.press("Enter");
 
     // Reader should show the second article content
     await expect(
@@ -65,18 +40,27 @@ test.describe("Keyboard navigation", () => {
     ).toBeVisible({ timeout: 10000 });
   });
 
-  test("Escape returns focus to list", async ({ feedPage: page }) => {
+  test("k opens previous article", async ({ feedPage: page }) => {
     await setupFeed(page);
 
-    // Click a non-list element to move focus away
-    await page.getByRole("heading", { name: "First Article" }).click();
+    // First article is auto-selected
+    await expect(
+      page.getByRole("heading", { name: "First Article" }),
+    ).toBeVisible({ timeout: 10000 });
 
-    // Press Escape to return focus to list
-    await page.keyboard.press("Escape");
+    // Press j to go to second article
+    await page.keyboard.press("j");
+    await expect(
+      page.getByText("Brief summary of the second article"),
+    ).toBeVisible({ timeout: 10000 });
 
-    // Focus should be on a list option
-    const focused = page.locator('[role="option"]:focus');
-    await expect(focused).toBeVisible({ timeout: 5000 });
+    // Press k to go back to first article
+    await page.keyboard.press("k");
+
+    // Reader should show the first article again
+    await expect(
+      page.getByRole("heading", { name: "First Article" }),
+    ).toBeVisible({ timeout: 10000 });
   });
 
   test("keys are ignored in input fields", async ({ feedPage: page }) => {
@@ -95,12 +79,48 @@ test.describe("Keyboard navigation", () => {
   test("j/k stay at boundaries", async ({ feedPage: page }) => {
     await setupFeed(page);
 
-    // Focus the first article
-    await articleOption(page, "First Article").focus();
+    // First article is auto-selected
+    await expect(
+      page.getByRole("heading", { name: "First Article" }),
+    ).toBeVisible({ timeout: 10000 });
 
     // Press k — should stay at first (can't go before first)
     await page.keyboard.press("k");
-    const focused = page.locator('[role="option"]:focus');
-    await expect(focused).toContainText("First Article");
+
+    // Should still show first article
+    await expect(
+      page.getByRole("heading", { name: "First Article" }),
+    ).toBeVisible({ timeout: 10000 });
+  });
+
+  test("o opens original link in new tab", async ({ feedPage: page }) => {
+    await setupFeed(page);
+
+    // Select an article first
+    await articleOption(page, "First Article").click();
+    await expect(
+      page.getByRole("heading", { name: "First Article" }),
+    ).toBeVisible({ timeout: 10000 });
+
+    // Press o — should open the original link
+    const popupPromise = page.waitForEvent("popup");
+    await page.keyboard.press("o");
+    const popup = await popupPromise;
+    expect(popup.url()).toContain("example.com/first");
+  });
+
+  test("n opens add feed form", async ({ feedPage: page }) => {
+    await setupFeed(page);
+
+    // Ensure add form is not open
+    await expect(page.getByPlaceholder("Feed or site URL")).not.toBeVisible();
+
+    // Press n
+    await page.keyboard.press("n");
+
+    // Add form should be open
+    await expect(page.getByPlaceholder("Feed or site URL")).toBeVisible({
+      timeout: 5000,
+    });
   });
 });

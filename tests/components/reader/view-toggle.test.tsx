@@ -72,4 +72,17 @@ describe("ViewToggle", () => {
     const feedBtn = screen.getByRole("radio", { name: "Feed" });
     expect(feedBtn).toHaveAttribute("data-state", "on");
   });
+
+  it("shows Kbd E hint next to the toggle group", () => {
+    const { container } = render(
+      <ViewToggle
+        modes={["feed", "extracted"]}
+        activeMode="feed"
+        onModeChange={vi.fn()}
+      />,
+    );
+    const kbd = container.querySelector("kbd");
+    expect(kbd).toBeTruthy();
+    expect(kbd?.textContent).toBe("E");
+  });
 });

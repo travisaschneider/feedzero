@@ -50,6 +50,40 @@ describe("SyncStatusChip", () => {
     });
   });
 
+  describe("color-aware hover states", () => {
+    it("has amber hover state for local-only", () => {
+      useSyncStore.setState({ status: "local-only" });
+      render(<SyncStatusChip />);
+      const button = screen.getByRole("button");
+      expect(button).toHaveClass("hover:bg-amber-600");
+      expect(button).toHaveClass("hover:text-white");
+    });
+
+    it("has green hover state for synced", () => {
+      useSyncStore.setState({ status: "synced" });
+      render(<SyncStatusChip />);
+      const button = screen.getByRole("button");
+      expect(button).toHaveClass("hover:bg-green-700");
+      expect(button).toHaveClass("hover:text-white");
+    });
+
+    it("has red hover state for error", () => {
+      useSyncStore.setState({ status: "error" });
+      render(<SyncStatusChip />);
+      const button = screen.getByRole("button");
+      expect(button).toHaveClass("hover:bg-red-700");
+      expect(button).toHaveClass("hover:text-white");
+    });
+
+    it("has default hover state for syncing", () => {
+      useSyncStore.setState({ status: "syncing" });
+      render(<SyncStatusChip />);
+      const button = screen.getByRole("button");
+      expect(button).toHaveClass("hover:bg-sidebar-accent");
+      expect(button).toHaveClass("hover:text-sidebar-accent-foreground");
+    });
+  });
+
   describe("behavior", () => {
     it("displays correct label for each status", () => {
       useSyncStore.setState({ status: "local-only" });

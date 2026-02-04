@@ -55,8 +55,8 @@ test.describe("Error states", () => {
       .getByPlaceholder("Feed or site URL")
       .fill("https://example.com/feed");
     await page.getByRole("button", { name: "Add" }).click();
-    await expect(page.getByText("Test Feed")).toBeVisible({ timeout: 10000 });
-    await page.getByText("Test Feed").click();
+    await expect(page.getByRole("button", { name: "Test Feed" })).toBeVisible({ timeout: 10000 });
+    await page.getByRole("button", { name: "Test Feed" }).click();
     await expect(articleOption(page, "First Article")).toBeVisible({
       timeout: 10000,
     });

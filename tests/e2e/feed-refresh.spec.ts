@@ -30,8 +30,8 @@ test.describe("Feed refresh", () => {
       .getByPlaceholder("Feed or site URL")
       .fill("https://example.com/feed");
     await page.getByRole("button", { name: "Add" }).click();
-    await expect(page.getByText("Test Feed")).toBeVisible({ timeout: 10000 });
-    await page.getByText("Test Feed").click();
+    await expect(page.getByRole("button", { name: "Test Feed" })).toBeVisible({ timeout: 10000 });
+    await page.getByRole("button", { name: "Test Feed" }).click();
     await expect(articleOption(page, "First Article")).toBeVisible({
       timeout: 10000,
     });
@@ -46,7 +46,7 @@ test.describe("Feed refresh", () => {
     // After refresh, articles in DB are updated but the article store
     // doesn't auto-reload. Navigate away and back to trigger loadArticles.
     await page.goto("/feeds");
-    await page.getByText("Test Feed").click();
+    await page.getByRole("button", { name: "Test Feed" }).click();
 
     // New article should appear
     await expect(articleOption(page, "Brand New Article")).toBeVisible({
@@ -61,7 +61,7 @@ test.describe("Feed refresh", () => {
       .getByPlaceholder("Feed or site URL")
       .fill("https://example.com/feed");
     await page.getByRole("button", { name: "Add" }).click();
-    await expect(page.getByText("Test Feed")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole("button", { name: "Test Feed" })).toBeVisible({ timeout: 10000 });
 
     // Add a delay to the feed response so we can observe the spinner
     await page.unroute("**/api/feed*");
@@ -98,8 +98,8 @@ test.describe("Feed refresh", () => {
       .getByPlaceholder("Feed or site URL")
       .fill("https://example.com/feed");
     await page.getByRole("button", { name: "Add" }).click();
-    await expect(page.getByText("Test Feed")).toBeVisible({ timeout: 10000 });
-    await page.getByText("Test Feed").click();
+    await expect(page.getByRole("button", { name: "Test Feed" })).toBeVisible({ timeout: 10000 });
+    await page.getByRole("button", { name: "Test Feed" }).click();
     await expect(articleOption(page, "First Article")).toBeVisible({
       timeout: 10000,
     });

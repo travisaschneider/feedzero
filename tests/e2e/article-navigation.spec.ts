@@ -11,7 +11,7 @@ async function addTestFeed(page: import("@playwright/test").Page) {
     .getByPlaceholder("Feed or site URL")
     .fill("https://example.com/feed");
   await page.getByRole("button", { name: "Add" }).click();
-  await expect(page.getByText("Test Feed")).toBeVisible({ timeout: 10000 });
+  await expect(page.getByRole("button", { name: "Test Feed" })).toBeVisible({ timeout: 10000 });
 }
 
 /** Scoped selector for an article in the list (not the reader heading). */
@@ -22,7 +22,7 @@ function articleOption(page: import("@playwright/test").Page, text: string) {
 test.describe("Article navigation", () => {
   test("select feed shows articles", async ({ feedPage: page }) => {
     await addTestFeed(page);
-    await page.getByText("Test Feed").click();
+    await page.getByRole("button", { name: "Test Feed" }).click();
 
     // Articles should appear in the list
     await expect(articleOption(page, "First Article")).toBeVisible({
@@ -33,7 +33,7 @@ test.describe("Article navigation", () => {
 
   test("select article shows reader content", async ({ feedPage: page }) => {
     await addTestFeed(page);
-    await page.getByText("Test Feed").click();
+    await page.getByRole("button", { name: "Test Feed" }).click();
     await expect(articleOption(page, "First Article")).toBeVisible({
       timeout: 10000,
     });
@@ -49,7 +49,7 @@ test.describe("Article navigation", () => {
 
   test("URL updates on feed selection", async ({ feedPage: page }) => {
     await addTestFeed(page);
-    await page.getByText("Test Feed").click();
+    await page.getByRole("button", { name: "Test Feed" }).click();
 
     // URL should contain /feeds/<feedId>
     await page.waitForURL(/\/feeds\/[a-zA-Z0-9_-]+/, { timeout: 10000 });
@@ -58,7 +58,7 @@ test.describe("Article navigation", () => {
 
   test("URL updates on article selection", async ({ feedPage: page }) => {
     await addTestFeed(page);
-    await page.getByText("Test Feed").click();
+    await page.getByRole("button", { name: "Test Feed" }).click();
     await expect(articleOption(page, "First Article")).toBeVisible({
       timeout: 10000,
     });
@@ -76,7 +76,7 @@ test.describe("Article navigation", () => {
     feedPage: page,
   }) => {
     await addTestFeed(page);
-    await page.getByText("Test Feed").click();
+    await page.getByRole("button", { name: "Test Feed" }).click();
 
     // Should auto-navigate to first article
     await page.waitForURL(/\/feeds\/[^/]+\/articles\/[a-zA-Z0-9_-]+/, {
@@ -91,7 +91,7 @@ test.describe("Article navigation", () => {
 
   test("unread articles are bold", async ({ feedPage: page }) => {
     await addTestFeed(page);
-    await page.getByText("Test Feed").click();
+    await page.getByRole("button", { name: "Test Feed" }).click();
     await expect(articleOption(page, "First Article")).toBeVisible({
       timeout: 10000,
     });
@@ -107,7 +107,7 @@ test.describe("Article navigation", () => {
     feedPage: page,
   }) => {
     await addTestFeed(page);
-    await page.getByText("Test Feed").click();
+    await page.getByRole("button", { name: "Test Feed" }).click();
     await expect(articleOption(page, "Second Article")).toBeVisible({
       timeout: 10000,
     });
@@ -136,7 +136,7 @@ test.describe("Article navigation — mobile", () => {
 
     // Click the feed — on mobile, auto-select navigates directly to
     // the first article's reader view.
-    await page.getByText("Test Feed").click();
+    await page.getByRole("button", { name: "Test Feed" }).click();
     await page.waitForTimeout(500);
 
     // Dismiss the sidebar sheet by clicking the overlay area

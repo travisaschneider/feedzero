@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { MoreHorizontal, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { MoreHorizontal, RefreshCw, Rss, Trash2 } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { Button } from "@/components/ui/button.tsx";
 import {
@@ -38,6 +38,14 @@ import {
 import { SyncStatusChip } from "@/components/sync/sync-status-chip.tsx";
 import { AddFeedForm } from "@/components/feeds/add-feed-form.tsx";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
+import { Kbd } from "@/components/ui/kbd.tsx";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from "@/components/ui/empty.tsx";
 import type { Feed } from "@/types/index.ts";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
@@ -56,6 +64,13 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   const [addFormOpen, setAddFormOpen] = useState(false);
   const [feedToRemove, setFeedToRemove] = useState<Feed | null>(null);
 
+  useEffect(() => {
+    const handleAddFeed = () => setAddFormOpen(true);
+    document.addEventListener("feedzero:add-feed", handleAddFeed);
+    return () =>
+      document.removeEventListener("feedzero:add-feed", handleAddFeed);
+  }, []);
+
   function handleSelect(feedId: string) {
     if (onFeedSelect) onFeedSelect(feedId);
   }
@@ -71,43 +86,39 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
     <>
       <Sidebar {...props}>
         <SidebarHeader>
-          <div className="flex items-center justify-between px-2 py-1">
+          <div className="flex flex-col gap-2 px-2 py-2">
             <span className="text-lg font-semibold tracking-tight">
               FeedZero
             </span>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
               <Button
-                variant="ghost"
-                size="icon"
-                className="size-7"
-                title="Refresh all feeds"
+                variant="outline"
+                size="sm"
                 disabled={isRefreshingAll}
                 onClick={refreshAll}
+                className="flex-1 font-mono"
               >
-                <RefreshCw
-                  className={`size-4 ${isRefreshingAll ? "animate-spin" : ""}`}
-                />
+                {isRefreshingAll ? "Refreshing…" : "Refresh"}
+                <Kbd className="ml-auto">R</Kbd>
               </Button>
               <Button
-                variant="ghost"
-                size="icon"
-                className="size-7"
-                title={addFormOpen ? "Cancel" : "Add feed"}
+                variant="outline"
+                size="sm"
                 onClick={() => setAddFormOpen(!addFormOpen)}
+                className="flex-1 font-mono"
               >
-                <Plus
-                  className="size-4 transition-transform duration-200"
-                  style={{
-                    transform: addFormOpen ? "rotate(45deg)" : "rotate(0deg)",
-                  }}
-                />
+                Add Feed
+                <Kbd className="ml-auto">N</Kbd>
               </Button>
             </div>
           </div>
 
           <Collapsible open={addFormOpen}>
             <CollapsibleContent>
-              <AddFeedForm onAdded={() => setAddFormOpen(false)} />
+              <AddFeedForm
+                onAdded={() => setAddFormOpen(false)}
+                onCancel={() => setAddFormOpen(false)}
+              />
             </CollapsibleContent>
           </Collapsible>
         </SidebarHeader>
@@ -115,10 +126,24 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
         <SidebarContent>
           <SidebarGroup>
             <SidebarGroupContent>
-              {feeds.length === 0 ? (
-                <div className="px-2 py-4 text-muted-foreground text-sm">
-                  No feeds yet. Add one above.
+              {feeds.length > 0 && (
+                <div className="flex items-center gap-1 px-2 py-2 text-xs text-muted-foreground border-b border-border">
+                  <Kbd>U</Kbd>
+                  <Kbd>I</Kbd> navigate
                 </div>
+              )}
+              {feeds.length === 0 ? (
+                <Empty className="border-0 py-8">
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <Rss />
+                    </EmptyMedia>
+                    <EmptyTitle>No feeds yet</EmptyTitle>
+                    <EmptyDescription>
+                      Add your first RSS feed to get started
+                    </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
               ) : (
                 <SidebarMenu>
                   {feeds.map((feed) => (
@@ -127,7 +152,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                         isActive={feed.id === selectedFeedId}
                         onClick={() => handleSelect(feed.id)}
                         tooltip={feed.title}
-                        className="font-semibold py-2 group-has-data-[state=open]/menu-item:bg-sidebar-accent"
+                        className="py-2 group-has-data-[state=open]/menu-item:bg-sidebar-accent data-[active=true]:border-l-2 data-[active=true]:border-primary data-[active=true]:pl-1.5"
                       >
                         <FeedFavicon siteUrl={feed.siteUrl} />
                         <span className="truncate">{feed.title}</span>

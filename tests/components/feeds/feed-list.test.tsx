@@ -47,9 +47,7 @@ describe("AppSidebar", () => {
 
   it("shows empty state when no feeds", () => {
     renderSidebar();
-    expect(
-      screen.getByText("No feeds yet. Add one above."),
-    ).toBeInTheDocument();
+    expect(screen.getByText("No feeds yet")).toBeInTheDocument();
   });
 
   it("renders feed items", () => {
@@ -90,7 +88,9 @@ describe("AppSidebar", () => {
 
   it("has refresh all button", () => {
     renderSidebar();
-    expect(screen.getByTitle("Refresh all feeds")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /refresh/i }),
+    ).toBeInTheDocument();
   });
 
   it("shows app title", () => {

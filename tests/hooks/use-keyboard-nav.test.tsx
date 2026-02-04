@@ -1,6 +1,31 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useKeyboardNav } from "@/hooks/use-keyboard-nav.ts";
+import { useArticleStore } from "@/stores/article-store.ts";
+import { useExtractionStore } from "@/stores/extraction-store.ts";
+
+vi.mock("@/core/storage/db.ts", () => ({
+  getArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+  updateArticle: vi.fn().mockResolvedValue({ ok: true, value: true }),
+  getFeeds: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+}));
+
+vi.mock("@/core/extractor/extractor.ts", () => ({
+  extract: vi.fn(),
+}));
+
+function createSidebarButtons(count: number, activeIndex = -1): HTMLElement[] {
+  const buttons: HTMLElement[] = [];
+  for (let i = 0; i < count; i++) {
+    const btn = document.createElement("button");
+    btn.setAttribute("data-sidebar", "menu-button");
+    btn.setAttribute("data-active", i === activeIndex ? "true" : "false");
+    btn.textContent = `Feed ${i}`;
+    document.body.appendChild(btn);
+    buttons.push(btn);
+  }
+  return buttons;
+}
 
 function createListbox(itemCount: number, selectedIndex = -1): HTMLElement {
   const listbox = document.createElement("ul");
@@ -10,10 +35,8 @@ function createListbox(itemCount: number, selectedIndex = -1): HTMLElement {
     const item = document.createElement("li");
     item.setAttribute("role", "option");
     item.setAttribute("tabindex", "0");
+    item.setAttribute("aria-selected", i === selectedIndex ? "true" : "false");
     item.textContent = `Item ${i}`;
-    if (i === selectedIndex) {
-      item.setAttribute("aria-selected", "true");
-    }
     listbox.appendChild(item);
   }
 
@@ -40,125 +63,148 @@ describe("useKeyboardNav", () => {
     document.body.innerHTML = "";
   });
 
-  it("j moves focus to the first item when nothing is focused", () => {
-    const listbox = createListbox(3);
-    renderHook(() => useKeyboardNav());
+  describe("article navigation (j/k)", () => {
+    it("j clicks the first item when none is selected", () => {
+      const listbox = createListbox(3);
+      let clicked = -1;
+      Array.from(listbox.children).forEach((item, i) =>
+        item.addEventListener("click", () => {
+          clicked = i;
+        }),
+      );
+      renderHook(() => useKeyboardNav());
 
-    pressKey("j");
+      pressKey("j");
 
-    expect(document.activeElement).toBe(listbox.children[0]);
-  });
-
-  it("j moves focus down by one item", () => {
-    const listbox = createListbox(3);
-    renderHook(() => useKeyboardNav());
-
-    (listbox.children[0] as HTMLElement).focus();
-    pressKey("j");
-
-    expect(document.activeElement).toBe(listbox.children[1]);
-  });
-
-  it("k moves focus up by one item", () => {
-    const listbox = createListbox(3);
-    renderHook(() => useKeyboardNav());
-
-    (listbox.children[2] as HTMLElement).focus();
-    pressKey("k");
-
-    expect(document.activeElement).toBe(listbox.children[1]);
-  });
-
-  it("j does not go past the last item", () => {
-    const listbox = createListbox(3);
-    renderHook(() => useKeyboardNav());
-
-    (listbox.children[2] as HTMLElement).focus();
-    pressKey("j");
-
-    expect(document.activeElement).toBe(listbox.children[2]);
-  });
-
-  it("k does not go before the first item", () => {
-    const listbox = createListbox(3);
-    renderHook(() => useKeyboardNav());
-
-    (listbox.children[0] as HTMLElement).focus();
-    pressKey("k");
-
-    expect(document.activeElement).toBe(listbox.children[0]);
-  });
-
-  it("k focuses the last item when nothing is focused", () => {
-    const listbox = createListbox(3);
-    renderHook(() => useKeyboardNav());
-
-    pressKey("k");
-
-    expect(document.activeElement).toBe(listbox.children[2]);
-  });
-
-  it("Enter clicks the focused option element", () => {
-    const listbox = createListbox(3);
-    renderHook(() => useKeyboardNav());
-
-    let clicked = false;
-    (listbox.children[1] as HTMLElement).addEventListener("click", () => {
-      clicked = true;
-    });
-    (listbox.children[1] as HTMLElement).focus();
-
-    pressKey("Enter");
-
-    expect(clicked).toBe(true);
-  });
-
-  it("Enter does nothing when focused element is not an option", () => {
-    createListbox(3);
-    renderHook(() => useKeyboardNav());
-
-    const div = document.createElement("div");
-    div.setAttribute("tabindex", "0");
-    document.body.appendChild(div);
-    div.focus();
-
-    let clicked = false;
-    div.addEventListener("click", () => {
-      clicked = true;
+      expect(clicked).toBe(0);
     });
 
-    pressKey("Enter");
+    it("j clicks the next item after the selected one", () => {
+      const listbox = createListbox(3, 0);
+      let clicked = -1;
+      Array.from(listbox.children).forEach((item, i) =>
+        item.addEventListener("click", () => {
+          clicked = i;
+        }),
+      );
+      renderHook(() => useKeyboardNav());
 
-    expect(clicked).toBe(false);
-  });
+      pressKey("j");
 
-  it("Escape moves focus to the selected item in the first listbox", () => {
-    const listbox = createListbox(3, 1);
-    renderHook(() => useKeyboardNav());
+      expect(clicked).toBe(1);
+    });
 
-    // Focus somewhere else
-    const div = document.createElement("div");
-    div.setAttribute("tabindex", "0");
-    div.setAttribute("role", "option");
-    document.body.appendChild(div);
-    div.focus();
+    it("k clicks the previous item before the selected one", () => {
+      const listbox = createListbox(3, 2);
+      let clicked = -1;
+      Array.from(listbox.children).forEach((item, i) =>
+        item.addEventListener("click", () => {
+          clicked = i;
+        }),
+      );
+      renderHook(() => useKeyboardNav());
 
-    pressKey("Escape");
+      pressKey("k");
 
-    expect(document.activeElement).toBe(listbox.children[1]);
-  });
+      expect(clicked).toBe(1);
+    });
 
-  it("Escape moves focus to the first item when none is selected", () => {
-    const listbox = createListbox(3);
-    renderHook(() => useKeyboardNav());
+    it("j does not go past the last item", () => {
+      const listbox = createListbox(3, 2);
+      let clicked = -1;
+      Array.from(listbox.children).forEach((item, i) =>
+        item.addEventListener("click", () => {
+          clicked = i;
+        }),
+      );
+      renderHook(() => useKeyboardNav());
 
-    pressKey("Escape");
+      pressKey("j");
 
-    expect(document.activeElement).toBe(listbox.children[0]);
+      expect(clicked).toBe(2);
+    });
+
+    it("k does not go before the first item", () => {
+      const listbox = createListbox(3, 0);
+      let clicked = -1;
+      Array.from(listbox.children).forEach((item, i) =>
+        item.addEventListener("click", () => {
+          clicked = i;
+        }),
+      );
+      renderHook(() => useKeyboardNav());
+
+      pressKey("k");
+
+      expect(clicked).toBe(0);
+    });
+
+    it("k clicks the last item when none is selected", () => {
+      const listbox = createListbox(3);
+      let clicked = -1;
+      Array.from(listbox.children).forEach((item, i) =>
+        item.addEventListener("click", () => {
+          clicked = i;
+        }),
+      );
+      renderHook(() => useKeyboardNav());
+
+      pressKey("k");
+
+      expect(clicked).toBe(2);
+    });
+
+    it("scrolls selected article into view after j navigation", () => {
+      vi.useFakeTimers();
+      const listbox = createListbox(5, 0);
+      const scrollIntoViewSpy = vi.fn();
+      (listbox.children[1] as HTMLElement).scrollIntoView = scrollIntoViewSpy;
+
+      renderHook(() => useKeyboardNav());
+      pressKey("j");
+
+      // Wait for setTimeout(0)
+      vi.runAllTimers();
+
+      expect(scrollIntoViewSpy).toHaveBeenCalledWith({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "nearest",
+      });
+
+      vi.useRealTimers();
+    });
+
+    it("scrolls selected article into view after k navigation", () => {
+      vi.useFakeTimers();
+      const listbox = createListbox(5, 2);
+      const scrollIntoViewSpy = vi.fn();
+      (listbox.children[1] as HTMLElement).scrollIntoView = scrollIntoViewSpy;
+
+      renderHook(() => useKeyboardNav());
+      pressKey("k");
+
+      // Wait for setTimeout(0)
+      vi.runAllTimers();
+
+      expect(scrollIntoViewSpy).toHaveBeenCalledWith({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "nearest",
+      });
+
+      vi.useRealTimers();
+    });
   });
 
   it("ignores keys when an input element is focused", () => {
     const listbox = createListbox(3);
+    let clicked = false;
+    Array.from(listbox.children).forEach((item) =>
+      item.addEventListener("click", () => {
+        clicked = true;
+      }),
+    );
     renderHook(() => useKeyboardNav());
 
     const input = document.createElement("input");
@@ -167,12 +213,17 @@ describe("useKeyboardNav", () => {
 
     pressKey("j", input);
 
-    expect(document.activeElement).toBe(input);
-    expect(document.activeElement).not.toBe(listbox.children[0]);
+    expect(clicked).toBe(false);
   });
 
   it("ignores keys when a textarea is focused", () => {
-    createListbox(3);
+    const listbox = createListbox(3);
+    let clicked = false;
+    Array.from(listbox.children).forEach((item) =>
+      item.addEventListener("click", () => {
+        clicked = true;
+      }),
+    );
     renderHook(() => useKeyboardNav());
 
     const textarea = document.createElement("textarea");
@@ -181,11 +232,17 @@ describe("useKeyboardNav", () => {
 
     pressKey("j", textarea);
 
-    expect(document.activeElement).toBe(textarea);
+    expect(clicked).toBe(false);
   });
 
   it("ignores keys when a contenteditable element is focused", () => {
-    createListbox(3);
+    const listbox = createListbox(3);
+    let clicked = false;
+    Array.from(listbox.children).forEach((item) =>
+      item.addEventListener("click", () => {
+        clicked = true;
+      }),
+    );
     renderHook(() => useKeyboardNav());
 
     const editable = document.createElement("div");
@@ -196,7 +253,7 @@ describe("useKeyboardNav", () => {
 
     pressKey("j", editable);
 
-    expect(document.activeElement).toBe(editable);
+    expect(clicked).toBe(false);
   });
 
   it("does nothing when no listbox exists", () => {
@@ -205,8 +262,6 @@ describe("useKeyboardNav", () => {
     // Should not throw
     pressKey("j");
     pressKey("k");
-    pressKey("Enter");
-    pressKey("Escape");
   });
 
   it("does nothing for unhandled keys", () => {
@@ -215,35 +270,202 @@ describe("useKeyboardNav", () => {
 
     const event = pressKey("a");
 
-    // Unhandled keys should not be preventDefault'd
-    // (In happy-dom this isn't fully testable but we ensure no error)
     expect(event.defaultPrevented).toBe(false);
   });
 
-  it("uses the listbox containing the focused element", () => {
-    // Create two listboxes
-    const listbox1 = createListbox(2);
-    const listbox2 = createListbox(3);
-
-    renderHook(() => useKeyboardNav());
-
-    // Focus an item in the second listbox
-    (listbox2.children[0] as HTMLElement).focus();
-    pressKey("j");
-
-    // Should move within the second listbox, not the first
-    expect(document.activeElement).toBe(listbox2.children[1]);
-    expect(document.activeElement).not.toBe(listbox1.children[0]);
-  });
-
   it("removes the event listener on unmount", () => {
-    createListbox(3);
+    const listbox = createListbox(3);
+    let clicked = false;
+    Array.from(listbox.children).forEach((item) =>
+      item.addEventListener("click", () => {
+        clicked = true;
+      }),
+    );
     const { unmount } = renderHook(() => useKeyboardNav());
 
     unmount();
     pressKey("j");
 
-    // Focus should not have moved since the listener was removed
-    expect(document.activeElement).toBe(document.body);
+    expect(clicked).toBe(false);
+  });
+
+  describe("feed navigation (u/i)", () => {
+    it("u clicks the next feed button", () => {
+      const buttons = createSidebarButtons(3, 0);
+      let clicked = -1;
+      buttons.forEach((btn, i) =>
+        btn.addEventListener("click", () => {
+          clicked = i;
+        }),
+      );
+      renderHook(() => useKeyboardNav());
+
+      pressKey("u");
+
+      expect(clicked).toBe(1);
+    });
+
+    it("i clicks the previous feed button", () => {
+      const buttons = createSidebarButtons(3, 2);
+      let clicked = -1;
+      buttons.forEach((btn, i) =>
+        btn.addEventListener("click", () => {
+          clicked = i;
+        }),
+      );
+      renderHook(() => useKeyboardNav());
+
+      pressKey("i");
+
+      expect(clicked).toBe(1);
+    });
+
+    it("u does not go past the last feed", () => {
+      const buttons = createSidebarButtons(3, 2);
+      let clicked = -1;
+      buttons.forEach((btn, i) =>
+        btn.addEventListener("click", () => {
+          clicked = i;
+        }),
+      );
+      renderHook(() => useKeyboardNav());
+
+      pressKey("u");
+
+      expect(clicked).toBe(2);
+    });
+
+    it("i does not go before the first feed", () => {
+      const buttons = createSidebarButtons(3, 0);
+      let clicked = -1;
+      buttons.forEach((btn, i) =>
+        btn.addEventListener("click", () => {
+          clicked = i;
+        }),
+      );
+      renderHook(() => useKeyboardNav());
+
+      pressKey("i");
+
+      expect(clicked).toBe(0);
+    });
+
+    it("u selects first feed when none is active", () => {
+      const buttons = createSidebarButtons(3);
+      let clicked = -1;
+      buttons.forEach((btn, i) =>
+        btn.addEventListener("click", () => {
+          clicked = i;
+        }),
+      );
+      renderHook(() => useKeyboardNav());
+
+      pressKey("u");
+
+      expect(clicked).toBe(0);
+    });
+  });
+
+  describe("open original (o)", () => {
+    it("opens article link in a new tab", () => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      useArticleStore.setState({
+        selectedArticle: {
+          id: "a1",
+          feedId: "f1",
+          guid: "g1",
+          title: "Test",
+          link: "https://example.com/article",
+          content: "",
+          summary: "",
+          author: "",
+          read: false,
+          publishedAt: 0,
+          createdAt: 0,
+        },
+      });
+      renderHook(() => useKeyboardNav());
+
+      pressKey("o");
+
+      expect(openSpy).toHaveBeenCalledWith(
+        "https://example.com/article",
+        "_blank",
+        "noopener,noreferrer",
+      );
+      openSpy.mockRestore();
+    });
+
+    it("does nothing when no article is selected", () => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      useArticleStore.setState({ selectedArticle: null });
+      renderHook(() => useKeyboardNav());
+
+      pressKey("o");
+
+      expect(openSpy).not.toHaveBeenCalled();
+      openSpy.mockRestore();
+    });
+  });
+
+  describe("toggle view (e)", () => {
+    it("toggles from feed to extracted mode", () => {
+      useExtractionStore.setState({ viewMode: "feed" });
+      renderHook(() => useKeyboardNav());
+
+      pressKey("e");
+
+      expect(useExtractionStore.getState().viewMode).toBe("extracted");
+    });
+
+    it("toggles from extracted back to feed mode", () => {
+      useExtractionStore.setState({ viewMode: "extracted" });
+      renderHook(() => useKeyboardNav());
+
+      pressKey("e");
+
+      expect(useExtractionStore.getState().viewMode).toBe("feed");
+    });
+  });
+
+  describe("add feed (n)", () => {
+    it("dispatches feedzero:add-feed custom event", () => {
+      let eventFired = false;
+      document.addEventListener("feedzero:add-feed", () => {
+        eventFired = true;
+      });
+      renderHook(() => useKeyboardNav());
+
+      pressKey("n");
+
+      expect(eventFired).toBe(true);
+    });
+  });
+
+  describe("toggle sidebar ([)", () => {
+    it("dispatches feedzero:toggle-sidebar custom event", () => {
+      let eventFired = false;
+      document.addEventListener("feedzero:toggle-sidebar", () => {
+        eventFired = true;
+      });
+      renderHook(() => useKeyboardNav());
+
+      pressKey("[");
+
+      expect(eventFired).toBe(true);
+    });
+  });
+
+  describe("refresh feeds (r)", () => {
+    it("r key triggers refresh", () => {
+      // The hook should add 'r' case to keyboard handler
+      // We can't easily test the store call, but we can verify the key is handled
+      renderHook(() => useKeyboardNav());
+
+      const event = pressKey("r");
+
+      // If 'r' is handled, event should be prevented
+      expect(event.defaultPrevented).toBe(true);
+    });
   });
 });

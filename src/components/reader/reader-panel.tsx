@@ -2,12 +2,14 @@ import { useEffect } from "react";
 import { ExternalLink } from "lucide-react";
 import { decodeEntities } from "@/lib/decode-entities.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
+import { useFeedStore } from "@/stores/feed-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
 import {
   getAvailableModes,
   hasSummarySubheading,
 } from "@/lib/content-modes.ts";
 import { Button } from "@/components/ui/button.tsx";
+import { Kbd } from "@/components/ui/kbd.tsx";
 import { ArticleContent } from "./article-content.tsx";
 import { ViewToggle } from "./view-toggle.tsx";
 
@@ -25,6 +27,7 @@ function formatDate(timestamp: number): string {
 
 export function ReaderPanel() {
   const article = useArticleStore((s) => s.selectedArticle);
+  const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
   const cache = useExtractionStore((s) => s.cache);
   const viewMode = useExtractionStore((s) => s.viewMode);
   const isExtracting = useExtractionStore((s) => s.isExtracting);
@@ -36,6 +39,15 @@ export function ReaderPanel() {
   useEffect(() => {
     resetForArticle();
   }, [article?.id, resetForArticle]);
+
+  // Defensive: don't render article if it doesn't belong to current feed
+  if (article && selectedFeedId && article.feedId !== selectedFeedId) {
+    return (
+      <div className="p-4 text-muted-foreground text-sm">
+        Select an article to read.
+      </div>
+    );
+  }
 
   if (!article) {
     return (
@@ -98,6 +110,7 @@ export function ReaderPanel() {
             <a href={article.link} target="_blank" rel="noopener noreferrer">
               <ExternalLink className="size-3" />
               Original
+              <Kbd className="ml-1">O</Kbd>
             </a>
           </Button>
         )}

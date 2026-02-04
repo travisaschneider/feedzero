@@ -18,7 +18,7 @@ test.describe("Feed management", () => {
     await page.getByRole("button", { name: "Add" }).click();
 
     // Feed should appear in sidebar
-    await expect(page.getByText("Test Feed")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole("button", { name: "Test Feed" })).toBeVisible({ timeout: 10000 });
   });
 
   test("added feed is auto-selected and articles appear", async ({
@@ -33,10 +33,10 @@ test.describe("Feed management", () => {
     await page.getByRole("button", { name: "Add" }).click();
 
     // Wait for feed to appear
-    await expect(page.getByText("Test Feed")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole("button", { name: "Test Feed" })).toBeVisible({ timeout: 10000 });
 
     // Click the feed to select it
-    await page.getByText("Test Feed").click();
+    await page.getByRole("button", { name: "Test Feed" }).click();
 
     // Articles from the feed should appear in the article list
     await expect(
@@ -54,7 +54,7 @@ test.describe("Feed management", () => {
     await page.getByRole("button", { name: "Add" }).click();
 
     // Title should match <title> from RSS fixture
-    await expect(page.getByText("Test Feed")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole("button", { name: "Test Feed" })).toBeVisible({ timeout: 10000 });
   });
 
   test("remove feed with confirmation", async ({ feedPage: page }) => {
@@ -66,7 +66,7 @@ test.describe("Feed management", () => {
       .getByPlaceholder("Feed or site URL")
       .fill("https://example.com/feed");
     await page.getByRole("button", { name: "Add" }).click();
-    await expect(page.getByText("Test Feed")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole("button", { name: "Test Feed" })).toBeVisible({ timeout: 10000 });
 
     // Open the dropdown menu for the feed
     await page.getByRole("button", { name: "More" }).click();
@@ -79,7 +79,7 @@ test.describe("Feed management", () => {
     await page.getByRole("button", { name: "Remove" }).click();
 
     // Feed should be gone
-    await expect(page.getByText("Test Feed")).toBeHidden({ timeout: 5000 });
+    await expect(page.getByRole("button", { name: "Test Feed" })).toBeHidden({ timeout: 5000 });
   });
 
   test("cancel remove keeps feed", async ({ feedPage: page }) => {
@@ -90,14 +90,14 @@ test.describe("Feed management", () => {
       .getByPlaceholder("Feed or site URL")
       .fill("https://example.com/feed");
     await page.getByRole("button", { name: "Add" }).click();
-    await expect(page.getByText("Test Feed")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole("button", { name: "Test Feed" })).toBeVisible({ timeout: 10000 });
 
     await page.getByRole("button", { name: "More" }).click();
     await page.getByRole("menuitem", { name: /delete/i }).click();
     await page.getByRole("button", { name: "Cancel" }).click();
 
     // Feed should still be there
-    await expect(page.getByText("Test Feed")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Test Feed" })).toBeVisible();
   });
 
   test("invalid URL shows error", async ({ feedPage: page }) => {
