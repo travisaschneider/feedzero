@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Kbd } from "@/components/ui/kbd";
 import {
   DialogDescription,
   DialogFooter,
@@ -13,13 +14,14 @@ export function PassphraseConfirmStep() {
   const confirmationInput = useOnboardingStore((s) => s.confirmationInput);
   const confirmationError = useOnboardingStore((s) => s.confirmationError);
   const setConfirmationInput = useOnboardingStore(
-    (s) => s.setConfirmationInput
+    (s) => s.setConfirmationInput,
   );
   const validateConfirmation = useOnboardingStore(
-    (s) => s.validateConfirmation
+    (s) => s.validateConfirmation,
   );
 
-  function handleConfirm() {
+  function handleConfirm(e?: React.FormEvent) {
+    e?.preventDefault();
     if (validateConfirmation()) {
       setStep("initializing");
     }
@@ -34,28 +36,34 @@ export function PassphraseConfirmStep() {
         </DialogDescription>
       </DialogHeader>
 
-      <div className="space-y-2">
-        <Input
-          type="text"
-          placeholder="Enter your secret key"
-          value={confirmationInput}
-          onChange={(e) => setConfirmationInput(e.target.value)}
-          autoComplete="off"
-        />
-        {confirmationError && (
-          <p className="text-sm text-destructive">{confirmationError}</p>
-        )}
-      </div>
+      <form onSubmit={handleConfirm}>
+        <div className="space-y-2">
+          <Input
+            type="text"
+            placeholder="Enter your secret key"
+            value={confirmationInput}
+            onChange={(e) => setConfirmationInput(e.target.value)}
+            autoComplete="off"
+          />
+          {confirmationError && (
+            <p className="text-sm text-destructive">{confirmationError}</p>
+          )}
+        </div>
 
-      <DialogFooter className="flex-row gap-2 sm:justify-between">
-        <Button
-          variant="outline"
-          onClick={() => setStep("passphrase-display")}
-        >
-          Back
-        </Button>
-        <Button onClick={handleConfirm}>Confirm</Button>
-      </DialogFooter>
+        <DialogFooter className="mt-4 flex-row gap-2 sm:justify-between">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setStep("passphrase-display")}
+          >
+            Back
+          </Button>
+          <Button type="submit">
+            Confirm
+            <Kbd className="ml-2">Enter</Kbd>
+          </Button>
+        </DialogFooter>
+      </form>
     </>
   );
 }

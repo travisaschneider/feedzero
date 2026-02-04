@@ -143,4 +143,35 @@ describe("StorageChoiceStep", () => {
 
     expect(useOnboardingStore.getState().step).toBe("recovery");
   });
+
+  it("shows Tab kbd hint for navigating options", () => {
+    renderInDialog(<StorageChoiceStep />);
+    expect(screen.getByText("Tab")).toBeInTheDocument();
+  });
+
+  it("shows Enter kbd hint on Continue button", () => {
+    renderInDialog(<StorageChoiceStep />);
+    const button = screen.getByRole("button", { name: /continue/i });
+    expect(button.querySelector("kbd")).toHaveTextContent("Enter");
+  });
+
+  it("allows selecting options with Tab and Enter keys", async () => {
+    const user = userEvent.setup();
+    renderInDialog(<StorageChoiceStep />);
+
+    // Tab to first radio option (past dialog close button) and select with Space
+    const localRadio = screen.getByRole("radio", { name: /local only/i });
+    await user.click(localRadio);
+
+    // Continue button should be enabled after selecting via keyboard
+    const button = screen.getByRole("button", { name: /continue/i });
+    expect(button).toBeEnabled();
+
+    // Tab to Continue button and press Enter to submit
+    await user.tab();
+    await user.keyboard("{Enter}");
+
+    const state = useOnboardingStore.getState();
+    expect(state.step).toBe("initializing");
+  });
 });

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Smartphone, Lock, AlertTriangle, KeyRound, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 import {
   DialogDescription,
   DialogFooter,
@@ -189,6 +190,10 @@ export function StorageChoiceStep() {
         </div>
       )}
 
+      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+        <Kbd>Tab</Kbd> navigate options
+      </div>
+
       <DialogFooter>
         <Button
           size="lg"
@@ -197,6 +202,7 @@ export function StorageChoiceStep() {
           className="w-full"
         >
           Continue
+          <Kbd className="ml-2">Enter</Kbd>
         </Button>
       </DialogFooter>
     </>

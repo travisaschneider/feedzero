@@ -2,6 +2,7 @@ import { useState } from "react";
 import { KeyRound, ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Kbd } from "@/components/ui/kbd";
 import {
   DialogDescription,
   DialogFooter,
@@ -21,7 +22,8 @@ export function RecoveryStep() {
   const setStep = useOnboardingStore((s) => s.setStep);
   const completeOnboarding = useAppStore((s) => s.completeOnboarding);
 
-  const handleRecover = async () => {
+  const handleRecover = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!passphrase.trim()) return;
 
     setIsLoading(true);
@@ -62,47 +64,53 @@ export function RecoveryStep() {
         </DialogDescription>
       </DialogHeader>
 
-      <div className="space-y-4">
-        <Input
-          type="text"
-          placeholder="Enter your 4-word passphrase"
-          value={passphrase}
-          onChange={(e) => {
-            setPassphrase(e.target.value);
-            setError(null);
-          }}
-          className={error ? "border-destructive" : ""}
-          disabled={isLoading}
-        />
-        {error && <p className="text-sm text-destructive">{error}</p>}
-      </div>
+      <form onSubmit={handleRecover}>
+        <div className="space-y-4">
+          <Input
+            type="text"
+            placeholder="Enter your 4-word passphrase"
+            value={passphrase}
+            onChange={(e) => {
+              setPassphrase(e.target.value);
+              setError(null);
+            }}
+            className={error ? "border-destructive" : ""}
+            disabled={isLoading}
+          />
+          {error && <p className="text-sm text-destructive">{error}</p>}
+        </div>
 
-      <DialogFooter className="flex-col gap-2 sm:flex-col">
-        <Button
-          size="lg"
-          onClick={handleRecover}
-          disabled={!passphrase.trim() || isLoading}
-          className="w-full"
-        >
-          {isLoading ? (
-            <>
-              <Loader2 className="mr-2 size-4 animate-spin" />
-              Recovering...
-            </>
-          ) : (
-            "Recover"
-          )}
-        </Button>
-        <Button
-          variant="ghost"
-          onClick={() => setStep("storage-choice")}
-          disabled={isLoading}
-          className="w-full"
-        >
-          <ArrowLeft className="mr-2 size-4" />
-          Back
-        </Button>
-      </DialogFooter>
+        <DialogFooter className="mt-4 flex-col gap-2 sm:flex-col">
+          <Button
+            type="submit"
+            size="lg"
+            disabled={!passphrase.trim() || isLoading}
+            className="w-full"
+          >
+            {isLoading ? (
+              <>
+                <Loader2 className="mr-2 size-4 animate-spin" />
+                Recovering...
+              </>
+            ) : (
+              <>
+                Recover
+                <Kbd className="ml-2">Enter</Kbd>
+              </>
+            )}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setStep("storage-choice")}
+            disabled={isLoading}
+            className="w-full"
+          >
+            <ArrowLeft className="mr-2 size-4" />
+            Back
+          </Button>
+        </DialogFooter>
+      </form>
     </>
   );
 }

@@ -8,6 +8,7 @@ interface KbdProps extends React.HTMLAttributes<HTMLElement> {
 export function Kbd({ children, className, ...props }: KbdProps) {
   return (
     <kbd
+      aria-hidden="true"
       className={cn(
         "pointer-events-none inline-flex h-6 select-none items-center gap-1 rounded border border-border bg-blue-50 dark:bg-blue-950 px-2 font-mono text-xs font-medium text-blue-700 dark:text-blue-300",
         className,

@@ -90,4 +90,10 @@ describe("PassphraseDisplayStep", () => {
 
     expect(useOnboardingStore.getState().step).toBe("passphrase-confirm");
   });
+
+  it("shows Enter kbd hint on Continue button", () => {
+    renderInDialog(<PassphraseDisplayStep />);
+    const button = screen.getByRole("button", { name: /continue/i });
+    expect(button.querySelector("kbd")).toHaveTextContent("Enter");
+  });
 });

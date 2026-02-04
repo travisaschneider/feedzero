@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Kbd } from "@/components/ui/kbd";
 import {
   DialogDescription,
   DialogFooter,
@@ -61,11 +62,9 @@ export function PassphraseDisplayStep() {
       </label>
 
       <DialogFooter>
-        <Button
-          onClick={() => setStep("passphrase-confirm")}
-          disabled={!saved}
-        >
+        <Button onClick={() => setStep("passphrase-confirm")} disabled={!saved}>
           Continue
+          <Kbd className="ml-2">Enter</Kbd>
         </Button>
       </DialogFooter>
     </>
