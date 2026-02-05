@@ -4,6 +4,7 @@ import { MemoryRouter, Routes, Route, useLocation } from "react-router";
 import { FeedsPage } from "@/pages/feeds-page.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
+import * as db from "@/core/storage/db.ts";
 import type { Article, Feed } from "@/types/index.ts";
 
 vi.mock("@/core/storage/db.ts", () => ({
@@ -242,10 +243,15 @@ describe("FeedsPage behavior — mobile", () => {
     expect(screen.getByText(/open the sidebar/i)).toBeInTheDocument();
   });
 
-  it("Back button navigates from article to article list", async () => {
+  it("Back button navigates from article to article list and stays there", async () => {
+    const articles = [makeArticle("art-1"), makeArticle("art-2")];
+
+    // Mock getArticles to return articles (simulates real DB with data)
+    vi.mocked(db.getArticles).mockResolvedValue({ ok: true, value: articles });
+
     useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
-    useArticleStore.setState({ articles: [makeArticle("art-1")] });
-    const { container } = renderPage("/feeds/feed-1/articles/art-1");
+    useArticleStore.setState({ articles });
+    const { container } = renderPage("/feeds/feed-1/articles/art-2");
 
     const backBtn = Array.from(container.querySelectorAll("button")).find((b) =>
       b.textContent?.includes("←"),
@@ -256,11 +262,19 @@ describe("FeedsPage behavior — mobile", () => {
       backBtn!.click();
     });
 
-    // Observable: URL changes to feed's article list
-    // Note: auto-select may redirect back, so we check the navigation happened
+    // Observable: URL changes to article list and STAYS there
+    // User should see the article list to pick a different article
     await vi.waitFor(() => {
-      expect(currentUrl).toMatch(/^\/feeds\/feed-1/);
+      expect(currentUrl).toBe("/feeds/feed-1");
     });
+
+    // Wait a tick to ensure no auto-redirect happens
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+
+    // Still at article list, not redirected back to an article
+    expect(currentUrl).toBe("/feeds/feed-1");
   });
 
   it("Back button navigates from article list to /feeds", async () => {

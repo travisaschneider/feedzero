@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router";
 import { Rss } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
@@ -63,6 +63,9 @@ export function FeedsPage() {
   const articles = useArticleStore((s) => s.articles);
   const selectArticle = useArticleStore((s) => s.selectArticle);
 
+  // Track whether user explicitly navigated back (to suppress auto-select)
+  const skipAutoSelectRef = useRef(false);
+
   useEffect(() => {
     if (feedId) {
       selectFeed(feedId);
@@ -79,13 +82,24 @@ export function FeedsPage() {
   }, [articleId, articles, selectArticle]);
 
   // Auto-select first article when switching to a feed with no article selected
+  // Skip if user explicitly navigated back (they want to see the article list)
   useEffect(() => {
+    if (skipAutoSelectRef.current) {
+      return;
+    }
     if (feedId && articles.length > 0 && !articleId) {
       navigate(`/feeds/${feedId}/articles/${articles[0].id}`, {
         replace: true,
       });
     }
   }, [feedId, articles, articleId, navigate]);
+
+  // Reset skip flag when user navigates to an article (either by clicking or auto-select)
+  useEffect(() => {
+    if (articleId) {
+      skipAutoSelectRef.current = false;
+    }
+  }, [articleId]);
 
   function handleFeedSelect(id: string) {
     selectFeed(id);
@@ -100,6 +114,7 @@ export function FeedsPage() {
   }
 
   function handleBack() {
+    skipAutoSelectRef.current = true;
     if (articleId) {
       navigate(`/feeds/${feedId}`);
     } else if (feedId) {
