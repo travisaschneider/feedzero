@@ -47,6 +47,27 @@ function SidebarKeyboardToggle() {
 }
 
 /**
+ * Opens the sidebar when the add-feed event is dispatched (N key).
+ * Must be rendered inside SidebarProvider.
+ */
+function SidebarAddFeedOpener() {
+  const { open, setOpen, isMobile, setOpenMobile } = useSidebar();
+  useEffect(() => {
+    const handler = () => {
+      // Open sidebar if it's collapsed
+      if (isMobile) {
+        setOpenMobile(true);
+      } else if (!open) {
+        setOpen(true);
+      }
+    };
+    document.addEventListener("feedzero:add-feed", handler);
+    return () => document.removeEventListener("feedzero:add-feed", handler);
+  }, [open, setOpen, isMobile, setOpenMobile]);
+  return null;
+}
+
+/**
  * Main page component.
  * Desktop: sidebar (feeds) + article list + reader pane.
  * Mobile: sidebar collapses to offcanvas, single panel navigation.
@@ -126,6 +147,7 @@ export function FeedsPage() {
     return (
       <SidebarProvider defaultOpen={false}>
         <SidebarKeyboardToggle />
+        <SidebarAddFeedOpener />
         <AppSidebar onFeedSelect={handleFeedSelect} />
         <SidebarInset>
           <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
@@ -165,6 +187,7 @@ export function FeedsPage() {
   return (
     <SidebarProvider className="h-svh overflow-hidden">
       <SidebarKeyboardToggle />
+      <SidebarAddFeedOpener />
       <AppSidebar onFeedSelect={handleFeedSelect} />
       <SidebarInset className="overflow-hidden">
         <header className="flex h-10 shrink-0 items-center border-b px-2 gap-2">
