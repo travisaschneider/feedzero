@@ -9,7 +9,7 @@ function renderInDialog(ui: React.ReactNode) {
   return render(
     <Dialog open={true} onOpenChange={() => {}}>
       <DialogContent>{ui}</DialogContent>
-    </Dialog>
+    </Dialog>,
   );
 }
 
@@ -32,14 +32,14 @@ describe("PassphraseConfirmStep", () => {
   it("renders instructions", () => {
     renderInDialog(<PassphraseConfirmStep />);
     expect(
-      screen.getByText(/enter your secret key to confirm/i)
+      screen.getByText(/enter your secret key to confirm/i),
     ).toBeInTheDocument();
   });
 
   it("renders input field", () => {
     renderInDialog(<PassphraseConfirmStep />);
     expect(
-      screen.getByPlaceholderText(/enter your secret key/i)
+      screen.getByPlaceholderText(/enter your secret key/i),
     ).toBeInTheDocument();
   });
 
@@ -50,7 +50,9 @@ describe("PassphraseConfirmStep", () => {
 
   it("renders Confirm button", () => {
     renderInDialog(<PassphraseConfirmStep />);
-    expect(screen.getByRole("button", { name: /confirm/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /confirm/i }),
+    ).toBeInTheDocument();
   });
 
   it("Back button returns to passphrase-display step", async () => {
@@ -68,7 +70,7 @@ describe("PassphraseConfirmStep", () => {
 
     await user.type(
       screen.getByPlaceholderText(/enter your secret key/i),
-      "test input"
+      "test input",
     );
 
     expect(useOnboardingStore.getState().confirmationInput).toBe("test input");
@@ -80,7 +82,7 @@ describe("PassphraseConfirmStep", () => {
 
     await user.type(
       screen.getByPlaceholderText(/enter your secret key/i),
-      "wrong passphrase"
+      "wrong passphrase",
     );
     await user.click(screen.getByRole("button", { name: /confirm/i }));
 
@@ -93,7 +95,7 @@ describe("PassphraseConfirmStep", () => {
 
     await user.type(
       screen.getByPlaceholderText(/enter your secret key/i),
-      "carbon mango velvet prism"
+      "carbon mango velvet prism",
     );
     await user.click(screen.getByRole("button", { name: /confirm/i }));
 
@@ -106,7 +108,7 @@ describe("PassphraseConfirmStep", () => {
 
     await user.type(
       screen.getByPlaceholderText(/enter your secret key/i),
-      "CARBON MANGO VELVET PRISM"
+      "CARBON MANGO VELVET PRISM",
     );
     await user.click(screen.getByRole("button", { name: /confirm/i }));
 
@@ -122,11 +124,24 @@ describe("PassphraseConfirmStep", () => {
 
     expect(screen.getByText(/previous error/i)).toBeInTheDocument();
 
-    await user.type(
-      screen.getByPlaceholderText(/enter your secret key/i),
-      "a"
-    );
+    await user.type(screen.getByPlaceholderText(/enter your secret key/i), "a");
 
     expect(screen.queryByText(/previous error/i)).not.toBeInTheDocument();
+  });
+
+  it("shows Enter kbd hint on Confirm button", () => {
+    renderInDialog(<PassphraseConfirmStep />);
+    const button = screen.getByRole("button", { name: /confirm/i });
+    expect(button.querySelector("kbd")).toHaveTextContent("Enter");
+  });
+
+  it("submits on Enter key in input field", async () => {
+    const user = userEvent.setup();
+    renderInDialog(<PassphraseConfirmStep />);
+
+    const input = screen.getByPlaceholderText(/enter your secret key/i);
+    await user.type(input, "carbon mango velvet prism{Enter}");
+
+    expect(useOnboardingStore.getState().step).toBe("initializing");
   });
 });

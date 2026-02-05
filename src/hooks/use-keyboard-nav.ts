@@ -1,8 +1,14 @@
 import { useEffect, useCallback } from "react";
+import { useArticleStore } from "@/stores/article-store.ts";
+import { useFeedStore } from "@/stores/feed-store.ts";
+import { useExtractionStore } from "@/stores/extraction-store.ts";
 
 /**
- * Keyboard navigation hook for j/k/Enter/Escape feed reader navigation.
- * Replaces the old Shadow DOM-traversing keyboard-nav.js.
+ * Keyboard navigation hook for feed reader shortcuts.
+ *
+ * Article nav:  j/k (next/prev — directly opens article)
+ * Feed nav:     u/i (next/prev feed)
+ * Actions:      o (open original), e (toggle view), n (add feed)
  */
 export function useKeyboardNav() {
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -19,16 +25,31 @@ export function useKeyboardNav() {
 
     switch (e.key) {
       case "j":
-        moveFocus(1);
+        moveArticle(1);
         break;
       case "k":
-        moveFocus(-1);
+        moveArticle(-1);
         break;
-      case "Enter":
-        activateFocused();
+      case "u":
+        moveFeedFocus(1);
         break;
-      case "Escape":
-        goBack();
+      case "i":
+        moveFeedFocus(-1);
+        break;
+      case "o":
+        openOriginal();
+        break;
+      case "e":
+        toggleView();
+        break;
+      case "n":
+        requestAddFeed();
+        break;
+      case "[":
+        toggleSidebar();
+        break;
+      case "r":
+        refreshAllFeeds();
         break;
       default:
         return;
@@ -43,48 +64,78 @@ export function useKeyboardNav() {
   }, [handleKeyDown]);
 }
 
-/** Find the listbox that contains the currently focused element, or the first listbox. */
-function getActiveListbox(): HTMLElement | null {
-  const focused = document.activeElement as HTMLElement | null;
-  const listboxes = document.querySelectorAll<HTMLElement>('[role="listbox"]');
-
-  // If focus is inside a listbox, use that one
-  for (const listbox of listboxes) {
-    if (listbox.contains(focused)) return listbox;
+/** Clamp next index within bounds, defaulting to first or last when no current index. */
+function clampedIndex(
+  currentIndex: number,
+  direction: 1 | -1,
+  length: number,
+): number {
+  if (currentIndex === -1) {
+    return direction === 1 ? 0 : length - 1;
   }
-
-  // Otherwise use the first listbox
-  return listboxes[0] || null;
+  return Math.max(0, Math.min(length - 1, currentIndex + direction));
 }
 
-function moveFocus(direction: 1 | -1) {
-  const listbox = getActiveListbox();
+function moveArticle(direction: 1 | -1) {
+  const listbox = document.querySelector<HTMLElement>('[role="listbox"]');
   if (!listbox) return;
 
-  const items = Array.from(listbox.querySelectorAll<HTMLElement>('[role="option"]'));
+  const items = Array.from(
+    listbox.querySelectorAll<HTMLElement>('[role="option"]'),
+  );
   if (items.length === 0) return;
 
-  const focused = document.activeElement as HTMLElement;
-  const currentIndex = items.indexOf(focused);
-  const nextIndex = currentIndex === -1
-    ? (direction === 1 ? 0 : items.length - 1)
-    : Math.max(0, Math.min(items.length - 1, currentIndex + direction));
+  const selectedIndex = items.findIndex(
+    (item) => item.getAttribute("aria-selected") === "true",
+  );
+  const nextItem = items[clampedIndex(selectedIndex, direction, items.length)];
 
-  items[nextIndex].focus();
+  nextItem.click();
+
+  // Scroll into view after selection
+  // Use setTimeout to ensure click has processed and DOM has updated
+  setTimeout(() => {
+    nextItem.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+      inline: "nearest",
+    });
+  }, 0);
 }
 
-function activateFocused() {
-  const focused = document.activeElement as HTMLElement | null;
-  if (focused?.getAttribute("role") === "option") {
-    focused.click();
+function moveFeedFocus(direction: 1 | -1) {
+  const buttons = Array.from(
+    document.querySelectorAll<HTMLElement>('[data-sidebar="menu-button"]'),
+  );
+  if (buttons.length === 0) return;
+
+  const activeIndex = buttons.findIndex(
+    (btn) => btn.getAttribute("data-active") === "true",
+  );
+  buttons[clampedIndex(activeIndex, direction, buttons.length)].click();
+}
+
+function openOriginal() {
+  const { selectedArticle } = useArticleStore.getState();
+  if (selectedArticle?.link) {
+    window.open(selectedArticle.link, "_blank", "noopener,noreferrer");
   }
 }
 
-function goBack() {
-  // Move focus to the first listbox (feed list)
-  const firstListbox = document.querySelector<HTMLElement>('[role="listbox"]');
-  if (!firstListbox) return;
-  const firstItem = firstListbox.querySelector<HTMLElement>('[role="option"][aria-selected="true"]')
-    || firstListbox.querySelector<HTMLElement>('[role="option"]');
-  firstItem?.focus();
+function toggleView() {
+  const { toggleViewMode } = useExtractionStore.getState();
+  const { selectedArticle } = useArticleStore.getState();
+  toggleViewMode(selectedArticle?.link);
+}
+
+function requestAddFeed() {
+  document.dispatchEvent(new CustomEvent("feedzero:add-feed"));
+}
+
+function toggleSidebar() {
+  document.dispatchEvent(new CustomEvent("feedzero:toggle-sidebar"));
+}
+
+function refreshAllFeeds() {
+  useFeedStore.getState().refreshAll();
 }

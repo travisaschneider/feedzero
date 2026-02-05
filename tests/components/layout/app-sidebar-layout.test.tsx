@@ -46,7 +46,9 @@ describe("AppSidebar layout structure", () => {
     const { container } = renderSidebar();
     const header = container.querySelector("[data-sidebar='header']");
     expect(header).not.toBeNull();
-    expect(screen.getByTitle("Refresh all feeds")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /refresh/i }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /add feed/i }),
     ).toBeInTheDocument();
@@ -56,8 +58,8 @@ describe("AppSidebar layout structure", () => {
     const { container } = renderSidebar();
     const content = container.querySelector("[data-sidebar='content']");
     expect(content).not.toBeNull();
-    // Empty state text should be within the content area
-    const emptyMsg = screen.getByText("No feeds yet. Add one above.");
+    // Empty state component should be within the content area
+    const emptyMsg = screen.getByText("No feeds yet");
     expect(content!.contains(emptyMsg)).toBe(true);
   });
 

@@ -1,5 +1,6 @@
 import { Rss, Plus, BookOpen, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 import {
   DialogDescription,
   DialogFooter,
@@ -57,8 +58,9 @@ export function WelcomeStep() {
       </div>
 
       <DialogFooter className="sm:justify-center">
-        <Button size="lg" onClick={() => setStep("storage-choice")}>
+        <Button size="lg" onClick={() => setStep("storage-choice")} autoFocus>
           Get Started
+          <Kbd className="ml-2">Enter</Kbd>
         </Button>
       </DialogFooter>
     </>

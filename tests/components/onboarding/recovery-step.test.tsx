@@ -244,6 +244,28 @@ describe("RecoveryStep", () => {
       );
     });
 
+    it("shows Enter kbd hint on Recover button", () => {
+      renderInDialog(<RecoveryStep />);
+      const button = screen.getByRole("button", { name: /^recover$/i });
+      expect(button.querySelector("kbd")).toHaveTextContent("Enter");
+    });
+
+    it("submits on Enter key in input field", async () => {
+      const user = userEvent.setup();
+      vi.mocked(open).mockResolvedValue({ ok: true, value: true });
+
+      renderInDialog(<RecoveryStep />);
+
+      const input = screen.getByPlaceholderText(
+        /enter your 4-word passphrase/i,
+      );
+      await user.type(input, "carbon mango velvet prism{Enter}");
+
+      await waitFor(() => {
+        expect(useAppStore.getState().hasCompletedOnboarding).toBe(true);
+      });
+    });
+
     it("completes onboarding even if pull fails (falls back to local)", async () => {
       const user = userEvent.setup();
       vi.mocked(open).mockResolvedValue({ ok: true, value: true });

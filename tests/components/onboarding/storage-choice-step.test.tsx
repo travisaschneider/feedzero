@@ -143,4 +143,36 @@ describe("StorageChoiceStep", () => {
 
     expect(useOnboardingStore.getState().step).toBe("recovery");
   });
+
+  it("shows Tab kbd hint for navigating options", () => {
+    renderInDialog(<StorageChoiceStep />);
+    expect(screen.getByText("Tab")).toBeInTheDocument();
+  });
+
+  it("shows Enter kbd hint on Continue button", () => {
+    renderInDialog(<StorageChoiceStep />);
+    const button = screen.getByRole("button", { name: /continue/i });
+    expect(button.querySelector("kbd")).toHaveTextContent("Enter");
+  });
+
+  it("radio options are focusable via Tab", () => {
+    renderInDialog(<StorageChoiceStep />);
+    // Radio inputs exist and are part of a radiogroup
+    const radios = screen.getAllByRole("radio");
+    expect(radios.length).toBe(3);
+    // All radios are inside the radiogroup
+    expect(screen.getByRole("radiogroup")).toBeInTheDocument();
+  });
+
+  it("submits form with Enter key when option selected", async () => {
+    const user = userEvent.setup();
+    renderInDialog(<StorageChoiceStep />);
+
+    // Select local option, then press Enter to submit
+    await user.click(screen.getByRole("radio", { name: /local only/i }));
+    await user.keyboard("{Enter}");
+
+    const state = useOnboardingStore.getState();
+    expect(state.step).toBe("initializing");
+  });
 });

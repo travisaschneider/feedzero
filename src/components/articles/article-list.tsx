@@ -1,5 +1,6 @@
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
+import { Kbd } from "@/components/ui/kbd.tsx";
 import { ArticleItem } from "./article-item.tsx";
 import type { Article } from "@/types/index.ts";
 
@@ -28,6 +29,12 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
 
   return (
     <>
+      {selectedFeedId && articles.length > 0 && (
+        <div className="flex items-center gap-1 px-2 py-2 text-xs text-muted-foreground border-b border-border font-mono">
+          <Kbd>J</Kbd>
+          <Kbd>K</Kbd> next/prev article
+        </div>
+      )}
       {articles.length === 0 ? (
         <div className="p-2 text-muted-foreground text-sm">
           No articles found.

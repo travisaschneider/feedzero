@@ -138,4 +138,17 @@ describe("ArticleItem keyboard interaction", () => {
     );
     expect(screen.getByText("Unread").className).toContain("font-semibold");
   });
+
+  it("selected article has accent background", () => {
+    const onSelect = vi.fn();
+    render(
+      <ArticleItem
+        article={mockArticle("a1", "Selected")}
+        isSelected={true}
+        onSelect={onSelect}
+      />,
+    );
+    const item = screen.getByRole("option");
+    expect(item.className).toContain("aria-selected:bg-accent");
+  });
 });

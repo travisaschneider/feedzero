@@ -1,14 +1,25 @@
 import { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { useFeedStore } from "@/stores/feed-store.ts";
-import { Button } from "@/components/ui/button.tsx";
-import { Input } from "@/components/ui/input.tsx";
+import { Pending } from "@/components/ui/pending.tsx";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group.tsx";
 
 interface AddFeedFormProps {
   onAdded: () => void;
+  onCancel?: () => void;
+  onFeedSelect?: (feedId: string) => void;
 }
 
-export function AddFeedForm({ onAdded }: AddFeedFormProps) {
+export function AddFeedForm({
+  onAdded,
+  onCancel,
+  onFeedSelect,
+}: AddFeedFormProps) {
   const [url, setUrl] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const addFeed = useFeedStore((s) => s.addFeed);
@@ -33,31 +44,58 @@ export function AddFeedForm({ onAdded }: AddFeedFormProps) {
       toast.error(error, { id: toastId });
     } else {
       toast.success("Feed added", { id: toastId });
+      const newFeedId = useFeedStore.getState().selectedFeedId;
+      if (newFeedId && onFeedSelect) onFeedSelect(newFeedId);
       onAdded();
     }
   }
 
+  if (isLoading) {
+    return (
+      <form aria-label="Add feed" className="p-2">
+        <Pending isPending>
+          <InputGroupButton
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="w-full font-mono"
+          >
+            Adding feed…
+          </InputGroupButton>
+        </Pending>
+      </form>
+    );
+  }
+
   return (
-    <form
-      onSubmit={handleSubmit}
-      aria-label="Add feed"
-      className="flex gap-1 p-2"
-    >
-      <Input
-        ref={inputRef}
-        type="text"
-        inputMode="url"
-        placeholder="Feed or site URL…"
-        required
-        aria-label="Feed URL"
-        value={url}
-        onChange={(e) => setUrl(e.target.value)}
-        disabled={isLoading}
-        className="flex-1"
-      />
-      <Button type="submit" disabled={isLoading} size="sm">
-        Add
-      </Button>
+    <form onSubmit={handleSubmit} aria-label="Add feed" className="p-2">
+      <InputGroup>
+        <InputGroupInput
+          ref={inputRef}
+          type="text"
+          inputMode="url"
+          placeholder="Feed or site URL…"
+          required
+          aria-label="Feed URL"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.preventDefault();
+              onCancel?.();
+            }
+          }}
+        />
+        <InputGroupAddon align="inline-end">
+          <InputGroupButton
+            type="submit"
+            variant="secondary"
+            className="font-mono"
+          >
+            Add
+          </InputGroupButton>
+        </InputGroupAddon>
+      </InputGroup>
     </form>
   );
 }

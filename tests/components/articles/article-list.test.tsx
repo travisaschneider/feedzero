@@ -20,32 +20,55 @@ vi.mock("@/core/feeds/feed-service.ts", () => ({
 }));
 
 const mockArticle = (id: string, title: string, read = false) => ({
-  id, feedId: "f1", guid: id, title,
-  link: `https://example.com/${id}`, content: "<p>content</p>",
-  summary: "summary", author: "Author", publishedAt: Date.now(),
-  read, createdAt: Date.now(),
+  id,
+  feedId: "f1",
+  guid: id,
+  title,
+  link: `https://example.com/${id}`,
+  content: "<p>content</p>",
+  summary: "summary",
+  author: "Author",
+  publishedAt: Date.now(),
+  read,
+  createdAt: Date.now(),
 });
 
 describe("ArticleList", () => {
   beforeEach(() => {
     useFeedStore.setState({
-      feeds: [], selectedFeedId: null, isLoading: false, error: null,
+      feeds: [],
+      selectedFeedId: null,
+      isLoading: false,
+      error: null,
     });
     useArticleStore.setState({
-      articles: [], selectedArticle: null, isLoading: false,
+      articles: [],
+      selectedArticle: null,
+      isLoading: false,
     });
   });
 
   it("shows empty state when no feed selected", () => {
     render(<ArticleList />);
-    expect(screen.getByText("Select a feed to view articles.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Select a feed to view articles."),
+    ).toBeInTheDocument();
   });
 
   it("renders articles when feed is selected", () => {
-    useFeedStore.setState({ feeds: [], selectedFeedId: "f1", isLoading: false, error: null });
+    useFeedStore.setState({
+      feeds: [],
+      selectedFeedId: "f1",
+      isLoading: false,
+      error: null,
+    });
     useArticleStore.setState({
-      articles: [mockArticle("a1", "First Post"), mockArticle("a2", "Second Post")],
-      selectedArticle: null, isLoading: false,
+      articles: [
+        mockArticle("a1", "First Post"),
+        mockArticle("a2", "Second Post"),
+      ],
+      selectedArticle: null,
+      isLoading: false,
     });
 
     render(<ArticleList />);
@@ -56,10 +79,17 @@ describe("ArticleList", () => {
   it("calls onArticleSelect when article clicked", async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
-    useFeedStore.setState({ feeds: [], selectedFeedId: "f1", isLoading: false, error: null });
+    useFeedStore.setState({
+      feeds: [],
+      selectedFeedId: "f1",
+      isLoading: false,
+      error: null,
+    });
     const article = mockArticle("a1", "Click Me");
     useArticleStore.setState({
-      articles: [article], selectedArticle: null, isLoading: false,
+      articles: [article],
+      selectedArticle: null,
+      isLoading: false,
     });
 
     render(<ArticleList onArticleSelect={onSelect} />);
@@ -68,11 +98,58 @@ describe("ArticleList", () => {
     expect(onSelect).toHaveBeenCalled();
   });
 
-  it("shows read/unread styling", () => {
-    useFeedStore.setState({ feeds: [], selectedFeedId: "f1", isLoading: false, error: null });
+  it("shows j/k keyboard hints when articles are present", () => {
+    useFeedStore.setState({
+      feeds: [],
+      selectedFeedId: "f1",
+      isLoading: false,
+      error: null,
+    });
     useArticleStore.setState({
-      articles: [mockArticle("a1", "Unread", false), mockArticle("a2", "Read", true)],
-      selectedArticle: null, isLoading: false,
+      articles: [mockArticle("a1", "First Post")],
+      selectedArticle: null,
+      isLoading: false,
+    });
+
+    const { container } = render(<ArticleList />);
+    const kbds = container.querySelectorAll("kbd");
+    const keys = Array.from(kbds).map((kbd) => kbd.textContent);
+    expect(keys).toContain("J");
+    expect(keys).toContain("K");
+  });
+
+  it("does not show j/k hints when no articles", () => {
+    useFeedStore.setState({
+      feeds: [],
+      selectedFeedId: "f1",
+      isLoading: false,
+      error: null,
+    });
+    useArticleStore.setState({
+      articles: [],
+      selectedArticle: null,
+      isLoading: false,
+    });
+
+    const { container } = render(<ArticleList />);
+    const kbds = container.querySelectorAll("kbd");
+    expect(kbds).toHaveLength(0);
+  });
+
+  it("shows read/unread styling", () => {
+    useFeedStore.setState({
+      feeds: [],
+      selectedFeedId: "f1",
+      isLoading: false,
+      error: null,
+    });
+    useArticleStore.setState({
+      articles: [
+        mockArticle("a1", "Unread", false),
+        mockArticle("a2", "Read", true),
+      ],
+      selectedArticle: null,
+      isLoading: false,
     });
 
     render(<ArticleList />);

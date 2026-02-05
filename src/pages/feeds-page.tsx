@@ -1,11 +1,20 @@
 import { useEffect } from "react";
 import { useParams, useNavigate } from "react-router";
+import { Rss } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useIsDesktop } from "@/hooks/use-media-query.ts";
 import { useKeyboardNav } from "@/hooks/use-keyboard-nav.ts";
+import { useSidebar } from "@/components/ui/sidebar.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from "@/components/ui/empty.tsx";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -18,8 +27,25 @@ import {
 } from "@/components/ui/sidebar.tsx";
 import { Separator } from "@/components/ui/separator.tsx";
 import { AppSidebar } from "@/components/layout/app-sidebar.tsx";
+import { HeaderBreadcrumbs } from "@/components/layout/header-breadcrumbs.tsx";
+import { Kbd } from "@/components/ui/kbd.tsx";
 import { ArticleList } from "@/components/articles/article-list.tsx";
 import { ReaderPanel } from "@/components/reader/reader-panel.tsx";
+
+/**
+ * Listens for the feedzero:toggle-sidebar event and toggles the sidebar.
+ * Must be rendered inside SidebarProvider.
+ */
+function SidebarKeyboardToggle() {
+  const { toggleSidebar } = useSidebar();
+  useEffect(() => {
+    const handler = () => toggleSidebar();
+    document.addEventListener("feedzero:toggle-sidebar", handler);
+    return () =>
+      document.removeEventListener("feedzero:toggle-sidebar", handler);
+  }, [toggleSidebar]);
+  return null;
+}
 
 /**
  * Main page component.
@@ -31,6 +57,7 @@ export function FeedsPage() {
   const navigate = useNavigate();
   const isDesktop = useIsDesktop();
   useKeyboardNav();
+  const feeds = useFeedStore((s) => s.feeds);
   const selectFeed = useFeedStore((s) => s.selectFeed);
   const loadArticles = useArticleStore((s) => s.loadArticles);
   const articles = useArticleStore((s) => s.articles);
@@ -39,9 +66,10 @@ export function FeedsPage() {
   useEffect(() => {
     if (feedId) {
       selectFeed(feedId);
+      selectArticle(null);
       loadArticles(feedId);
     }
-  }, [feedId, selectFeed, loadArticles]);
+  }, [feedId, selectFeed, selectArticle, loadArticles]);
 
   useEffect(() => {
     if (articleId && articles.length > 0) {
@@ -61,7 +89,8 @@ export function FeedsPage() {
 
   function handleFeedSelect(id: string) {
     selectFeed(id);
-    navigate(`/feeds/${id}`);
+    selectArticle(null); // Clear immediately before navigation
+    navigate(`/feeds/${id}`); // Navigate without articleId
   }
 
   function handleArticleSelect(article: { id: string }) {
@@ -82,17 +111,17 @@ export function FeedsPage() {
   if (!isDesktop) {
     return (
       <SidebarProvider defaultOpen={false}>
+        <SidebarKeyboardToggle />
         <AppSidebar onFeedSelect={handleFeedSelect} />
         <SidebarInset>
           <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
             <SidebarTrigger />
+            <Kbd>[</Kbd>
             <Separator
               orientation="vertical"
               className="mr-2 data-[orientation=vertical]:h-4"
             />
-            <span className="text-sm font-medium truncate">
-              {articleId ? "Article" : feedId ? "Articles" : "Feeds"}
-            </span>
+            <HeaderBreadcrumbs fallback={feedId ? "Articles" : "Feeds"} />
           </header>
           <main role="main" className="flex-1 flex flex-col min-h-0">
             {(articleId || feedId) && (
@@ -125,32 +154,58 @@ export function FeedsPage() {
   // Desktop: sidebar + article list + reader pane
   return (
     <SidebarProvider className="h-svh overflow-hidden">
+      <SidebarKeyboardToggle />
       <AppSidebar onFeedSelect={handleFeedSelect} />
       <SidebarInset className="overflow-hidden">
-        <header className="flex h-10 shrink-0 items-center border-b px-2">
+        <header className="flex h-10 shrink-0 items-center border-b px-2 gap-2">
           <SidebarTrigger />
+          <Kbd>[</Kbd>
+          <Separator
+            orientation="vertical"
+            className="data-[orientation=vertical]:h-4"
+          />
+          <HeaderBreadcrumbs />
         </header>
-        <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
-          <ResizablePanel
-            defaultSize="40%"
-            minSize="300px"
-            className="overflow-hidden"
+        {feeds.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center p-8">
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Rss />
+                </EmptyMedia>
+                <EmptyTitle>Get started with FeedZero</EmptyTitle>
+                <EmptyDescription>
+                  Add your first feed using the sidebar
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          </div>
+        ) : (
+          <ResizablePanelGroup
+            direction="horizontal"
+            className="flex-1 min-h-0"
           >
-            <ScrollArea className="h-full">
-              <ArticleList onArticleSelect={handleArticleSelect} />
-            </ScrollArea>
-          </ResizablePanel>
-          <ResizableHandle />
-          <ResizablePanel
-            defaultSize="60%"
-            minSize="300px"
-            className="overflow-hidden"
-          >
-            <ScrollArea className="h-full">
-              <ReaderPanel />
-            </ScrollArea>
-          </ResizablePanel>
-        </ResizablePanelGroup>
+            <ResizablePanel
+              defaultSize="40%"
+              minSize="300px"
+              className="overflow-hidden"
+            >
+              <ScrollArea className="h-full">
+                <ArticleList onArticleSelect={handleArticleSelect} />
+              </ScrollArea>
+            </ResizablePanel>
+            <ResizableHandle />
+            <ResizablePanel
+              defaultSize="60%"
+              minSize="300px"
+              className="overflow-hidden"
+            >
+              <ScrollArea className="h-full">
+                <ReaderPanel />
+              </ScrollArea>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        )}
       </SidebarInset>
     </SidebarProvider>
   );

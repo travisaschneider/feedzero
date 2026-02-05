@@ -15,6 +15,13 @@ const STATUS_COLOR_CLASS: Record<SyncStatus, string> = {
   error: "text-sync-error bg-sync-error-bg",
 };
 
+const STATUS_HOVER_CLASS: Record<SyncStatus, string> = {
+  "local-only": "hover:bg-amber-600 hover:text-white",
+  syncing: "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+  synced: "hover:bg-green-700 hover:text-white",
+  error: "hover:bg-red-700 hover:text-white",
+};
+
 export function SyncStatusChip() {
   const status = useSyncStore((s) => s.status);
   const setDialogOpen = useSyncStore((s) => s.setDialogOpen);
@@ -26,7 +33,7 @@ export function SyncStatusChip() {
   return (
     <button
       onClick={() => setDialogOpen(true)}
-      className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-xs hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition-colors w-full ${colorClass}`}
+      className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-all duration-200 w-full ${colorClass} ${STATUS_HOVER_CLASS[status]}`}
     >
       <Icon
         className={`size-3.5 ${status === "syncing" ? "animate-spin" : ""}`}

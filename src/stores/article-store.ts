@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { getArticles, updateArticle } from "../core/storage/db.ts";
 import { useSyncStore } from "./sync-store.ts";
+import { useFeedStore } from "./feed-store.ts";
 import type { Article } from "../types/index.ts";
 
 interface ArticleStore {
@@ -18,7 +19,7 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
   isLoading: false,
 
   loadArticles: async (feedId) => {
-    set({ isLoading: true });
+    set({ articles: [], selectedArticle: null, isLoading: true });
     const result = await getArticles(feedId);
     set({
       articles: result.ok ? result.value : [],
@@ -28,6 +29,16 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
 
   selectArticle: async (article) => {
     if (!article) {
+      set({ selectedArticle: null });
+      return;
+    }
+
+    // Validate article belongs to current feed
+    const currentFeedId = useFeedStore.getState().selectedFeedId;
+    if (currentFeedId && article.feedId !== currentFeedId) {
+      console.warn(
+        `Rejecting article selection: article.feedId (${article.feedId}) !== selectedFeedId (${currentFeedId})`,
+      );
       set({ selectedArticle: null });
       return;
     }

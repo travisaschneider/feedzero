@@ -58,4 +58,16 @@ describe("WelcomeStep", () => {
 
     expect(useOnboardingStore.getState().step).toBe("storage-choice");
   });
+
+  it("shows Enter kbd hint on Get Started button", () => {
+    renderInDialog(<WelcomeStep />);
+    const button = screen.getByRole("button", { name: /get started/i });
+    expect(button.querySelector("kbd")).toHaveTextContent("Enter");
+  });
+
+  it("Get Started button has autoFocus", () => {
+    renderInDialog(<WelcomeStep />);
+    const button = screen.getByRole("button", { name: /get started/i });
+    expect(button).toHaveFocus();
+  });
 });

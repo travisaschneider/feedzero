@@ -38,6 +38,13 @@ describe("AddFeedForm", () => {
     });
   });
 
+  it("uses input-group for consistent input+button height", () => {
+    const { container } = render(<AddFeedForm onAdded={onAdded} />);
+    expect(
+      container.querySelector("[data-slot='input-group']"),
+    ).toBeInTheDocument();
+  });
+
   it("input has inputMode url", () => {
     render(<AddFeedForm onAdded={onAdded} />);
     expect(screen.getByLabelText("Feed URL")).toHaveAttribute(
@@ -61,16 +68,26 @@ describe("AddFeedForm", () => {
     expect(screen.getByRole("form")).toHaveAttribute("aria-label", "Add feed");
   });
 
-  it("submit button is disabled during loading", () => {
+  it("submit button shows pending text during loading", () => {
     useFeedStore.setState({ isLoading: true });
     render(<AddFeedForm onAdded={onAdded} />);
-    expect(screen.getByRole("button", { name: "Add" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: /adding feed/i }),
+    ).toBeInTheDocument();
   });
 
-  it("input is disabled during loading", () => {
+  it("submit button has aria-busy during loading", () => {
     useFeedStore.setState({ isLoading: true });
     render(<AddFeedForm onAdded={onAdded} />);
-    expect(screen.getByLabelText("Feed URL")).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: /adding feed/i }),
+    ).toHaveAttribute("aria-busy", "true");
+  });
+
+  it("input is hidden during loading", () => {
+    useFeedStore.setState({ isLoading: true });
+    render(<AddFeedForm onAdded={onAdded} />);
+    expect(screen.queryByLabelText("Feed URL")).not.toBeInTheDocument();
   });
 
   it("calls addFeed with entered URL on submit", async () => {
@@ -79,7 +96,10 @@ describe("AddFeedForm", () => {
     useFeedStore.setState({ addFeed, error: null });
 
     render(<AddFeedForm onAdded={onAdded} />);
-    await user.type(screen.getByLabelText("Feed URL"), "https://example.com/feed");
+    await user.type(
+      screen.getByLabelText("Feed URL"),
+      "https://example.com/feed",
+    );
     await user.click(screen.getByRole("button", { name: "Add" }));
 
     expect(addFeed).toHaveBeenCalledWith("https://example.com/feed");
@@ -150,6 +170,45 @@ describe("AddFeedForm", () => {
 
     await waitFor(() => {
       expect(input).toHaveValue("");
+    });
+  });
+
+  it("calls onCancel when Escape is pressed in input", async () => {
+    const user = userEvent.setup();
+    const onCancel = vi.fn();
+    render(<AddFeedForm onAdded={onAdded} onCancel={onCancel} />);
+    const input = screen.getByLabelText("Feed URL");
+    await user.click(input);
+    await user.keyboard("{Escape}");
+    expect(onCancel).toHaveBeenCalled();
+  });
+
+  it("does not call onCancel when other keys are pressed", async () => {
+    const user = userEvent.setup();
+    const onCancel = vi.fn();
+    render(<AddFeedForm onAdded={onAdded} onCancel={onCancel} />);
+    const input = screen.getByLabelText("Feed URL");
+    await user.click(input);
+    await user.keyboard("hello");
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
+  it("calls onFeedSelect with new feed ID after successful add", async () => {
+    const user = userEvent.setup();
+    const onFeedSelect = vi.fn();
+    useFeedStore.setState({
+      addFeed: vi.fn().mockImplementation(async () => {
+        useFeedStore.setState({ selectedFeedId: "new-feed-123" });
+      }),
+      error: null,
+    });
+
+    render(<AddFeedForm onAdded={onAdded} onFeedSelect={onFeedSelect} />);
+    await user.type(screen.getByLabelText("Feed URL"), "https://example.com");
+    await user.click(screen.getByRole("button", { name: "Add" }));
+
+    await waitFor(() => {
+      expect(onFeedSelect).toHaveBeenCalledWith("new-feed-123");
     });
   });
 
