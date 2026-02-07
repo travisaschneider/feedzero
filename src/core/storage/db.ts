@@ -11,7 +11,6 @@ interface DexieRecord {
   ciphertext?: number[];
   url?: string;
   feedId?: string;
-  publishedAt?: number;
   guid?: string;
   [key: string]: unknown;
 }
@@ -27,9 +26,14 @@ let cryptoKey: CryptoKey | null = null;
 export async function open(passphrase: string): Promise<Result<boolean>> {
   try {
     db = new Dexie(DB_NAME);
-    db.version(DB_VERSION).stores({
+    db.version(2).stores({
       feeds: "id, &url",
       articles: "id, feedId, publishedAt, [feedId+guid]",
+      meta: "key",
+    });
+    db.version(DB_VERSION).stores({
+      feeds: "id, &url",
+      articles: "id, feedId, [feedId+guid]",
       meta: "key",
     });
 
@@ -336,8 +340,6 @@ async function putEncrypted(
     const d = data as Record<string, unknown>;
     if (d.url !== undefined) record.url = d.url as string;
     if (d.feedId !== undefined) record.feedId = d.feedId as string;
-    if (d.publishedAt !== undefined)
-      record.publishedAt = d.publishedAt as number;
     if (d.guid !== undefined) record.guid = d.guid as string;
 
     await db!.table(table).put(record);

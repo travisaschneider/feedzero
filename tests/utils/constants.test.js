@@ -12,7 +12,7 @@ import {
 describe("Constants", () => {
   it("should define database config", () => {
     expect(DB_NAME).toBe("feedzero");
-    expect(DB_VERSION).toBe(2);
+    expect(DB_VERSION).toBe(3);
   });
 
   it("should define crypto params with secure defaults", () => {

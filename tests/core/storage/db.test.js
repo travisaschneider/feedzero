@@ -246,6 +246,38 @@ describe("Database", () => {
       expect(rawData[0].title).toBeUndefined();
       expect(rawData[0].description).toBeUndefined();
     });
+
+    it("should not store publishedAt as a plaintext index field on articles", async () => {
+      const feed = unwrap(
+        createFeed({ url: "https://example.com/rss", title: "Feed" }),
+      );
+      await addFeed(feed);
+      const article = unwrap(
+        createArticle({
+          feedId: feed.id,
+          title: "Post",
+          link: "https://example.com/1",
+          publishedAt: 1700000000000,
+        }),
+      );
+      await addArticles([article]);
+
+      const rawData = await new Promise((resolve) => {
+        const tx = indexedDB.open("feedzero");
+        tx.onsuccess = () => {
+          const rawDb = tx.result;
+          const rtx = rawDb.transaction("articles", "readonly");
+          const req = rtx.objectStore("articles").getAll();
+          req.onsuccess = () => {
+            rawDb.close();
+            resolve(req.result);
+          };
+        };
+      });
+
+      expect(rawData).toHaveLength(1);
+      expect(rawData[0].publishedAt).toBeUndefined();
+    });
   });
 
   describe("getArticleByGuid", () => {
