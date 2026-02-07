@@ -158,13 +158,14 @@ All API handlers use the Web standard `Request -> Response` pattern. Three entry
 | `src/utils/base64.ts` | Base64 encode/decode for vault ciphertext |
 | `src/core/sync/types.ts` | `VaultData`, `EncryptedVault`, `SyncStorageAdapter` interfaces |
 | `src/core/sync/vault-crypto.ts` | Vault ID derivation, key derivation, encrypt/decrypt |
-| `src/core/sync/sync-service.ts` | Client-side orchestration: export, import, push, pull, delete, checkVaultExists, mergeVaults |
+| `src/core/sync/sync-service.ts` | Client-side orchestration: export, import, push, pull, delete, checkVaultExists, mergeVaults. Pads vault payloads to power-of-2 bucket sizes. |
+| `src/core/storage/key-material.ts` | Key derivation, JWK export/import, localStorage persistence. `deriveAndStoreKeys`, `loadStoredKeys`, `clearStoredKeys` |
 | `src/core/sync/sync-handler.ts` | Server-side `handleSyncRequest(req, adapter)` |
 | `src/core/sync/adapters/memory-adapter.ts` | In-memory storage adapter |
 | `src/core/sync/adapters/filesystem-adapter.ts` | Filesystem storage adapter |
 | `src/core/sync/adapters/vercel-blob-adapter.ts` | Vercel Blob storage adapter |
 | `src/core/sync/adapters/resolve-adapter.ts` | Reads `SYNC_STORAGE` env var, returns adapter |
-| `src/stores/sync-store.ts` | Zustand store: `enableSync`, `push`, `pull`, `scheduleSyncPush`, `logout`, `switchToExistingCloud` |
+| `src/stores/sync-store.ts` | Zustand store: `enableSync`, `push`, `pull`, `scheduleSyncPush` (5s debounce + 0-30s jitter), `logout`, `switchToExistingCloud`. Stores `credentials: SyncCredentials | null` (not raw passphrase). |
 | `server.ts` | Hono standalone server |
 | `api/sync.ts` | Vercel serverless wrapper (pre-bundled during build, ADR 007) |
 
@@ -179,7 +180,8 @@ All API handlers use the Web standard `Request -> Response` pattern. Three entry
 | `tests/core/sync/sync-handler.test.ts` | GET/PUT validation, 404/400/413 errors |
 | `tests/core/sync/adapters/memory-adapter.test.ts` | CRUD operations |
 | `tests/core/sync/adapters/filesystem-adapter.test.ts` | File I/O, directory creation, path traversal |
-| `tests/stores/sync-store.test.ts` | State transitions, debounce, localStorage persistence |
+| `tests/core/storage/key-material.test.ts` | deriveAndStoreKeys, loadStoredKeys, clearStoredKeys |
+| `tests/stores/sync-store.test.ts` | State transitions, debounce, credentials persistence |
 | `tests/stores/sync-store-switch.test.ts` | switchToExistingCloud replace/merge modes |
 | `tests/server.test.ts` | Hono app route mounting |
 | `tests/app.test.tsx` | Sync-aware initialization |
@@ -189,7 +191,7 @@ All API handlers use the Web standard `Request -> Response` pattern. Three entry
 
 - **Deterministic salt derivation** — The passphrase alone is sufficient to derive both vault ID and encryption key. No external state needed on new devices.
 - **Vault ID and encryption key are cryptographically independent** — Different PBKDF2 salts ensure the server-side lookup key reveals nothing about the encryption key.
-- **Passphrase in localStorage** — Accepted trade-off. Threat model is zero-knowledge server, not physical device security.
+- **Derived keys in localStorage, passphrase discarded** — Raw passphrase is never persisted. Derived JWK keys (DB key, HMAC key, optionally vault key + vault ID) are stored instead. Stolen keys can decrypt local data but cannot recover the passphrase or access the cloud vault from another device. Legacy users with stored passphrases are auto-migrated on first load.
 - **Full-state sync, last-write-wins** — Entire vault uploaded/downloaded as one blob. Acceptable for Phase 1.
 - **Storage adapter pattern** — Vendor-neutral. Default is filesystem for self-hosting; Vercel Blob is opt-in.
 - **Hono standalone server** — 14kB Web standard framework. Runs on Node, Deno, Bun. Same `Request/Response` API as handlers.

@@ -28,7 +28,7 @@ User enters feed URL in AddFeedForm
   Normalizes URL + checks for duplicate in DB
       │
       ▼
-  fetch(/api/feed?url=...) via CORS proxy
+  POST /api/feed via CORS proxy
       │
       ▼
   validator.ts → Detects JSON Feed, RSS 2.0, or Atom 1.0
@@ -62,7 +62,7 @@ User clicks "Extracted" in ViewToggle
   extraction-store.fetchExtracted(url)
       │
       ▼
-  fetch(/api/page?url=...) via CORS proxy
+  POST /api/page via CORS proxy
       │
       ▼
   extractor.ts → defuddle-extractor.ts (Defuddle parse)
@@ -116,7 +116,7 @@ IndexedDB (encrypted via Dexie + Web Crypto)
 - **feed-store** — Feed CRUD, selection, refresh. Debounces concurrent refreshAll calls. Triggers sync push after mutations.
 - **article-store** — Article list for selected feed, selection (auto-marks read), read state. Triggers sync push after mark-as-read.
 - **extraction-store** — Extraction cache (link → HTML), view mode toggle, fetch status
-- **sync-store** — Cloud sync state: `enableSync`, `restoreSync`, `push`, `pull`, `scheduleSyncPush` (5s debounce), `disableSync` (deletes server vault + clears local state), `logout` (clears local data, preserves cloud vault). Passphrase persistence in localStorage.
+- **sync-store** — Cloud sync state: `enableSync`, `restoreSync`, `push`, `pull`, `scheduleSyncPush` (5s debounce + 0-30s jitter), `disableSync` (deletes server vault + clears stored keys), `logout` (clears local data, preserves cloud vault). Stores `credentials: SyncCredentials | null` (pre-derived vault ID + CryptoKey); raw passphrase is never persisted.
 
 ## Routing
 
@@ -138,8 +138,8 @@ All API handlers use the Web standard `Request -> Response` pattern via shared h
 
 Endpoints:
 
-- `/api/feed?url=<encoded>` — Proxies RSS/Atom/JSON feed requests (CORS bypass)
-- `/api/page?url=<encoded>` — Proxies web page requests for full-text extraction
+- `POST /api/feed` (body: `{ "url": "..." }`) — Proxies RSS/Atom/JSON feed requests (CORS bypass). Uses POST to keep URLs out of query strings and server logs.
+- `POST /api/page` (body: `{ "url": "..." }`) — Proxies web page requests for full-text extraction.
 - `/api/sync` — GET retrieves encrypted vault, HEAD checks vault existence, PUT stores encrypted vault, DELETE removes encrypted vault
 
 ### SSRF Protection
@@ -193,8 +193,11 @@ main.tsx → app.tsx
 - Salt generated once on first launch, stored in `meta` store, reused on subsequent opens
 - Same passphrase + same salt = same key across sessions
 - Each record encrypted with random 12-byte IV
-- Stored as `{id, iv, ciphertext, ...indexFields}` — content encrypted, index fields in plaintext for Dexie queries
-- Key derived once on app open, held in memory, cleared on close
+- Index fields (url, feedId, guid) are HMAC-SHA256 hashed before storage — deterministic for querying, non-reversible
+- Stored as `{id, iv, ciphertext, url: "<hmac>", feedId: "<hmac>", guid: "<hmac>"}` — content encrypted, index fields hashed
+- On first use, all keys are derived from passphrase, exported as JWK, and persisted to localStorage. The raw passphrase is discarded.
+- On subsequent opens, `openWithKeys()` imports JWKs directly — no passphrase needed.
+- Legacy users with stored passphrases are auto-migrated (keys derived, stored, passphrase removed).
 
 ## Zero-Knowledge Sync
 
@@ -234,8 +237,8 @@ Coverage thresholds: 90% statements/lines/functions, 83% branches. shadcn/ui wra
 
 Dexie.js manages IndexedDB with these stores:
 
-- `feeds` — keyPath: `id`, unique index: `url`
-- `articles` — keyPath: `id`, indexes: `feedId`, `publishedAt`, `[feedId+guid]` (compound, for dedup)
+- `feeds` — keyPath: `id`, unique index: `url` (HMAC-hashed)
+- `articles` — keyPath: `id`, indexes: `feedId` (HMAC-hashed), `[feedId+guid]` (compound, both HMAC-hashed)
 - `meta` — keyPath: `key` (stores encryption salt)
 
 Schema migrations are handled by Dexie's `version().stores()` API.
@@ -250,20 +253,26 @@ Schema migrations are handled by Dexie's `version().stores()` API.
 |--------|------------|
 | Server reading your feed list or articles | All data encrypted client-side before upload; server stores opaque blobs |
 | Server correlating your identity with feeds | Vault ID derived from passphrase via PBKDF2 with different salt than encryption key; server cannot link vault to passphrase |
-| XSS via malicious feed content | All HTML sanitized through DOMPurify before rendering |
+| XSS via malicious feed content | All HTML sanitized through DOMPurify; Content Security Policy headers restrict script/style sources |
 | Malicious feed URLs (SSRF) | Proxy blocks localhost, private IPs (10.x, 172.16-31.x, 192.168.x), link-local (169.254.x), and AWS metadata endpoint |
-| Data persistence after logout | "Delete all data" removes IndexedDB, localStorage, and cloud blob |
+| Passphrase theft from localStorage | Raw passphrase never persisted — only derived JWK key material stored. Stolen keys cannot be used to recover the passphrase or access the vault from a different device. |
+| Feed URL logging by proxy | Proxy uses POST with JSON body; URLs never appear in query strings, access logs, or CDN logs |
+| User IP leaked via favicons | Favicons proxied through the CORS proxy, not loaded directly from publisher servers |
+| Timing analysis of sync patterns | 0-30s random jitter added after debounce; vault payloads padded to power-of-2 bucket sizes |
+| IndexedDB metadata leakage | Index fields (url, feedId, guid) are HMAC-SHA256 hashed — deterministic for queries but non-reversible |
+| User-Agent fingerprinting via proxy | Fixed `User-Agent: FeedZero/1.0` on all outbound proxy requests |
+| Data persistence after logout | "Delete all data" removes IndexedDB, localStorage (including derived keys), and cloud blob |
 
 ### What FeedZero does NOT protect against
 
 | Limitation | Explanation |
 |------------|-------------|
-| **Proxy operator sees feed URLs** | The CORS proxy must know which URLs to fetch. A malicious or compromised proxy operator can log every feed URL you subscribe to. |
+| **Proxy operator sees feed URLs** | The CORS proxy must know which URLs to fetch. A malicious or compromised proxy operator can log every feed URL you subscribe to. Self-hosting mitigates this. |
 | **DNS visibility** | Your ISP/network can see DNS queries for feed domains (unless you use encrypted DNS). |
 | **Feed server logs** | Feed publishers see requests from the proxy's IP, not yours. But if you use a self-hosted proxy, your IP is exposed. |
-| **localStorage passphrase storage** | For usability, the passphrase is stored in localStorage in plaintext. A browser extension or XSS on the same origin could read it. |
-| **Timing attacks** | An observer watching network traffic can infer reading patterns from sync frequency and payload sizes. |
-| **Metadata in IndexedDB** | Index fields (URL, feedId, guid, publishedAt) are stored in plaintext for Dexie queries. Only content fields are encrypted. |
+| **Stolen derived keys enable local decryption** | Derived JWK keys in localStorage can decrypt local IndexedDB data. However, they cannot recover the passphrase or access the cloud vault from another device. |
+| **4-word passphrase brute-force** | 51.7 bits of entropy is strong against online attacks (rate-limited) but potentially vulnerable to offline brute-force if an attacker obtains your encrypted vault. |
+| **No forward secrecy** | If your passphrase is compromised, all historical data encrypted with that passphrase is exposed. |
 
 ### Network Request Inventory
 
@@ -271,13 +280,13 @@ Complete list of all network requests FeedZero makes:
 
 | Request | Trigger | Data Sent | Data Received |
 |---------|---------|-----------|---------------|
-| `GET /api/feed?url=<url>` | Adding feed, refreshing feed | Feed URL (to proxy) | Feed XML/JSON |
-| `GET /api/page?url=<url>` | "Extract full text" button | Page URL (to proxy) | Page HTML |
+| `POST /api/feed` | Adding feed, refreshing feed | `{ "url": "..." }` in body | Feed XML/JSON |
+| `POST /api/page` | "Extract full text" button | `{ "url": "..." }` in body | Page HTML |
+| `POST /api/feed` (favicon) | Displaying feed favicon | `{ "url": "https://example.com/favicon.ico" }` | Icon image |
 | `HEAD /api/sync?vaultId=<id>` | Checking if cloud vault exists | Vault ID | 200/404 status |
 | `GET /api/sync?vaultId=<id>` | Pulling cloud data | Vault ID | Encrypted blob |
-| `PUT /api/sync?vaultId=<id>` | Pushing local data to cloud | Vault ID, encrypted blob | Success/error |
+| `PUT /api/sync?vaultId=<id>` | Pushing local data to cloud | Vault ID, encrypted blob (padded to power-of-2 size) | Success/error |
 | `DELETE /api/sync?vaultId=<id>` | Deleting cloud data | Vault ID | Success/error |
-| `GET <feed-icon-url>` | Displaying feed favicon | Direct browser request | Icon image |
 
 **No other network requests are made.** There is no analytics, no telemetry, no crash reporting, no third-party tracking.
 
@@ -287,6 +296,7 @@ Complete list of all network requests FeedZero makes:
 - Algorithm: AES-GCM with 256-bit key
 - IV: 12 bytes, randomly generated per encryption operation
 - Key derivation: PBKDF2 with SHA-256, 100,000 iterations
+- Index hashing: HMAC-SHA256 with a dedicated key (derived from passphrase with separate salt)
 
 **Cloud sync encryption:**
 
@@ -327,10 +337,10 @@ The server never receives the passphrase or encryption key. It only sees the vau
 | Key | Value | Purpose |
 |-----|-------|---------|
 | `feedzero:onboarding-complete` | `"true"` or absent | Tracks if user completed onboarding |
-| `feedzero:passphrase` | Plaintext passphrase | **Privacy caveat**: Stored unencrypted for session persistence |
+| `feedzero:derived-keys` | JSON with JWK key material | Derived cryptographic keys (DB key, HMAC key, optionally vault key + vault ID) |
 | `feedzero:sync-status` | `"local-only"` / `"synced"` | Current sync mode |
 
-**Why plaintext passphrase?** The passphrase must be available to derive encryption keys on page load. Encrypting it would require another secret, which would need to be stored somewhere — turtles all the way down.
+**Why store derived keys?** On page load, the app needs cryptographic keys to open the database. Storing pre-derived JWK keys avoids re-deriving from the passphrase (which is never persisted). Stolen keys can decrypt local data but cannot recover the passphrase or access the cloud vault from another device. Legacy users with stored passphrases are auto-migrated on first load.
 
 ### Third-Party Dependencies (Runtime)
 
@@ -349,24 +359,20 @@ The server never receives the passphrase or encryption key. It only sees the vau
 
 1. **The proxy is a trust point.** If you don't trust the proxy operator, they can log your feed subscriptions. Self-hosting the proxy shifts trust to your own infrastructure.
 
-2. **localStorage is not encrypted.** Your passphrase is stored in plaintext. A malicious browser extension with access to localStorage could steal it.
+2. **Derived keys in localStorage.** JWK key material is stored in localStorage. A malicious browser extension or same-origin XSS could steal the keys and decrypt local IndexedDB data. However, stolen keys cannot recover the passphrase or access the cloud vault from another device.
 
-3. **Favicon requests bypass the proxy.** Feed icons are loaded directly by the browser, exposing your IP to the feed publisher's icon server.
+3. **4-word passphrases are not uncrackable.** 51.7 bits of entropy is strong against online attacks (rate-limited) but potentially vulnerable to offline brute-force if an attacker obtains your encrypted vault.
 
-4. **4-word passphrases are not uncrackable.** 51.7 bits of entropy is strong against online attacks (rate-limited) but potentially vulnerable to offline brute-force if an attacker obtains your encrypted vault.
+4. **No forward secrecy.** If your passphrase is compromised, all historical data encrypted with that passphrase is exposed.
 
-5. **Index fields in IndexedDB are plaintext.** An attacker with physical access to your device can see feed URLs, article GUIDs, and timestamps — even without the passphrase.
-
-6. **No forward secrecy.** If your passphrase is compromised, all historical data encrypted with that passphrase is exposed.
-
-7. **Sync is all-or-nothing.** The entire vault is uploaded/downloaded on each sync. There's no differential sync or conflict resolution beyond last-write-wins.
+5. **Sync is all-or-nothing.** The entire vault is uploaded/downloaded on each sync. There's no differential sync or conflict resolution beyond last-write-wins.
 
 ### Recommendations for High-Risk Users
 
 - **Self-host the proxy** to eliminate third-party URL logging
 - **Use a longer passphrase** (6+ words) for sync
 - **Use encrypted DNS** (DoH/DoT) to hide feed domain lookups from your ISP
-- **Clear localStorage** when using shared computers
+- **Use "Delete all data"** when leaving shared computers (removes IndexedDB, localStorage keys, and cloud vault)
 - **Disable cloud sync** if you don't need cross-device access
 
 ### Source Verification
@@ -375,10 +381,17 @@ All claims in this document can be verified by reading the source code:
 
 | Claim | Source File |
 |-------|-------------|
-| SSRF protection | `api/feed.ts`, `api/page.ts`, `src/core/proxy/validate-url.ts` |
+| SSRF protection | `src/core/proxy/validate-url.ts`, `src/core/proxy/proxy-handler.ts` |
 | AES-GCM encryption | `src/core/storage/crypto.ts` |
-| PBKDF2 parameters | `src/core/sync/vault-crypto.ts` |
+| HMAC-SHA256 index hashing | `src/core/storage/crypto.ts` (`hmacHash`), `src/core/storage/db.ts` |
+| Key derivation & JWK storage | `src/core/storage/key-material.ts` |
+| PBKDF2 vault parameters | `src/core/sync/vault-crypto.ts` |
 | Passphrase generation | `src/core/crypto/passphrase-generator.ts` |
 | DOMPurify sanitization | `src/core/parser/sanitizer.ts` |
+| CSP headers | `vercel.json`, `server.ts` |
+| Favicon proxying | `src/components/feeds/feed-favicon.tsx` |
+| Sync timing jitter | `src/stores/sync-store.ts` (`scheduleSyncPush`) |
+| Payload padding | `src/core/sync/sync-service.ts` |
+| Normalized User-Agent | `src/core/proxy/proxy-handler.ts` |
 | Sync handler | `src/core/sync/sync-handler.ts`, `api/sync.ts` |
 | IndexedDB schema | `src/core/storage/db.ts` |
