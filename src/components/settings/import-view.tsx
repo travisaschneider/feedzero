@@ -106,15 +106,11 @@ export function ImportView({ onClose }: ImportViewProps) {
 
       // Process each URL sequentially
       for (const url of urls) {
-        try {
-          await addFeed(url);
+        const result = await addFeed(url);
+        if (result.ok) {
           recordResult({ url, success: true });
-        } catch (err) {
-          recordResult({
-            url,
-            success: false,
-            error: err instanceof Error ? err.message : "Unknown error",
-          });
+        } else {
+          recordResult({ url, success: false, error: result.error });
         }
       }
     } catch (err) {

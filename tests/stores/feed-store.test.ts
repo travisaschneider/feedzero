@@ -94,15 +94,31 @@ describe("feed-store", () => {
       expect(useFeedStore.getState().selectedFeedId).toBe("new");
     });
 
-    it("sets error on failure", async () => {
+    it("sets error on failure and returns error result", async () => {
       vi.mocked(addFeedFlow).mockResolvedValue({
         ok: false,
         error: "not a feed",
       });
 
-      await useFeedStore.getState().addFeed("https://bad.com");
+      const result = await useFeedStore.getState().addFeed("https://bad.com");
 
       expect(useFeedStore.getState().error).toBe("not a feed");
+      expect(result).toEqual({ ok: false, error: "not a feed" });
+    });
+
+    it("returns ok result on success", async () => {
+      const feed = mockFeed("new", "New Feed");
+      vi.mocked(addFeedFlow).mockResolvedValue({
+        ok: true,
+        value: { feed, articles: [] },
+      });
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [feed] });
+
+      const result = await useFeedStore
+        .getState()
+        .addFeed("https://new.com/feed");
+
+      expect(result).toEqual({ ok: true, value: undefined });
     });
   });
 

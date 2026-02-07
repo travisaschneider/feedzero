@@ -11,6 +11,7 @@ import {
 } from "../core/feeds/feed-service.ts";
 import { useSyncStore } from "./sync-store.ts";
 import type { Feed } from "../types/index.ts";
+import type { Result } from "../utils/result.ts";
 
 interface FeedStore {
   feeds: Feed[];
@@ -20,7 +21,7 @@ interface FeedStore {
   refreshingFeedIds: Set<string>;
   error: string | null;
   loadFeeds: () => Promise<void>;
-  addFeed: (url: string) => Promise<void>;
+  addFeed: (url: string) => Promise<Result<void>>;
   removeFeed: (feedId: string) => Promise<void>;
   selectFeed: (feedId: string) => void;
   refreshAll: () => Promise<void>;
@@ -49,7 +50,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     const result = await addFeedFlow(url);
     if (!result.ok) {
       set({ isLoading: false, error: result.error });
-      return;
+      return { ok: false, error: result.error } as const;
     }
     const allFeeds = await getFeeds();
     set({
@@ -58,6 +59,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       isLoading: false,
     });
     useSyncStore.getState().scheduleSyncPush();
+    return { ok: true, value: undefined } as const;
   },
 
   removeFeed: async (feedId) => {

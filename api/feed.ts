@@ -9,3 +9,7 @@ import { handleProxyRequest } from "../src/core/proxy/proxy-handler.ts";
 export async function GET(req: Request): Promise<Response> {
   return handleProxyRequest(req, "text/xml");
 }
+
+export async function POST(req: Request): Promise<Response> {
+  return handleProxyRequest(req, "text/xml");
+}
