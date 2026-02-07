@@ -133,7 +133,7 @@ Endpoints:
 
 - `/api/feed?url=<encoded>` — Proxies RSS/Atom/JSON feed requests (CORS bypass)
 - `/api/page?url=<encoded>` — Proxies web page requests for full-text extraction
-- `/api/sync` — GET retrieves encrypted vault, PUT stores encrypted vault, DELETE removes encrypted vault
+- `/api/sync` — GET retrieves encrypted vault, HEAD checks vault existence, PUT stores encrypted vault, DELETE removes encrypted vault
 
 ### SSRF Protection
 

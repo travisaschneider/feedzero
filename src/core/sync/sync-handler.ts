@@ -95,9 +95,13 @@ type MethodHandler = (
  * Maps each supported HTTP method to its handler function.
  * This is the single source of truth — SUPPORTED_METHODS is derived from it
  * so the two cannot drift apart.
+ *
+ * HEAD reuses handleGet — per HTTP/1.1 spec (RFC 7231), HEAD returns the same
+ * status and headers as GET but with no body. The HTTP layer strips the body.
  */
 const methodHandlers: Record<string, MethodHandler> = {
   GET: handleGet,
+  HEAD: handleGet,
   PUT: handlePut,
   DELETE: handleDelete,
 };

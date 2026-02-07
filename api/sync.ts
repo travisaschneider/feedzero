@@ -22,3 +22,7 @@ export async function PUT(req: Request): Promise<Response> {
 export async function DELETE(req: Request): Promise<Response> {
   return handleSyncRequest(req, adapter);
 }
+
+export async function HEAD(req: Request): Promise<Response> {
+  return handleSyncRequest(req, adapter);
+}

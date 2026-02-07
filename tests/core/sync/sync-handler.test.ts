@@ -183,6 +183,50 @@ describe("sync-handler", () => {
     });
   });
 
+  describe("HEAD", () => {
+    function makeHeadRequest(vaultId: string): Request {
+      return new Request(`http://localhost/api/sync?vaultId=${vaultId}`, {
+        method: "HEAD",
+      });
+    }
+
+    it("returns 200 for existing vault", async () => {
+      const vaultId = "1".repeat(64);
+      await adapter.put(vaultId, '{"ok":true,"vault":{}}');
+
+      const response = await handleSyncRequest(
+        makeHeadRequest(vaultId),
+        adapter,
+      );
+      expect(response.status).toBe(200);
+    });
+
+    it("returns 404 for non-existent vault", async () => {
+      const vaultId = "2".repeat(64);
+      const response = await handleSyncRequest(
+        makeHeadRequest(vaultId),
+        adapter,
+      );
+      expect(response.status).toBe(404);
+    });
+
+    it("returns 400 for missing vaultId", async () => {
+      const request = new Request("http://localhost/api/sync", {
+        method: "HEAD",
+      });
+      const response = await handleSyncRequest(request, adapter);
+      expect(response.status).toBe(400);
+    });
+
+    it("returns 400 for invalid vaultId", async () => {
+      const response = await handleSyncRequest(
+        makeHeadRequest("not-valid-hex"),
+        adapter,
+      );
+      expect(response.status).toBe(400);
+    });
+  });
+
   describe("unsupported method", () => {
     it("returns 405 for PATCH", async () => {
       const request = new Request("http://localhost/api/sync", {
