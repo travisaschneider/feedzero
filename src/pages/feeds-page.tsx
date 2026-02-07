@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router";
+import { Rss } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useIsDesktop } from "@/hooks/use-media-query.ts";
@@ -7,6 +8,13 @@ import { useKeyboardNav } from "@/hooks/use-keyboard-nav.ts";
 import { useSidebar } from "@/components/ui/sidebar.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from "@/components/ui/empty.tsx";
 import { ALL_FEEDS_ID } from "@/utils/constants.ts";
 import {
   ResizablePanelGroup,
@@ -70,6 +78,24 @@ function SidebarAddFeedOpener() {
     return () => document.removeEventListener("feedzero:add-feed", handler);
   }, [open, setOpen, isMobile, setOpenMobile]);
   return null;
+}
+
+/** Shown when the user has no feeds yet. */
+function EmptyFeedsState() {
+  return (
+    <Empty className="flex-1">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <Rss />
+        </EmptyMedia>
+        <EmptyTitle>No feeds yet</EmptyTitle>
+        <EmptyDescription>
+          Add your first feed by clicking the + button in the sidebar or
+          pressing <Kbd>N</Kbd>.
+        </EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+  );
 }
 
 /**
@@ -181,9 +207,7 @@ export function FeedsPage() {
               {feedId ? (
                 <ArticleList onArticleSelect={handleArticleSelect} />
               ) : (
-                <div className="p-4 text-muted-foreground text-sm">
-                  Open the sidebar to select a feed.
-                </div>
+                <EmptyFeedsState />
               )}
             </div>
           </main>
@@ -204,27 +228,34 @@ export function FeedsPage() {
           <Kbd>[</Kbd>
           <HeaderBreadcrumbs />
         </header>
-        <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
-          <ResizablePanel
-            defaultSize="40%"
-            minSize="300px"
-            className="overflow-hidden"
+        {feeds.length === 0 ? (
+          <EmptyFeedsState />
+        ) : (
+          <ResizablePanelGroup
+            direction="horizontal"
+            className="flex-1 min-h-0"
           >
-            <ScrollArea className="h-full">
-              <ArticleList onArticleSelect={handleArticleSelect} />
-            </ScrollArea>
-          </ResizablePanel>
-          <ResizableHandle />
-          <ResizablePanel
-            defaultSize="60%"
-            minSize="300px"
-            className="overflow-hidden"
-          >
-            <ScrollArea className="h-full">
-              <ReaderPanel />
-            </ScrollArea>
-          </ResizablePanel>
-        </ResizablePanelGroup>
+            <ResizablePanel
+              defaultSize="40%"
+              minSize="300px"
+              className="overflow-hidden"
+            >
+              <ScrollArea className="h-full">
+                <ArticleList onArticleSelect={handleArticleSelect} />
+              </ScrollArea>
+            </ResizablePanel>
+            <ResizableHandle />
+            <ResizablePanel
+              defaultSize="60%"
+              minSize="300px"
+              className="overflow-hidden"
+            >
+              <ScrollArea className="h-full">
+                <ReaderPanel />
+              </ScrollArea>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        )}
       </SidebarInset>
     </SidebarProvider>
   );

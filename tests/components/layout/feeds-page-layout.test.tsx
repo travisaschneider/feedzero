@@ -75,14 +75,13 @@ describe("FeedsPage layout — desktop", () => {
     });
   });
 
-  it("always shows panels regardless of feed count", () => {
-    // Panels are always shown - empty states are handled within ArticleList/ReaderPanel
+  it("does not show panels when there are no feeds", () => {
     useFeedStore.setState({ feeds: [] });
     const { container } = renderPage();
     const panelGroup = container.querySelector(
       "[data-slot='resizable-panel-group']",
     );
-    expect(panelGroup).not.toBeNull();
+    expect(panelGroup).toBeNull();
   });
 
   it("shows panels when feeds exist", () => {

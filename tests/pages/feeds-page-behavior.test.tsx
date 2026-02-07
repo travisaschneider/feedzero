@@ -131,6 +131,26 @@ describe("FeedsPage behavior — desktop", () => {
     resetStores();
   });
 
+  it("shows empty state when there are no feeds", () => {
+    const { container } = renderPage("/feeds");
+
+    expect(screen.getByText("No feeds yet")).toBeInTheDocument();
+    expect(
+      container.querySelector("[data-slot='resizable-panel-group']"),
+    ).toBeNull();
+  });
+
+  it("shows panels instead of empty state when feeds exist", () => {
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+
+    const { container } = renderPage("/feeds");
+
+    expect(screen.queryByText("No feeds yet")).not.toBeInTheDocument();
+    expect(
+      container.querySelector("[data-slot='resizable-panel-group']"),
+    ).not.toBeNull();
+  });
+
   it("selects feed from URL on mount", () => {
     useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
 
@@ -243,9 +263,11 @@ describe("FeedsPage behavior — mobile", () => {
     expect(screen.getByText("Articles")).toBeInTheDocument();
   });
 
-  it("shows open-sidebar prompt at /feeds root", () => {
+  it("shows empty state when there are no feeds", () => {
     renderPage("/feeds");
-    expect(screen.getByText(/open the sidebar/i)).toBeInTheDocument();
+
+    expect(screen.getByText("No feeds yet")).toBeInTheDocument();
+    expect(screen.queryByText(/open the sidebar/i)).not.toBeInTheDocument();
   });
 
   it("Back button navigates from article to article list and stays there", async () => {
