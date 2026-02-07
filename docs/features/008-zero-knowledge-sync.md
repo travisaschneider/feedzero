@@ -66,6 +66,34 @@ Feature: Zero-knowledge cloud sync
     Then they are guided through passphrase generation and confirmation
     And their data is encrypted and pushed to the server
 
+  Scenario: Local-only user switches to existing cloud account (replace)
+    Given a local-only user with feeds
+    And a cloud account exists with different feeds
+    When they click "Use existing cloud account" in the Data & Storage dialog
+    And enter the existing passphrase
+    And choose "Replace local with cloud"
+    Then their local feeds are deleted
+    And the cloud feeds are imported
+    And they become a sync-enabled user
+
+  Scenario: Local-only user switches to existing cloud account (merge)
+    Given a local-only user with feeds
+    And a cloud account exists with different feeds
+    When they click "Use existing cloud account" in the Data & Storage dialog
+    And enter the existing passphrase
+    And choose "Merge feeds"
+    Then their local feeds are preserved
+    And the cloud feeds are merged (duplicates by URL skipped)
+    And the merged vault is pushed to the server
+    And they become a sync-enabled user
+
+  Scenario: Invalid passphrase shows error
+    Given a local-only user
+    When they click "Use existing cloud account" in the Data & Storage dialog
+    And enter an invalid passphrase
+    Then they see an error "No cloud data found for this passphrase"
+    And can try again or cancel
+
   Scenario: Server never sees plaintext
     Given any sync operation
     Then the server only stores/retrieves opaque encrypted blobs
@@ -100,6 +128,9 @@ Same passphrase always produces same vault ID and same encryption key. No extern
 6. **After mutations**: Debounced push (5s after last change)
 7. **Disable sync**: Delete server vault -> clear localStorage keys -> reset store to local-only
 8. **Logout**: Delete local DB -> clear all localStorage keys -> reset to onboarding (cloud vault preserved)
+9. **Check vault exists**: HEAD `/api/sync?vaultId=<hex>` -> returns true if 200, false if 404
+10. **Switch to existing cloud (replace)**: Check vault exists -> pull vault -> `importAll()` (clears local) -> set status to synced
+11. **Switch to existing cloud (merge)**: Check vault exists -> pull cloud vault -> export local vault -> merge by URL/guid -> `importAll()` -> push merged vault
 
 ### Storage Adapter Pattern
 
@@ -126,13 +157,13 @@ All API handlers use the Web standard `Request -> Response` pattern. Three entry
 | `src/utils/base64.ts` | Base64 encode/decode for vault ciphertext |
 | `src/core/sync/types.ts` | `VaultData`, `EncryptedVault`, `SyncStorageAdapter` interfaces |
 | `src/core/sync/vault-crypto.ts` | Vault ID derivation, key derivation, encrypt/decrypt |
-| `src/core/sync/sync-service.ts` | Client-side orchestration: export, import, push, pull, delete |
+| `src/core/sync/sync-service.ts` | Client-side orchestration: export, import, push, pull, delete, checkVaultExists, mergeVaults |
 | `src/core/sync/sync-handler.ts` | Server-side `handleSyncRequest(req, adapter)` |
 | `src/core/sync/adapters/memory-adapter.ts` | In-memory storage adapter |
 | `src/core/sync/adapters/filesystem-adapter.ts` | Filesystem storage adapter |
 | `src/core/sync/adapters/vercel-blob-adapter.ts` | Vercel Blob storage adapter |
 | `src/core/sync/adapters/resolve-adapter.ts` | Reads `SYNC_STORAGE` env var, returns adapter |
-| `src/stores/sync-store.ts` | Zustand store: `enableSync`, `push`, `pull`, `scheduleSyncPush`, `logout` |
+| `src/stores/sync-store.ts` | Zustand store: `enableSync`, `push`, `pull`, `scheduleSyncPush`, `logout`, `switchToExistingCloud` |
 | `server.ts` | Hono standalone server |
 | `api/sync.ts` | Vercel serverless wrapper (pre-bundled during build, ADR 007) |
 
@@ -143,12 +174,15 @@ All API handlers use the Web standard `Request -> Response` pattern. Three entry
 | `tests/utils/base64.test.ts` | Round-trip encoding |
 | `tests/core/sync/vault-crypto.test.ts` | Determinism, hex format, encrypt/decrypt, wrong-key failure |
 | `tests/core/sync/sync-service.test.ts` | Export, import, push, pull with mocked fetch |
+| `tests/core/sync/sync-service-switch.test.ts` | checkVaultExists, mergeVaults (feed/article deduplication) |
 | `tests/core/sync/sync-handler.test.ts` | GET/PUT validation, 404/400/413 errors |
 | `tests/core/sync/adapters/memory-adapter.test.ts` | CRUD operations |
 | `tests/core/sync/adapters/filesystem-adapter.test.ts` | File I/O, directory creation, path traversal |
 | `tests/stores/sync-store.test.ts` | State transitions, debounce, localStorage persistence |
+| `tests/stores/sync-store-switch.test.ts` | switchToExistingCloud replace/merge modes |
 | `tests/server.test.ts` | Hono app route mounting |
 | `tests/app.test.tsx` | Sync-aware initialization |
+| `tests/e2e/sync.spec.ts` | E2E tests for existing cloud account flow |
 
 ## Design Decisions
 
@@ -158,6 +192,7 @@ All API handlers use the Web standard `Request -> Response` pattern. Three entry
 - **Full-state sync, last-write-wins** — Entire vault uploaded/downloaded as one blob. Acceptable for Phase 1.
 - **Storage adapter pattern** — Vendor-neutral. Default is filesystem for self-hosting; Vercel Blob is opt-in.
 - **Hono standalone server** — 14kB Web standard framework. Runs on Node, Deno, Bun. Same `Request/Response` API as handlers.
+- **Merge by URL for feeds, by guid for articles** — When merging local and cloud vaults, feeds are deduplicated by URL (local preferred for duplicates). Articles are deduplicated by guid. Cloud article feedIds are remapped to local feed ids when the parent feed URL matches.
 
 ## Limitations
 

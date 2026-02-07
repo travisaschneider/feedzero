@@ -8,6 +8,8 @@ import {
   Trash2,
   AlertTriangle,
   LogOut,
+  ShieldCheck,
+  KeyRound,
 } from "lucide-react";
 import {
   Dialog,
@@ -21,13 +23,26 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { generatePassphrase } from "@/core/crypto/passphrase-generator";
 import { useSyncStore } from "@/stores/sync-store";
+import { useFeedStore } from "@/stores/feed-store";
 import { useAppStore } from "@/stores/app-store";
+import { checkVaultExists, pullVault } from "@/core/sync/sync-service";
 import { toast } from "sonner";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 
-type SetupStep = "passphrase" | "syncing" | "done";
+type SetupStep = "passphrase" | "confirm" | "syncing" | "done";
+type ExistingStep =
+  | "passphrase"
+  | "checking"
+  | "merge-options"
+  | "syncing"
+  | "done"
+  | "error";
+type MergeMode = "replace" | "merge";
 type DialogView =
   | "status"
   | "setup"
+  | "existing"
   | "confirm-delete"
   | "confirm-disable"
   | "confirm-logout";
@@ -110,7 +125,9 @@ export function SyncSetupDialog() {
   const enableSync = useSyncStore((s) => s.enableSync);
   const disableSync = useSyncStore((s) => s.disableSync);
   const logout = useSyncStore((s) => s.logout);
+  const switchToExistingCloud = useSyncStore((s) => s.switchToExistingCloud);
   const resetApp = useAppStore((s) => s.resetApp);
+  const localFeedCount = useFeedStore((s) => s.feeds.length);
   const open = useSyncStore((s) => s.dialogOpen);
   const onOpenChange = useSyncStore((s) => s.setDialogOpen);
 
@@ -122,6 +139,15 @@ export function SyncSetupDialog() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isDisabling, setIsDisabling] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [confirmInput, setConfirmInput] = useState("");
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+
+  // Existing cloud flow state
+  const [existingStep, setExistingStep] = useState<ExistingStep>("passphrase");
+  const [existingPassphrase, setExistingPassphrase] = useState("");
+  const [existingError, setExistingError] = useState<string | null>(null);
+  const [cloudFeedCount, setCloudFeedCount] = useState(0);
+  const [mergeMode, setMergeMode] = useState<MergeMode>("replace");
 
   // Reset all internal state when dialog closes
   useEffect(() => {
@@ -134,6 +160,14 @@ export function SyncSetupDialog() {
       setIsDeleting(false);
       setIsDisabling(false);
       setIsLoggingOut(false);
+      setConfirmInput("");
+      setConfirmError(null);
+      // Existing cloud flow state
+      setExistingStep("passphrase");
+      setExistingPassphrase("");
+      setExistingError(null);
+      setCloudFeedCount(0);
+      setMergeMode("replace");
     }
   }, [open]);
 
@@ -178,6 +212,58 @@ export function SyncSetupDialog() {
     setIsLoggingOut(true);
     await logout();
     handleOpenChange(false);
+  }
+
+  function handleStartExisting() {
+    setExistingStep("passphrase");
+    setExistingPassphrase("");
+    setExistingError(null);
+    setView("existing");
+  }
+
+  async function handleCheckExistingPassphrase() {
+    setExistingStep("checking");
+    setExistingError(null);
+
+    const existsResult = await checkVaultExists(existingPassphrase);
+    if (!existsResult.ok) {
+      setExistingError(existsResult.error);
+      setExistingStep("error");
+      return;
+    }
+
+    if (!existsResult.value) {
+      setExistingError(
+        "No cloud data found for this passphrase. Check that you entered it correctly.",
+      );
+      setExistingStep("error");
+      return;
+    }
+
+    // Vault exists, get feed count for merge options UI
+    const pullResult = await pullVault(existingPassphrase);
+    if (!pullResult.ok) {
+      setExistingError(pullResult.error);
+      setExistingStep("error");
+      return;
+    }
+
+    setCloudFeedCount(pullResult.value.feeds.length);
+    setExistingStep("merge-options");
+  }
+
+  async function handleExistingCloudSwitch() {
+    setExistingStep("syncing");
+
+    const result = await switchToExistingCloud(existingPassphrase, mergeMode);
+    if (!result.ok) {
+      setExistingError(result.error);
+      setExistingStep("error");
+      return;
+    }
+
+    setExistingStep("done");
+    toast.success("Connected to cloud account");
   }
 
   const getStatusDescription = () => {
@@ -238,10 +324,66 @@ export function SyncSetupDialog() {
               </label>
 
               <DialogFooter>
-                <Button onClick={handleEnable} disabled={!saved}>
-                  Enable sync
+                <Button
+                  onClick={() => setSetupStep("confirm")}
+                  disabled={!saved}
+                >
+                  Continue
                 </Button>
               </DialogFooter>
+            </>
+          )}
+
+          {setupStep === "confirm" && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Confirm your secret key</DialogTitle>
+                <DialogDescription>
+                  Enter your secret key to confirm you've saved it correctly.
+                </DialogDescription>
+              </DialogHeader>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const normalized = confirmInput.toLowerCase().trim();
+                  const expected = passphrase.toLowerCase().trim();
+                  if (normalized === expected) {
+                    setConfirmError(null);
+                    handleEnable();
+                  } else {
+                    setConfirmError("That doesn't match. Try again.");
+                  }
+                }}
+              >
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    placeholder="Enter your secret key"
+                    value={confirmInput}
+                    onChange={(e) => {
+                      setConfirmInput(e.target.value);
+                      setConfirmError(null);
+                    }}
+                    autoComplete="off"
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  />
+                  {confirmError && (
+                    <p className="text-sm text-destructive">{confirmError}</p>
+                  )}
+                </div>
+
+                <DialogFooter className="mt-4 flex-row gap-2 sm:justify-between">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setSetupStep("passphrase")}
+                  >
+                    Back
+                  </Button>
+                  <Button type="submit">Enable sync</Button>
+                </DialogFooter>
+              </form>
             </>
           )}
 
@@ -269,10 +411,197 @@ export function SyncSetupDialog() {
                 </DialogDescription>
               </DialogHeader>
               <div className="flex justify-center py-4">
-                <Cloud className="size-10 text-primary" />
+                <div className="flex size-16 items-center justify-center rounded-full bg-green-100">
+                  <ShieldCheck className="size-8 text-green-600" />
+                </div>
               </div>
               <DialogFooter>
                 <Button onClick={() => handleOpenChange(false)}>Done</Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // --- Existing cloud account flow ---
+  if (view === "existing") {
+    return (
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent
+          showCloseButton={
+            existingStep !== "checking" && existingStep !== "syncing"
+          }
+        >
+          {existingStep === "passphrase" && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Use existing cloud account</DialogTitle>
+                <DialogDescription>
+                  Enter your passphrase to connect to an existing cloud account.
+                </DialogDescription>
+              </DialogHeader>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (existingPassphrase.trim()) {
+                    handleCheckExistingPassphrase();
+                  }
+                }}
+              >
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    placeholder="Enter your passphrase"
+                    value={existingPassphrase}
+                    onChange={(e) => setExistingPassphrase(e.target.value)}
+                    autoComplete="off"
+                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  />
+                </div>
+
+                <DialogFooter className="mt-4 flex-row gap-2 sm:justify-between">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setView("status")}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={!existingPassphrase.trim()}>
+                    Connect
+                  </Button>
+                </DialogFooter>
+              </form>
+            </>
+          )}
+
+          {existingStep === "checking" && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Checking passphrase</DialogTitle>
+                <DialogDescription>
+                  Looking for your cloud account...
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex justify-center py-6">
+                <Loader2 className="size-8 animate-spin text-muted-foreground" />
+              </div>
+            </>
+          )}
+
+          {existingStep === "merge-options" && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Cloud account found</DialogTitle>
+                <DialogDescription>
+                  Found {cloudFeedCount} feed{cloudFeedCount !== 1 ? "s" : ""}{" "}
+                  in cloud.
+                  {localFeedCount > 0 &&
+                    ` You have ${localFeedCount} local feed${localFeedCount !== 1 ? "s" : ""}.`}
+                </DialogDescription>
+              </DialogHeader>
+
+              <RadioGroup
+                value={mergeMode}
+                onValueChange={(v) => setMergeMode(v as MergeMode)}
+                className="space-y-3"
+              >
+                <div className="flex items-start space-x-3">
+                  <RadioGroupItem value="replace" id="replace" />
+                  <div className="space-y-1">
+                    <Label htmlFor="replace" className="font-medium">
+                      Replace local with cloud
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Your local feeds will be deleted.
+                    </p>
+                  </div>
+                </div>
+                {localFeedCount > 0 && (
+                  <div className="flex items-start space-x-3">
+                    <RadioGroupItem value="merge" id="merge" />
+                    <div className="space-y-1">
+                      <Label htmlFor="merge" className="font-medium">
+                        Merge feeds
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Keep both local and cloud feeds. Duplicates will be
+                        skipped.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </RadioGroup>
+
+              <DialogFooter className="mt-4 flex-row gap-2 sm:justify-between">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setView("status")}
+                >
+                  Cancel
+                </Button>
+                <Button onClick={handleExistingCloudSwitch}>Continue</Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {existingStep === "syncing" && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Switching to cloud</DialogTitle>
+                <DialogDescription>
+                  {mergeMode === "merge"
+                    ? "Merging and syncing your feeds..."
+                    : "Importing your cloud data..."}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex justify-center py-6">
+                <Loader2 className="size-8 animate-spin text-muted-foreground" />
+              </div>
+            </>
+          )}
+
+          {existingStep === "done" && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Connected to cloud</DialogTitle>
+                <DialogDescription>
+                  Your feeds are now synced with your cloud account.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex justify-center py-4">
+                <div className="flex size-16 items-center justify-center rounded-full bg-green-100">
+                  <ShieldCheck className="size-8 text-green-600" />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button onClick={() => handleOpenChange(false)}>Done</Button>
+              </DialogFooter>
+            </>
+          )}
+
+          {existingStep === "error" && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Could not connect</DialogTitle>
+                <DialogDescription>{existingError}</DialogDescription>
+              </DialogHeader>
+              <div className="flex justify-center py-4">
+                <div className="flex size-16 items-center justify-center rounded-full bg-destructive/10">
+                  <AlertTriangle className="size-8 text-destructive" />
+                </div>
+              </div>
+              <DialogFooter className="flex-row gap-2 sm:justify-between">
+                <Button variant="outline" onClick={() => setView("status")}>
+                  Cancel
+                </Button>
+                <Button onClick={() => setExistingStep("passphrase")}>
+                  Try again
+                </Button>
               </DialogFooter>
             </>
           )}
@@ -358,7 +687,7 @@ export function SyncSetupDialog() {
 
         {/* Sync actions — enable or disable */}
         {status === "local-only" && (
-          <div className="border-t pt-4">
+          <div className="border-t pt-4 space-y-2">
             <Button
               variant="outline"
               className="w-full"
@@ -366,6 +695,14 @@ export function SyncSetupDialog() {
             >
               <Cloud className="mr-2 size-4" />
               Enable sync
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={handleStartExisting}
+            >
+              <KeyRound className="mr-2 size-4" />
+              Use existing cloud account
             </Button>
           </div>
         )}

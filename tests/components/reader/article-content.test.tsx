@@ -4,15 +4,13 @@ import { ArticleContent } from "@/components/reader/article-content.tsx";
 
 describe("ArticleContent", () => {
   it("renders sanitized HTML content", () => {
-    const { container } = render(
-      <ArticleContent html="<p>Hello world</p>" />,
-    );
+    const { container } = render(<ArticleContent html="<p>Hello world</p>" />);
     expect(container.querySelector("p")?.textContent).toBe("Hello world");
   });
 
   it("strips script tags via DOMPurify", () => {
     const { container } = render(
-      <ArticleContent html='<p>Safe</p><script>var x = 1;</script>' />,
+      <ArticleContent html="<p>Safe</p><script>var x = 1;</script>" />,
     );
     expect(container.querySelector("script")).toBeNull();
     expect(container.textContent).toContain("Safe");
@@ -33,11 +31,10 @@ describe("ArticleContent", () => {
     expect(wrapper?.className).toContain("max-w-180");
   });
 
-  it("has animation classes", () => {
+  it("has leading-relaxed class for readability", () => {
     const { container } = render(<ArticleContent html="<p>text</p>" />);
     const wrapper = container.firstElementChild;
-    expect(wrapper?.className).toContain("animate-in");
-    expect(wrapper?.className).toContain("fade-in");
+    expect(wrapper?.className).toContain("leading-relaxed");
   });
 
   it("handles empty string without error", () => {

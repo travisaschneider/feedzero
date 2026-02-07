@@ -130,11 +130,11 @@ describe("AppSidebar layout structure", () => {
       refreshingFeedIds: new Set(),
     });
     const { container } = renderSidebar();
-    const header = container.querySelector("[data-sidebar='header']");
-    // J/K hints shown (can navigate articles)
-    expect(header!.textContent).toMatch(/articles/i);
+    const footer = container.querySelector("[data-sidebar='footer']");
+    // J/K hints shown in footer (can navigate articles)
+    expect(footer!.textContent).toMatch(/article/i);
     // U/I hints hidden (only one feed, no need to switch)
-    expect(header!.textContent).not.toMatch(/\bfeeds\b/i);
+    expect(footer!.textContent).not.toMatch(/previous feed/i);
   });
 
   it("shows both U/I and J/K hints when multiple feeds exist", () => {
@@ -166,9 +166,9 @@ describe("AppSidebar layout structure", () => {
       refreshingFeedIds: new Set(),
     });
     const { container } = renderSidebar();
-    const header = container.querySelector("[data-sidebar='header']");
-    // Both hints shown (textContent concatenates without spaces, so "UI feeds" becomes "UIfeeds")
-    expect(header!.textContent).toMatch(/articles/i);
-    expect(header!.textContent).toMatch(/feeds/i);
+    const footer = container.querySelector("[data-sidebar='footer']");
+    // Both hints shown in footer
+    expect(footer!.textContent).toMatch(/article/i);
+    expect(footer!.textContent).toMatch(/previous feed/i);
   });
 });

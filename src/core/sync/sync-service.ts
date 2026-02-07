@@ -131,3 +131,84 @@ export async function pullVault(
     return err(`Sync pull failed: ${(e as Error).message}`);
   }
 }
+
+/**
+ * Check if a vault exists on the server for the given passphrase.
+ * Uses HEAD request to avoid downloading the entire vault.
+ */
+export async function checkVaultExists(
+  passphrase: string,
+): Promise<Result<boolean>> {
+  try {
+    const vaultIdResult = await deriveVaultId(passphrase);
+    if (!vaultIdResult.ok) return vaultIdResult;
+
+    const response = await fetch(`/api/sync?vaultId=${vaultIdResult.value}`, {
+      method: "HEAD",
+    });
+
+    if (response.status === 404) {
+      return ok(false);
+    }
+
+    if (!response.ok) {
+      const text = await response.text();
+      return err(`Check vault failed (${response.status}): ${text}`);
+    }
+
+    return ok(true);
+  } catch (e) {
+    return err(`Check vault failed: ${(e as Error).message}`);
+  }
+}
+
+/**
+ * Merge two vaults, deduplicating feeds by URL and articles by guid.
+ * Local versions are preferred for duplicates.
+ */
+export function mergeVaults(
+  localVault: VaultData,
+  cloudVault: VaultData,
+): Result<VaultData> {
+  // Build map of local feeds by URL
+  const localFeedsByUrl = new Map(localVault.feeds.map((f) => [f.url, f]));
+
+  // Build feed ID remapping for cloud feeds that have a local equivalent
+  const feedIdRemap = new Map<string, string>();
+
+  // Merge feeds: all local + cloud feeds not in local
+  const mergedFeeds = [...localVault.feeds];
+  for (const cloudFeed of cloudVault.feeds) {
+    const localFeed = localFeedsByUrl.get(cloudFeed.url);
+    if (localFeed) {
+      // Duplicate feed - map cloud feedId to local feedId
+      feedIdRemap.set(cloudFeed.id, localFeed.id);
+    } else {
+      // New feed from cloud
+      mergedFeeds.push(cloudFeed);
+    }
+  }
+
+  // Build map of local articles by guid
+  const localArticlesByGuid = new Map(
+    localVault.articles.map((a) => [a.guid, a]),
+  );
+
+  // Merge articles: all local + cloud articles not in local (with feedId remapping)
+  const mergedArticles = [...localVault.articles];
+  for (const cloudArticle of cloudVault.articles) {
+    if (!localArticlesByGuid.has(cloudArticle.guid)) {
+      // Remap feedId if the feed was deduplicated
+      const remappedFeedId =
+        feedIdRemap.get(cloudArticle.feedId) ?? cloudArticle.feedId;
+      mergedArticles.push({ ...cloudArticle, feedId: remappedFeedId });
+    }
+  }
+
+  return ok({
+    version: SYNC.FORMAT_VERSION,
+    exportedAt: Date.now(),
+    feeds: mergedFeeds,
+    articles: mergedArticles,
+  });
+}

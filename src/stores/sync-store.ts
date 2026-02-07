@@ -4,13 +4,19 @@ import {
   pullVault,
   importVault,
   deleteVault,
+  exportVault,
+  mergeVaults,
 } from "../core/sync/sync-service";
 import { deleteDatabase } from "../core/storage/db.ts";
 import { LOCAL_STORAGE } from "../utils/constants.ts";
+import type { Result } from "../utils/result.ts";
+import { ok, err } from "../utils/result.ts";
 
 export type SyncStatus = "local-only" | "syncing" | "synced" | "error";
 
 const DEBOUNCE_MS = 5000;
+
+type SwitchMode = "replace" | "merge";
 
 interface SyncStore {
   status: SyncStatus;
@@ -34,6 +40,15 @@ interface SyncStore {
   /** Schedule a debounced push (5s after last call). */
   scheduleSyncPush: () => void;
   setDialogOpen: (open: boolean) => void;
+  /**
+   * Switch from local-only to an existing cloud account.
+   * - replace: Delete local data, import cloud data.
+   * - merge: Merge local and cloud data, push merged result.
+   */
+  switchToExistingCloud: (
+    passphrase: string,
+    mode: SwitchMode,
+  ) => Promise<Result<boolean>>;
 }
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -158,4 +173,77 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
   },
 
   setDialogOpen: (open) => set({ dialogOpen: open }),
+
+  switchToExistingCloud: async (passphrase, mode) => {
+    set({ status: "syncing", error: null });
+
+    if (mode === "replace") {
+      // Replace mode: pull cloud vault, import it (clears local data)
+      const pullResult = await pullVault(passphrase);
+      if (!pullResult.ok) {
+        set({ status: "error", error: pullResult.error });
+        return pullResult;
+      }
+
+      const importResult = await importVault(pullResult.value);
+      if (!importResult.ok) {
+        set({ status: "error", error: importResult.error });
+        return importResult;
+      }
+
+      // Store passphrase and transition to synced
+      localStorage.setItem(LOCAL_STORAGE.SYNC_PASSPHRASE, passphrase);
+      localStorage.setItem(LOCAL_STORAGE.STORAGE_MODE, "sync");
+      set({
+        passphrase,
+        status: "synced",
+        lastSyncedAt: Date.now(),
+        error: null,
+      });
+      return ok(true);
+    }
+
+    // Merge mode: export local, pull cloud, merge, import, push
+    const exportResult = await exportVault();
+    if (!exportResult.ok) {
+      set({ status: "error", error: exportResult.error });
+      return exportResult;
+    }
+
+    const pullResult = await pullVault(passphrase);
+    if (!pullResult.ok) {
+      set({ status: "error", error: pullResult.error });
+      return pullResult;
+    }
+
+    const mergeResult = mergeVaults(exportResult.value, pullResult.value);
+    if (!mergeResult.ok) {
+      set({ status: "error", error: mergeResult.error });
+      return mergeResult;
+    }
+
+    const importResult = await importVault(mergeResult.value);
+    if (!importResult.ok) {
+      set({ status: "error", error: importResult.error });
+      return importResult;
+    }
+
+    // Push merged vault to cloud
+    const pushResult = await pushVault(passphrase);
+    if (!pushResult.ok) {
+      set({ status: "error", error: pushResult.error });
+      return err(pushResult.error);
+    }
+
+    // Store passphrase and transition to synced
+    localStorage.setItem(LOCAL_STORAGE.SYNC_PASSPHRASE, passphrase);
+    localStorage.setItem(LOCAL_STORAGE.STORAGE_MODE, "sync");
+    set({
+      passphrase,
+      status: "synced",
+      lastSyncedAt: pushResult.value,
+      error: null,
+    });
+    return ok(true);
+  },
 }));

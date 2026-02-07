@@ -91,7 +91,7 @@ export function App() {
             <Route path="*" element={<Navigate to="/feeds" replace />} />
           </Routes>
         </AppInit>
-        <Toaster />
+        <Toaster position="bottom-center" />
       </BrowserRouter>
       <OnboardingModal />
       <SyncSetupDialog />

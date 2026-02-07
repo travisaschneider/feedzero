@@ -57,14 +57,17 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
 
     if (!article.read) {
       const updated = { ...article, read: true };
-      set({ selectedArticle: updated });
-      await updateArticle(updated);
+      // Batch both updates atomically to prevent intermediate render states
       set({
+        selectedArticle: updated,
         articles: get().articles.map((a) =>
-          a.id === article.id ? { ...a, read: true } : a,
+          a.id === article.id ? updated : a,
         ),
       });
-      useSyncStore.getState().scheduleSyncPush();
+      // Persist to DB after UI update (fire-and-forget for responsiveness)
+      updateArticle(updated).then(() => {
+        useSyncStore.getState().scheduleSyncPush();
+      });
     } else {
       set({ selectedArticle: article });
     }

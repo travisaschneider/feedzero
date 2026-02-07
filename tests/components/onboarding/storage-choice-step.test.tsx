@@ -144,9 +144,74 @@ describe("StorageChoiceStep", () => {
     expect(useOnboardingStore.getState().step).toBe("recovery");
   });
 
-  it("shows Tab kbd hint for navigating options", () => {
+  it("shows number kbd hints (1, 2, 3) for selecting options", () => {
     renderInDialog(<StorageChoiceStep />);
-    expect(screen.getByText("Tab")).toBeInTheDocument();
+    expect(screen.getByText("1")).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument();
+  });
+
+  it("pressing 1 selects local option", async () => {
+    const user = userEvent.setup();
+    renderInDialog(<StorageChoiceStep />);
+
+    await user.keyboard("1");
+
+    expect(screen.getByRole("radio", { name: /local only/i })).toBeChecked();
+  });
+
+  it("pressing 2 selects sync option", async () => {
+    const user = userEvent.setup();
+    renderInDialog(<StorageChoiceStep />);
+
+    await user.keyboard("2");
+
+    expect(
+      screen.getByRole("radio", { name: /sync across devices/i }),
+    ).toBeChecked();
+  });
+
+  it("pressing 3 selects recovery option", async () => {
+    const user = userEvent.setup();
+    renderInDialog(<StorageChoiceStep />);
+
+    await user.keyboard("3");
+
+    expect(
+      screen.getByRole("radio", { name: /i already have a passphrase/i }),
+    ).toBeChecked();
+  });
+
+  it("displays warning inside local option card when selected", async () => {
+    const user = userEvent.setup();
+    renderInDialog(<StorageChoiceStep />);
+
+    await user.click(screen.getByRole("radio", { name: /local only/i }));
+
+    // Warning should be inside the label (option card)
+    const localOption = screen.getByRole("radio", { name: /local only/i });
+    const label = localOption.closest("label");
+    expect(label).toContainElement(
+      screen.getByText(/your data lives in this browser/i),
+    );
+  });
+
+  it("displays info inside recovery option card when selected", async () => {
+    const user = userEvent.setup();
+    renderInDialog(<StorageChoiceStep />);
+
+    await user.click(
+      screen.getByRole("radio", { name: /i already have a passphrase/i }),
+    );
+
+    // Info should be inside the label (option card)
+    const recoveryOption = screen.getByRole("radio", {
+      name: /i already have a passphrase/i,
+    });
+    const label = recoveryOption.closest("label");
+    expect(label).toContainElement(
+      screen.getByText(/enter your 4-word secret key/i),
+    );
   });
 
   it("shows Enter kbd hint on Continue button", () => {

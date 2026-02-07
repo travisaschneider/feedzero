@@ -140,12 +140,15 @@ describe("FeedsPage behavior — desktop", () => {
     expect(useFeedStore.getState().selectedFeedId).toBe("feed-1");
   });
 
-  it("does not select feed when no feedId in URL", () => {
+  it("auto-navigates to single feed when no feedId in URL", async () => {
     useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
 
     renderPage("/feeds");
 
-    expect(useFeedStore.getState().selectedFeedId).toBeNull();
+    // With one feed, auto-navigates to that feed
+    await vi.waitFor(() => {
+      expect(currentUrl).toBe("/feeds/feed-1");
+    });
   });
 
   it("clears articles when loading new feed", async () => {

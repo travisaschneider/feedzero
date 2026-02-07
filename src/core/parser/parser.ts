@@ -1,6 +1,6 @@
+import { parseFeed } from "feedsmith";
 import { ok, err } from "../../utils/result.ts";
 import type { Result } from "../../utils/result.ts";
-import { validate } from "./validator.ts";
 import { sanitize } from "./sanitizer.ts";
 
 interface ParsedFeed {
@@ -26,136 +26,179 @@ export interface ParseResult {
 }
 
 /**
- * Parse an RSS 2.0, Atom 1.0, or JSON Feed 1.1 string.
+ * Parse an RSS, Atom, RDF, or JSON Feed string using feedsmith.
  */
-export function parse(xml: string, feedUrl: string): Result<ParseResult> {
-  const typeResult = validate(xml);
-  if (!typeResult.ok) return typeResult;
+export function parse(text: string, feedUrl: string): Result<ParseResult> {
+  if (!text || typeof text !== "string" || !text.trim()) {
+    return err("Feed content is empty or not a string");
+  }
 
-  const type = typeResult.value;
-
-  if (type === "jsonfeed") {
+  // Reject JSON that doesn't look like a JSON Feed
+  const trimmed = text.trim();
+  if (trimmed.startsWith("{")) {
     try {
-      return parseJsonFeed(xml, feedUrl);
-    } catch (e) {
-      return err(`Parse error: ${(e as Error).message}`);
+      const json = JSON.parse(trimmed);
+      if (!json.version || !String(json.version).includes("jsonfeed")) {
+        return err("JSON object is not a JSON Feed (missing jsonfeed version)");
+      }
+    } catch {
+      // Not valid JSON, let feedsmith handle the error
     }
   }
 
-  const doc = new DOMParser().parseFromString(xml, "text/xml");
-
   try {
-    if (type === "rss") return parseRss(doc, feedUrl);
-    if (type === "atom") return parseAtom(doc, feedUrl);
-    return err(`Unknown feed type: ${type}`);
+    const result = parseFeed(text);
+    return mapToParseResult(result, feedUrl);
   } catch (e) {
     return err(`Parse error: ${(e as Error).message}`);
   }
 }
 
-function parseRss(doc: Document, feedUrl: string): Result<ParseResult> {
-  const channel = doc.querySelector("channel");
-  if (!channel) return err("RSS feed missing <channel>");
+type FeedsmithResult = ReturnType<typeof parseFeed>;
 
-  const feed: ParsedFeed = {
-    title: text(channel, "title") || feedUrl,
-    description: text(channel, "description") || "",
-    siteUrl: text(channel, "link") || "",
-    url: feedUrl,
-  };
+function mapToParseResult(
+  result: FeedsmithResult,
+  feedUrl: string,
+): Result<ParseResult> {
+  const { format, feed: rawFeed } = result;
 
-  const articles: ParsedArticle[] = [...channel.querySelectorAll("item")].map((item) => ({
-    title: text(item, "title") || "Untitled",
-    link: text(item, "link") || "",
-    content: sanitize(
-      text(item, "content:encoded") || text(item, "description") || "",
-    ),
-    summary: sanitize(text(item, "description") || ""),
-    author: text(item, "author") || text(item, "dc:creator") || "",
-    publishedAt: parseDate(text(item, "pubDate")),
-    guid: text(item, "guid") || text(item, "link") || "",
-  }));
-
-  return ok({ feed, articles });
-}
-
-function parseAtom(doc: Document, feedUrl: string): Result<ParseResult> {
-  const root = doc.documentElement;
-
-  const feed: ParsedFeed = {
-    title: text(root, "title") || feedUrl,
-    description: text(root, "subtitle") || "",
-    siteUrl: linkHref(root, "alternate") || "",
-    url: feedUrl,
-  };
-
-  const articles: ParsedArticle[] = [...root.querySelectorAll("entry")].map((entry) => ({
-    title: text(entry, "title") || "Untitled",
-    link: linkHref(entry, "alternate") || linkHref(entry) || "",
-    content: sanitize(text(entry, "content") || text(entry, "summary") || ""),
-    summary: sanitize(text(entry, "summary") || ""),
-    author: text(entry.querySelector("author"), "name") || "",
-    publishedAt: parseDate(text(entry, "published") || text(entry, "updated")),
-    guid: text(entry, "id") || linkHref(entry) || "",
-  }));
-
-  return ok({ feed, articles });
-}
-
-/** Decode HTML entities that survive XML parsing (double-encoded feeds). */
-function decodeEntities(str: string): string {
-  if (!str || !str.includes("&")) return str;
-  const el = document.createElement("textarea");
-  el.innerHTML = str;
-  return el.textContent || "";
-}
-
-function text(parent: Element | null, tag: string): string {
-  if (!parent) return "";
-  // Use getElementsByTagName for reliable namespaced element lookup
-  // (querySelector fails with namespace-prefixed tags like content:encoded)
-  const els = parent.getElementsByTagName(tag);
-  if (els.length === 0) return "";
-  return decodeEntities((els[0].textContent || "").trim());
-}
-
-function linkHref(parent: Element | null, rel?: string): string {
-  if (!parent) return "";
-  const links = parent.querySelectorAll("link");
-  for (const link of links) {
-    if (!rel || link.getAttribute("rel") === rel) {
-      return link.getAttribute("href") || "";
-    }
+  if (format === "rss" || format === "rdf") {
+    return mapRssFeed(rawFeed, feedUrl);
+  } else if (format === "atom") {
+    return mapAtomFeed(rawFeed, feedUrl);
+  } else if (format === "json") {
+    return mapJsonFeed(rawFeed, feedUrl);
   }
-  return "";
+
+  return err(`Unsupported feed format: ${format}`);
 }
 
-function parseJsonFeed(jsonStr: string, feedUrl: string): Result<ParseResult> {
-  const data = JSON.parse(jsonStr);
+function mapRssFeed(
+  feed: FeedsmithResult["feed"],
+  feedUrl: string,
+): Result<ParseResult> {
+  const rssFeed = feed as Extract<FeedsmithResult, { format: "rss" }>["feed"];
 
-  const feed: ParsedFeed = {
-    title: data.title || feedUrl,
-    description: data.description || "",
-    siteUrl: data.home_page_url || "",
+  const parsedFeed: ParsedFeed = {
+    title: decodeEntities(rssFeed.title || "") || feedUrl,
+    description: decodeEntities(rssFeed.description || ""),
+    siteUrl: rssFeed.link || "",
     url: feedUrl,
   };
 
-  const articles: ParsedArticle[] = (data.items || []).map((item: Record<string, unknown>) => {
+  const articles: ParsedArticle[] = (rssFeed.items || []).map((item) => {
+    // Prefer content:encoded over description for full content
+    const contentEncoded = item.content?.encoded;
+    const description = item.description;
+    const fullContent = contentEncoded || description || "";
+    const summary = description || "";
+
+    // Author: prefer dc:creator, then authors array
+    const dcCreator = item.dc?.creator;
+    const authorFromList = item.authors?.[0];
+    const author =
+      dcCreator ||
+      (typeof authorFromList === "string"
+        ? authorFromList
+        : (authorFromList as { name?: string } | undefined)?.name) ||
+      "";
+
+    return {
+      title: decodeEntities(item.title || "") || "Untitled",
+      link: item.link || "",
+      content: sanitize(decodeEntities(fullContent)),
+      summary: sanitize(decodeEntities(summary)),
+      author: decodeEntities(author),
+      publishedAt: parseDate(item.pubDate),
+      guid: item.guid?.value || item.link || "",
+    };
+  });
+
+  return ok({ feed: parsedFeed, articles });
+}
+
+function mapAtomFeed(
+  feed: FeedsmithResult["feed"],
+  feedUrl: string,
+): Result<ParseResult> {
+  const atomFeed = feed as Extract<FeedsmithResult, { format: "atom" }>["feed"];
+
+  const parsedFeed: ParsedFeed = {
+    title: decodeEntities(atomFeed.title || "") || feedUrl,
+    description: decodeEntities(atomFeed.subtitle || ""),
+    siteUrl: findLink(atomFeed.links, "alternate") || "",
+    url: feedUrl,
+  };
+
+  const articles: ParsedArticle[] = (atomFeed.entries || []).map((entry) => ({
+    title: decodeEntities(entry.title || "") || "Untitled",
+    link: findLink(entry.links, "alternate") || findLink(entry.links) || "",
+    content: sanitize(decodeEntities(entry.content || entry.summary || "")),
+    summary: sanitize(decodeEntities(entry.summary || "")),
+    author: decodeEntities(entry.authors?.[0]?.name || ""),
+    publishedAt: parseDate(entry.published || entry.updated),
+    guid: entry.id || findLink(entry.links) || "",
+  }));
+
+  return ok({ feed: parsedFeed, articles });
+}
+
+function mapJsonFeed(
+  feed: FeedsmithResult["feed"],
+  feedUrl: string,
+): Result<ParseResult> {
+  // feedsmith preserves JSON Feed's snake_case field names
+  const jsonFeed = feed as Record<string, unknown>;
+
+  const parsedFeed: ParsedFeed = {
+    title: (jsonFeed.title as string) || feedUrl,
+    description: (jsonFeed.description as string) || "",
+    siteUrl: (jsonFeed.home_page_url as string) || "",
+    url: feedUrl,
+  };
+
+  const items = (jsonFeed.items as Array<Record<string, unknown>>) || [];
+  const articles: ParsedArticle[] = items.map((item) => {
     const authors = item.authors as Array<{ name?: string }> | undefined;
-    const author = item.author as { name?: string } | undefined;
-    const authorName = authors?.[0]?.name || author?.name || "";
     return {
       title: (item.title as string) || "Untitled",
       link: (item.url as string) || (item.external_url as string) || "",
-      content: sanitize((item.content_html as string) || (item.content_text as string) || ""),
+      content: sanitize(
+        (item.content_html as string) || (item.content_text as string) || "",
+      ),
       summary: sanitize((item.summary as string) || ""),
-      author: authorName,
+      author: authors?.[0]?.name || "",
       publishedAt: parseDate(item.date_published as string),
       guid: (item.id as string) || (item.url as string) || "",
     };
   });
 
-  return ok({ feed, articles });
+  return ok({ feed: parsedFeed, articles });
+}
+
+function findLink(
+  links: Array<{ href?: string; rel?: string }> | undefined,
+  rel?: string,
+): string {
+  if (!links) return "";
+  for (const link of links) {
+    if (!rel || link.rel === rel) {
+      return link.href || "";
+    }
+  }
+  return "";
+}
+
+/**
+ * Decode HTML entities that survive XML parsing (double-encoded feeds).
+ * Handles both numeric (&#39;) and named (&amp;) entities.
+ */
+function decodeEntities(str: string): string {
+  if (!str || !str.includes("&")) return str;
+  // Use a textarea element to decode HTML entities
+  const el = document.createElement("textarea");
+  el.innerHTML = str;
+  return el.textContent || "";
 }
 
 function parseDate(str: string | null | undefined): number | null {

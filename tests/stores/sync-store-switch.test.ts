@@ -1,0 +1,300 @@
+import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
+import { useSyncStore } from "../../src/stores/sync-store";
+
+vi.mock("../../src/core/sync/sync-service", () => ({
+  pushVault: vi.fn(),
+  pullVault: vi.fn(),
+  importVault: vi.fn(),
+  deleteVault: vi.fn(),
+  exportVault: vi.fn(),
+  checkVaultExists: vi.fn(),
+  mergeVaults: vi.fn(),
+}));
+
+vi.mock("../../src/core/storage/db", () => ({
+  deleteDatabase: vi.fn().mockResolvedValue({ ok: true, value: true }),
+}));
+
+import {
+  pushVault,
+  pullVault,
+  importVault,
+  exportVault,
+  mergeVaults,
+} from "../../src/core/sync/sync-service";
+
+const mockPushVault = vi.mocked(pushVault);
+const mockPullVault = vi.mocked(pullVault);
+const mockImportVault = vi.mocked(importVault);
+const mockExportVault = vi.mocked(exportVault);
+const mockMergeVaults = vi.mocked(mergeVaults);
+
+const localStorageMock = (() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: vi.fn((key: string) => store[key] ?? null),
+    setItem: vi.fn((key: string, value: string) => {
+      store[key] = value;
+    }),
+    removeItem: vi.fn((key: string) => {
+      delete store[key];
+    }),
+    clear: vi.fn(() => {
+      store = {};
+    }),
+  };
+})();
+
+Object.defineProperty(globalThis, "localStorage", {
+  value: localStorageMock,
+  writable: true,
+});
+
+const makeVaultData = (feeds: number = 0) => ({
+  version: 1,
+  exportedAt: Date.now(),
+  feeds: Array.from({ length: feeds }, (_, i) => ({
+    id: `feed-${i}`,
+    url: `https://example${i}.com/rss`,
+    title: `Feed ${i}`,
+    description: "",
+    siteUrl: `https://example${i}.com`,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  })),
+  articles: [],
+});
+
+describe("sync-store switchToExistingCloud", () => {
+  beforeEach(() => {
+    localStorageMock.clear();
+    useSyncStore.setState({
+      status: "local-only",
+      lastSyncedAt: null,
+      error: null,
+      passphrase: null,
+      dialogOpen: false,
+    });
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  describe("replace mode", () => {
+    it("pulls cloud vault and imports it (replacing local data)", async () => {
+      const cloudVault = makeVaultData(3);
+      mockPullVault.mockResolvedValue({ ok: true, value: cloudVault });
+      mockImportVault.mockResolvedValue({ ok: true, value: true });
+
+      await useSyncStore
+        .getState()
+        .switchToExistingCloud("cloud-passphrase", "replace");
+
+      expect(mockPullVault).toHaveBeenCalledWith("cloud-passphrase");
+      expect(mockImportVault).toHaveBeenCalledWith(cloudVault);
+    });
+
+    it("transitions to synced state on success", async () => {
+      const cloudVault = makeVaultData(2);
+      mockPullVault.mockResolvedValue({ ok: true, value: cloudVault });
+      mockImportVault.mockResolvedValue({ ok: true, value: true });
+
+      await useSyncStore
+        .getState()
+        .switchToExistingCloud("cloud-passphrase", "replace");
+
+      const state = useSyncStore.getState();
+      expect(state.status).toBe("synced");
+      expect(state.passphrase).toBe("cloud-passphrase");
+      expect(state.lastSyncedAt).toBeTypeOf("number");
+      expect(state.error).toBeNull();
+    });
+
+    it("persists passphrase and storage mode to localStorage", async () => {
+      mockPullVault.mockResolvedValue({ ok: true, value: makeVaultData() });
+      mockImportVault.mockResolvedValue({ ok: true, value: true });
+
+      await useSyncStore
+        .getState()
+        .switchToExistingCloud("cloud-passphrase", "replace");
+
+      expect(localStorageMock.setItem).toHaveBeenCalledWith(
+        "feedzero:sync-passphrase",
+        "cloud-passphrase",
+      );
+      expect(localStorageMock.setItem).toHaveBeenCalledWith(
+        "feedzero:storage-mode",
+        "sync",
+      );
+    });
+
+    it("sets status to syncing during operation", async () => {
+      let capturedStatus: string | null = null;
+      mockPullVault.mockImplementation(async () => {
+        capturedStatus = useSyncStore.getState().status;
+        return { ok: true, value: makeVaultData() };
+      });
+      mockImportVault.mockResolvedValue({ ok: true, value: true });
+
+      await useSyncStore
+        .getState()
+        .switchToExistingCloud("cloud-passphrase", "replace");
+
+      expect(capturedStatus).toBe("syncing");
+    });
+
+    it("returns error when pull fails", async () => {
+      mockPullVault.mockResolvedValue({ ok: false, error: "Vault not found" });
+
+      const result = await useSyncStore
+        .getState()
+        .switchToExistingCloud("bad-passphrase", "replace");
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error).toBe("Vault not found");
+      }
+      expect(useSyncStore.getState().status).toBe("error");
+      expect(mockImportVault).not.toHaveBeenCalled();
+    });
+
+    it("returns error when import fails", async () => {
+      mockPullVault.mockResolvedValue({ ok: true, value: makeVaultData() });
+      mockImportVault.mockResolvedValue({ ok: false, error: "Import failed" });
+
+      const result = await useSyncStore
+        .getState()
+        .switchToExistingCloud("cloud-passphrase", "replace");
+
+      expect(result.ok).toBe(false);
+      expect(useSyncStore.getState().status).toBe("error");
+    });
+
+    it("does not push after replace (cloud already has data)", async () => {
+      mockPullVault.mockResolvedValue({ ok: true, value: makeVaultData() });
+      mockImportVault.mockResolvedValue({ ok: true, value: true });
+
+      await useSyncStore
+        .getState()
+        .switchToExistingCloud("cloud-passphrase", "replace");
+
+      expect(mockPushVault).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("merge mode", () => {
+    it("exports local vault, pulls cloud vault, merges them", async () => {
+      const localVault = makeVaultData(2);
+      const cloudVault = makeVaultData(3);
+      const mergedVault = makeVaultData(5);
+
+      mockExportVault.mockResolvedValue({ ok: true, value: localVault });
+      mockPullVault.mockResolvedValue({ ok: true, value: cloudVault });
+      mockMergeVaults.mockReturnValue({ ok: true, value: mergedVault });
+      mockImportVault.mockResolvedValue({ ok: true, value: true });
+      mockPushVault.mockResolvedValue({ ok: true, value: Date.now() });
+
+      await useSyncStore
+        .getState()
+        .switchToExistingCloud("cloud-passphrase", "merge");
+
+      expect(mockExportVault).toHaveBeenCalled();
+      expect(mockPullVault).toHaveBeenCalledWith("cloud-passphrase");
+      expect(mockMergeVaults).toHaveBeenCalledWith(localVault, cloudVault);
+    });
+
+    it("imports merged vault and pushes to cloud", async () => {
+      const localVault = makeVaultData(2);
+      const cloudVault = makeVaultData(3);
+      const mergedVault = makeVaultData(5);
+
+      mockExportVault.mockResolvedValue({ ok: true, value: localVault });
+      mockPullVault.mockResolvedValue({ ok: true, value: cloudVault });
+      mockMergeVaults.mockReturnValue({ ok: true, value: mergedVault });
+      mockImportVault.mockResolvedValue({ ok: true, value: true });
+      mockPushVault.mockResolvedValue({ ok: true, value: Date.now() });
+
+      await useSyncStore
+        .getState()
+        .switchToExistingCloud("cloud-passphrase", "merge");
+
+      expect(mockImportVault).toHaveBeenCalledWith(mergedVault);
+      expect(mockPushVault).toHaveBeenCalledWith("cloud-passphrase");
+    });
+
+    it("transitions to synced state on success", async () => {
+      mockExportVault.mockResolvedValue({ ok: true, value: makeVaultData(1) });
+      mockPullVault.mockResolvedValue({ ok: true, value: makeVaultData(2) });
+      mockMergeVaults.mockReturnValue({ ok: true, value: makeVaultData(3) });
+      mockImportVault.mockResolvedValue({ ok: true, value: true });
+      mockPushVault.mockResolvedValue({ ok: true, value: Date.now() });
+
+      await useSyncStore
+        .getState()
+        .switchToExistingCloud("cloud-passphrase", "merge");
+
+      const state = useSyncStore.getState();
+      expect(state.status).toBe("synced");
+      expect(state.passphrase).toBe("cloud-passphrase");
+    });
+
+    it("returns error when export fails", async () => {
+      mockExportVault.mockResolvedValue({ ok: false, error: "Export failed" });
+
+      const result = await useSyncStore
+        .getState()
+        .switchToExistingCloud("cloud-passphrase", "merge");
+
+      expect(result.ok).toBe(false);
+      expect(useSyncStore.getState().status).toBe("error");
+      expect(mockPullVault).not.toHaveBeenCalled();
+    });
+
+    it("returns error when pull fails", async () => {
+      mockExportVault.mockResolvedValue({ ok: true, value: makeVaultData(1) });
+      mockPullVault.mockResolvedValue({ ok: false, error: "Pull failed" });
+
+      const result = await useSyncStore
+        .getState()
+        .switchToExistingCloud("cloud-passphrase", "merge");
+
+      expect(result.ok).toBe(false);
+      expect(useSyncStore.getState().status).toBe("error");
+      expect(mockMergeVaults).not.toHaveBeenCalled();
+    });
+
+    it("returns error when merge fails", async () => {
+      mockExportVault.mockResolvedValue({ ok: true, value: makeVaultData(1) });
+      mockPullVault.mockResolvedValue({ ok: true, value: makeVaultData(2) });
+      mockMergeVaults.mockReturnValue({ ok: false, error: "Merge failed" });
+
+      const result = await useSyncStore
+        .getState()
+        .switchToExistingCloud("cloud-passphrase", "merge");
+
+      expect(result.ok).toBe(false);
+      expect(useSyncStore.getState().status).toBe("error");
+      expect(mockImportVault).not.toHaveBeenCalled();
+    });
+
+    it("returns error when push fails (but keeps local merged data)", async () => {
+      const mergedVault = makeVaultData(3);
+      mockExportVault.mockResolvedValue({ ok: true, value: makeVaultData(1) });
+      mockPullVault.mockResolvedValue({ ok: true, value: makeVaultData(2) });
+      mockMergeVaults.mockReturnValue({ ok: true, value: mergedVault });
+      mockImportVault.mockResolvedValue({ ok: true, value: true });
+      mockPushVault.mockResolvedValue({ ok: false, error: "Push failed" });
+
+      const result = await useSyncStore
+        .getState()
+        .switchToExistingCloud("cloud-passphrase", "merge");
+
+      expect(result.ok).toBe(false);
+      expect(useSyncStore.getState().status).toBe("error");
+      // Import should still have been called with merged data
+      expect(mockImportVault).toHaveBeenCalledWith(mergedVault);
+    });
+  });
+});

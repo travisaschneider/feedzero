@@ -63,13 +63,13 @@ describe("AppSidebar states", () => {
     expect(screen.getByText("Beta Feed")).toBeInTheDocument();
   });
 
-  it("refresh all button is disabled and shows text during refresh", () => {
+  it("refresh button is disabled during refresh", () => {
     useFeedStore.setState({
       feeds: [mockFeed("a", "Alpha Feed")],
       isRefreshingAll: true,
     });
     renderSidebar();
-    const refreshBtn = screen.getByRole("button", { name: /refreshing/i });
+    const refreshBtn = screen.getByRole("button", { name: /refresh/i });
     expect(refreshBtn).toBeDisabled();
   });
 
@@ -196,21 +196,21 @@ describe("AppSidebar states", () => {
     expect(keys).not.toContain("R");
   });
 
-  it("shows R keyboard hint in refresh button when feeds exist", () => {
+  it("shows refresh button when feeds exist", () => {
     useFeedStore.setState({
       feeds: [mockFeed("a", "Alpha Feed")],
     });
-    const { container } = renderSidebar();
-    const kbds = container.querySelectorAll("kbd");
-    const keys = Array.from(kbds).map((kbd) => kbd.textContent);
-    expect(keys).toContain("R");
+    renderSidebar();
+    expect(
+      screen.getByRole("button", { name: /refresh/i }),
+    ).toBeInTheDocument();
   });
 
-  it("hides R keyboard hint when no feeds exist", () => {
-    const { container } = renderSidebar();
-    const kbds = container.querySelectorAll("kbd");
-    const keys = Array.from(kbds).map((kbd) => kbd.textContent);
-    expect(keys).not.toContain("R");
+  it("hides refresh button when no feeds exist", () => {
+    renderSidebar();
+    expect(
+      screen.queryByRole("button", { name: /refresh/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("opens add form when feedzero:add-feed event is dispatched", () => {

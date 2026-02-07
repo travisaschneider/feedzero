@@ -1,8 +1,13 @@
 import { useState, useEffect } from "react";
-import { Layers, MoreHorizontal, RefreshCw, Trash2 } from "lucide-react";
+import { Layers, MoreHorizontal, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { ALL_FEEDS_ID } from "@/utils/constants.ts";
 import { Button } from "@/components/ui/button.tsx";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip.tsx";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,9 +19,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog.tsx";
 import {
-  Collapsible,
-  CollapsibleContent,
-} from "@/components/ui/collapsible.tsx";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover.tsx";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -82,63 +88,59 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
       <Sidebar {...props}>
         <SidebarHeader>
           <div className="flex flex-col gap-2 px-2 py-2">
-            <span className="text-lg font-semibold tracking-tight">
-              FeedZero
-            </span>
-            <div className={feeds.length > 0 ? "grid grid-cols-2 gap-2" : ""}>
-              {feeds.length > 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={isRefreshingAll}
-                  onClick={refreshAll}
-                  className="min-w-0 font-mono text-xs"
-                >
-                  <span className="truncate">
-                    {isRefreshingAll ? "Refreshing…" : "Refresh"}
-                  </span>
-                  {!isRefreshingAll && (
-                    <Kbd className="ml-auto shrink-0">R</Kbd>
-                  )}
-                </Button>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setAddFormOpen(!addFormOpen)}
-                className="min-w-0 font-mono text-xs"
-              >
-                <span className="truncate">Add Feed</span>
-                <Kbd className="ml-auto shrink-0">N</Kbd>
-              </Button>
-            </div>
-            {(feeds.length > 1 || feeds.length > 0) && (
-              <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono">
-                {feeds.length > 1 && (
-                  <span className="flex items-center gap-1">
-                    <Kbd>U</Kbd>
-                    <Kbd>I</Kbd> feeds
-                  </span>
-                )}
+            <div className="flex items-center justify-between">
+              <span className="text-lg font-semibold tracking-tight">
+                FeedZero
+              </span>
+              <div className="flex items-center gap-1">
                 {feeds.length > 0 && (
-                  <span className="flex items-center gap-1">
-                    <Kbd>J</Kbd>
-                    <Kbd>K</Kbd> articles
-                  </span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        disabled={isRefreshingAll}
+                        onClick={refreshAll}
+                        className="size-8"
+                      >
+                        <RefreshCw
+                          className={`size-4 ${isRefreshingAll ? "animate-spin" : ""}`}
+                        />
+                        <span className="sr-only">Refresh</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      Refresh <Kbd className="ml-1">R</Kbd>
+                    </TooltipContent>
+                  </Tooltip>
                 )}
+                <Popover open={addFormOpen} onOpenChange={setAddFormOpen}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <PopoverTrigger asChild>
+                        <Button variant="ghost" size="icon" className="size-8">
+                          <Plus className="size-4" />
+                          <span className="sr-only">Add Feed</span>
+                        </Button>
+                      </PopoverTrigger>
+                    </TooltipTrigger>
+                    {!addFormOpen && (
+                      <TooltipContent>
+                        Add Feed <Kbd className="ml-1">N</Kbd>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                  <PopoverContent align="start" variant="form" className="w-80">
+                    <AddFeedForm
+                      onAdded={() => setAddFormOpen(false)}
+                      onCancel={() => setAddFormOpen(false)}
+                      onFeedSelect={onFeedSelect}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
-            )}
+            </div>
           </div>
-
-          <Collapsible open={addFormOpen}>
-            <CollapsibleContent>
-              <AddFeedForm
-                onAdded={() => setAddFormOpen(false)}
-                onCancel={() => setAddFormOpen(false)}
-                onFeedSelect={onFeedSelect}
-              />
-            </CollapsibleContent>
-          </Collapsible>
         </SidebarHeader>
 
         <SidebarContent>
@@ -202,6 +204,26 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
         </SidebarContent>
 
         <SidebarFooter>
+          {feeds.length > 0 && (
+            <div className="flex flex-col gap-1 px-2 text-xs text-muted-foreground font-mono">
+              {feeds.length > 1 && (
+                <>
+                  <span className="flex items-center gap-2">
+                    <Kbd>U</Kbd> previous feed
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <Kbd>I</Kbd> next feed
+                  </span>
+                </>
+              )}
+              <span className="flex items-center gap-2">
+                <Kbd>J</Kbd> next article
+              </span>
+              <span className="flex items-center gap-2">
+                <Kbd>K</Kbd> previous article
+              </span>
+            </div>
+          )}
           <SyncStatusChip />
         </SidebarFooter>
 

@@ -75,16 +75,14 @@ describe("FeedsPage layout — desktop", () => {
     });
   });
 
-  it("shows empty state instead of panels when no feeds", () => {
+  it("always shows panels regardless of feed count", () => {
+    // Panels are always shown - empty states are handled within ArticleList/ReaderPanel
     useFeedStore.setState({ feeds: [] });
     const { container } = renderPage();
-    // Should NOT have resizable panels
     const panelGroup = container.querySelector(
       "[data-slot='resizable-panel-group']",
     );
-    expect(panelGroup).toBeNull();
-    // Should have the empty component
-    expect(container.querySelector("[data-slot='empty']")).not.toBeNull();
+    expect(panelGroup).not.toBeNull();
   });
 
   it("shows panels when feeds exist", () => {
@@ -93,7 +91,6 @@ describe("FeedsPage layout — desktop", () => {
       "[data-slot='resizable-panel-group']",
     );
     expect(panelGroup).not.toBeNull();
-    expect(container.querySelector("[data-slot='empty']")).toBeNull();
   });
 
   it("SidebarProvider wrapper has h-svh and overflow-hidden", () => {
