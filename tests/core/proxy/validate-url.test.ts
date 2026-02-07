@@ -78,6 +78,31 @@ describe("validateProxyUrl", () => {
       expect(result.error).toBe("Access to internal addresses is blocked");
     });
 
+    it("blocks 172.17.x.x (Docker default bridge)", () => {
+      const result = expectErr(validateProxyUrl("http://172.17.0.1/feed"));
+      expect(result.error).toBe("Access to internal addresses is blocked");
+    });
+
+    it("blocks 172.24.x.x (mid-range class B private)", () => {
+      const result = expectErr(validateProxyUrl("http://172.24.0.1/feed"));
+      expect(result.error).toBe("Access to internal addresses is blocked");
+    });
+
+    it("blocks 172.31.x.x (end of class B private range)", () => {
+      const result = expectErr(validateProxyUrl("http://172.31.255.1/feed"));
+      expect(result.error).toBe("Access to internal addresses is blocked");
+    });
+
+    it("allows 172.15.x.x (not in private range)", () => {
+      const result = validateProxyUrl("http://172.15.0.1/feed");
+      expect(result.ok).toBe(true);
+    });
+
+    it("allows 172.32.x.x (not in private range)", () => {
+      const result = validateProxyUrl("http://172.32.0.1/feed");
+      expect(result.ok).toBe(true);
+    });
+
     it("blocks 169.254.169.254 (cloud metadata)", () => {
       const result = expectErr(
         validateProxyUrl("http://169.254.169.254/latest/meta-data/"),

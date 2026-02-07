@@ -8,7 +8,15 @@ const BLOCKED_HOSTNAMES = new Set([
   "169.254.169.254",
 ]);
 
-const BLOCKED_PREFIXES = ["10.", "192.168.", "172.16."];
+const BLOCKED_PREFIXES = ["10.", "192.168."];
+
+/** Checks if hostname is in the 172.16.0.0/12 range (172.16.x.x – 172.31.x.x). */
+function isPrivate172(hostname: string): boolean {
+  const match = hostname.match(/^172\.(\d+)\./);
+  if (!match) return false;
+  const octet = parseInt(match[1], 10);
+  return octet >= 16 && octet <= 31;
+}
 
 /**
  * Validates a URL for proxying: checks for presence, allowed protocols,
@@ -33,7 +41,8 @@ export function validateProxyUrl(url: string | null | undefined): Result<URL> {
   const hostname = parsed.hostname.replace(/^\[|\]$/g, "");
   if (
     BLOCKED_HOSTNAMES.has(hostname) ||
-    BLOCKED_PREFIXES.some((prefix) => hostname.startsWith(prefix))
+    BLOCKED_PREFIXES.some((prefix) => hostname.startsWith(prefix)) ||
+    isPrivate172(hostname)
   ) {
     return err("Access to internal addresses is blocked");
   }
