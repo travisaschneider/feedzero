@@ -219,32 +219,90 @@ describe("Database", () => {
   });
 
   describe("encryption", () => {
-    it("should store data encrypted (raw values are not plaintext)", async () => {
-      const feed = unwrap(
-        createFeed({ url: "https://example.com/rss", title: "Secret Feed" }),
-      );
-      await addFeed(feed);
-
-      // Access raw IndexedDB to verify encryption
-      const rawData = await new Promise((resolve) => {
+    function readRawRecords(table) {
+      return new Promise((resolve) => {
         const tx = indexedDB.open("feedzero");
         tx.onsuccess = () => {
           const rawDb = tx.result;
-          const rtx = rawDb.transaction("feeds", "readonly");
-          const req = rtx.objectStore("feeds").getAll();
+          const rtx = rawDb.transaction(table, "readonly");
+          const req = rtx.objectStore(table).getAll();
           req.onsuccess = () => {
             rawDb.close();
             resolve(req.result);
           };
         };
       });
+    }
+
+    it("should store data encrypted (raw values are not plaintext)", async () => {
+      const feed = unwrap(
+        createFeed({ url: "https://example.com/rss", title: "Secret Feed" }),
+      );
+      await addFeed(feed);
+
+      const rawData = await readRawRecords("feeds");
 
       expect(rawData).toHaveLength(1);
-      // Raw record should have iv and ciphertext, not plaintext content fields
       expect(rawData[0].iv).toBeDefined();
       expect(rawData[0].ciphertext).toBeDefined();
       expect(rawData[0].title).toBeUndefined();
       expect(rawData[0].description).toBeUndefined();
+    });
+
+    it("should store feed url as HMAC hash, not plaintext", async () => {
+      const feed = unwrap(
+        createFeed({ url: "https://example.com/rss", title: "Feed" }),
+      );
+      await addFeed(feed);
+
+      const rawData = await readRawRecords("feeds");
+
+      expect(rawData).toHaveLength(1);
+      expect(rawData[0].url).not.toBe("https://example.com/rss");
+      expect(rawData[0].url).toMatch(/^[0-9a-f]{64}$/);
+    });
+
+    it("should store article guid as HMAC hash, not plaintext", async () => {
+      const feed = unwrap(
+        createFeed({ url: "https://example.com/rss", title: "Feed" }),
+      );
+      await addFeed(feed);
+      const article = unwrap(
+        createArticle({
+          feedId: feed.id,
+          title: "Post",
+          link: "https://example.com/1",
+          guid: "unique-guid-123",
+        }),
+      );
+      await addArticles([article]);
+
+      const rawData = await readRawRecords("articles");
+
+      expect(rawData).toHaveLength(1);
+      expect(rawData[0].guid).not.toBe("unique-guid-123");
+      expect(rawData[0].guid).toMatch(/^[0-9a-f]{64}$/);
+    });
+
+    it("should store article feedId as HMAC hash, not plaintext", async () => {
+      const feed = unwrap(
+        createFeed({ url: "https://example.com/rss", title: "Feed" }),
+      );
+      await addFeed(feed);
+      const article = unwrap(
+        createArticle({
+          feedId: feed.id,
+          title: "Post",
+          link: "https://example.com/1",
+        }),
+      );
+      await addArticles([article]);
+
+      const rawData = await readRawRecords("articles");
+
+      expect(rawData).toHaveLength(1);
+      expect(rawData[0].feedId).not.toBe(feed.id);
+      expect(rawData[0].feedId).toMatch(/^[0-9a-f]{64}$/);
     });
 
     it("should not store publishedAt as a plaintext index field on articles", async () => {
@@ -262,18 +320,7 @@ describe("Database", () => {
       );
       await addArticles([article]);
 
-      const rawData = await new Promise((resolve) => {
-        const tx = indexedDB.open("feedzero");
-        tx.onsuccess = () => {
-          const rawDb = tx.result;
-          const rtx = rawDb.transaction("articles", "readonly");
-          const req = rtx.objectStore("articles").getAll();
-          req.onsuccess = () => {
-            rawDb.close();
-            resolve(req.result);
-          };
-        };
-      });
+      const rawData = await readRawRecords("articles");
 
       expect(rawData).toHaveLength(1);
       expect(rawData[0].publishedAt).toBeUndefined();

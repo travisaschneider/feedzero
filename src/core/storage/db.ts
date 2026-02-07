@@ -2,7 +2,14 @@ import Dexie from "dexie";
 import { ok, err } from "../../utils/result.ts";
 import type { Result } from "../../utils/result.ts";
 import { DB_NAME, DB_VERSION } from "../../utils/constants.ts";
-import { deriveKey, generateSalt, encrypt, decrypt } from "./crypto.ts";
+import {
+  deriveKey,
+  deriveHmacKey,
+  hmacIndex,
+  generateSalt,
+  encrypt,
+  decrypt,
+} from "./crypto.ts";
 import type { Feed, Article } from "../../types/index.ts";
 
 interface DexieRecord {
@@ -17,6 +24,7 @@ interface DexieRecord {
 
 let db: Dexie | null = null;
 let cryptoKey: CryptoKey | null = null;
+let hmacKey: CryptoKey | null = null;
 
 /**
  * Open the database and derive encryption key from passphrase.
@@ -47,6 +55,10 @@ export async function open(passphrase: string): Promise<Result<boolean>> {
     if (!keyResult.ok) return keyResult;
     cryptoKey = keyResult.value;
 
+    const hmacResult = await deriveHmacKey(passphrase);
+    if (!hmacResult.ok) return hmacResult;
+    hmacKey = hmacResult.value;
+
     if (!existing) {
       await db.table("meta").put({ key: "salt", value: Array.from(salt) });
     }
@@ -66,6 +78,7 @@ export function close(): void {
     db = null;
   }
   cryptoKey = null;
+  hmacKey = null;
 }
 
 /**
@@ -84,11 +97,16 @@ export async function deleteDatabase(): Promise<Result<boolean>> {
 
 /**
  * Check if a feed with the given URL already exists, using the
- * plaintext url index. Does not require decryption.
+ * HMAC-hashed url index. Does not require decryption.
  */
 export async function feedExistsByUrl(url: string): Promise<Result<boolean>> {
   try {
-    const count = await db!.table("feeds").where("url").equals(url).count();
+    const hashedUrl = await hmacIndex(hmacKey!, url);
+    const count = await db!
+      .table("feeds")
+      .where("url")
+      .equals(hashedUrl)
+      .count();
     return ok(count > 0);
   } catch (e) {
     return err(`Failed to check feed existence: ${(e as Error).message}`);
@@ -134,12 +152,18 @@ export async function getFeed(id: string): Promise<Result<Feed>> {
  */
 export async function removeFeedsByUrl(url: string): Promise<Result<boolean>> {
   try {
-    const records = await db!.table("feeds").where("url").equals(url).toArray();
+    const hashedUrl = await hmacIndex(hmacKey!, url);
+    const records = await db!
+      .table("feeds")
+      .where("url")
+      .equals(hashedUrl)
+      .toArray();
     for (const record of records) {
+      const hashedFeedId = await hmacIndex(hmacKey!, record.id);
       const articleKeys = await db!
         .table("articles")
         .where("feedId")
-        .equals(record.id)
+        .equals(hashedFeedId)
         .primaryKeys();
       await db!.table("articles").bulkDelete(articleKeys);
       await db!.table("feeds").delete(record.id);
@@ -156,11 +180,12 @@ export async function removeFeedsByUrl(url: string): Promise<Result<boolean>> {
 export async function removeFeed(id: string): Promise<Result<boolean>> {
   try {
     await db!.table("feeds").delete(id);
-    // Delete associated articles by querying the feedId index
+    // Delete associated articles by querying the HMAC-hashed feedId index
+    const hashedFeedId = await hmacIndex(hmacKey!, id);
     const articleKeys = await db!
       .table("articles")
       .where("feedId")
-      .equals(id)
+      .equals(hashedFeedId)
       .primaryKeys();
     await db!.table("articles").bulkDelete(articleKeys);
     return ok(true);
@@ -208,10 +233,11 @@ async function decryptAndSortArticles(raws: DexieRecord[]): Promise<Article[]> {
  */
 export async function getArticles(feedId: string): Promise<Result<Article[]>> {
   try {
+    const hashedFeedId = await hmacIndex(hmacKey!, feedId);
     const raws: DexieRecord[] = await db!
       .table("articles")
       .where("feedId")
-      .equals(feedId)
+      .equals(hashedFeedId)
       .toArray();
     return ok(await decryptAndSortArticles(raws));
   } catch (e) {
@@ -249,10 +275,12 @@ export async function getArticleByGuid(
   guid: string,
 ): Promise<Result<Article | null>> {
   try {
+    const hashedFeedId = await hmacIndex(hmacKey!, feedId);
+    const hashedGuid = await hmacIndex(hmacKey!, guid);
     const raw: DexieRecord | undefined = await db!
       .table("articles")
       .where("[feedId+guid]")
-      .equals([feedId, guid])
+      .equals([hashedFeedId, hashedGuid])
       .first();
     if (!raw || !raw.iv || !raw.ciphertext) return ok(null);
     const result = await decrypt(
@@ -329,18 +357,20 @@ async function putEncrypted(
     if (!encResult.ok) return encResult;
     const { iv, ciphertext } = encResult.value;
 
-    // Store encrypted blob with original indexes preserved for querying
     const record: DexieRecord = {
       id,
       iv: Array.from(iv),
       ciphertext: Array.from(ciphertext),
     };
 
-    // Preserve indexed fields in plaintext for Dexie queries
+    // HMAC-hash indexed fields for Dexie queries (hides plaintext values)
     const d = data as Record<string, unknown>;
-    if (d.url !== undefined) record.url = d.url as string;
-    if (d.feedId !== undefined) record.feedId = d.feedId as string;
-    if (d.guid !== undefined) record.guid = d.guid as string;
+    if (d.url !== undefined)
+      record.url = await hmacIndex(hmacKey!, d.url as string);
+    if (d.feedId !== undefined)
+      record.feedId = await hmacIndex(hmacKey!, d.feedId as string);
+    if (d.guid !== undefined)
+      record.guid = await hmacIndex(hmacKey!, d.guid as string);
 
     await db!.table(table).put(record);
     return ok(true);

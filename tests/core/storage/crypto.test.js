@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   deriveKey,
   deriveBytes,
+  deriveHmacKey,
+  hmacIndex,
   generateSalt,
   encrypt,
   decrypt,
@@ -140,6 +142,69 @@ describe("Crypto", () => {
       ciphertext[0] ^= 0xff;
       const result = await decrypt(key, iv, ciphertext);
       expect(isErr(result)).toBe(true);
+    });
+  });
+
+  describe("deriveHmacKey", () => {
+    it("should derive an HMAC key from a passphrase", async () => {
+      const result = await deriveHmacKey(passphrase);
+      expect(isOk(result)).toBe(true);
+      const key = unwrap(result);
+      expect(key.type).toBe("secret");
+      expect(key.algorithm.name).toBe("HMAC");
+    });
+
+    it("should derive the same key for the same passphrase", async () => {
+      const k1 = unwrap(await deriveHmacKey(passphrase));
+      const k2 = unwrap(await deriveHmacKey(passphrase));
+      // Verify by hashing the same value — should produce identical output
+      const h1 = await hmacIndex(k1, "test-value");
+      const h2 = await hmacIndex(k2, "test-value");
+      expect(h1).toBe(h2);
+    });
+
+    it("should derive different keys for different passphrases", async () => {
+      const k1 = unwrap(await deriveHmacKey("pass-a"));
+      const k2 = unwrap(await deriveHmacKey("pass-b"));
+      const h1 = await hmacIndex(k1, "same-value");
+      const h2 = await hmacIndex(k2, "same-value");
+      expect(h1).not.toBe(h2);
+    });
+  });
+
+  describe("hmacIndex", () => {
+    it("should return a hex string", async () => {
+      const key = unwrap(await deriveHmacKey(passphrase));
+      const hash = await hmacIndex(key, "https://example.com/rss");
+      expect(hash).toMatch(/^[0-9a-f]+$/);
+    });
+
+    it("should return a 64-character hex string (SHA-256)", async () => {
+      const key = unwrap(await deriveHmacKey(passphrase));
+      const hash = await hmacIndex(key, "test");
+      expect(hash).toHaveLength(64);
+    });
+
+    it("should produce deterministic output for the same input", async () => {
+      const key = unwrap(await deriveHmacKey(passphrase));
+      const a = await hmacIndex(key, "https://example.com/rss");
+      const b = await hmacIndex(key, "https://example.com/rss");
+      expect(a).toBe(b);
+    });
+
+    it("should produce different output for different inputs", async () => {
+      const key = unwrap(await deriveHmacKey(passphrase));
+      const a = await hmacIndex(key, "https://a.com/rss");
+      const b = await hmacIndex(key, "https://b.com/rss");
+      expect(a).not.toBe(b);
+    });
+
+    it("should not contain the original value", async () => {
+      const key = unwrap(await deriveHmacKey(passphrase));
+      const url = "https://example.com/rss";
+      const hash = await hmacIndex(key, url);
+      expect(hash).not.toContain("example");
+      expect(hash).not.toContain("rss");
     });
   });
 });

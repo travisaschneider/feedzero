@@ -4,6 +4,7 @@ import { CRYPTO } from "../../utils/constants.ts";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
+const HMAC_SALT = encoder.encode("feedzero:index-hmac:v1");
 
 export interface EncryptedPayload {
   iv: Uint8Array;
@@ -104,6 +105,58 @@ export async function encrypt(
   } catch (e) {
     return err(`Encryption failed: ${(e as Error).message}`);
   }
+}
+
+/**
+ * Derive an HMAC-SHA256 key from a passphrase using PBKDF2 with a
+ * domain-separated static salt. Used to hash index fields before storage
+ * so IndexedDB queries work without exposing plaintext values.
+ */
+export async function deriveHmacKey(
+  passphrase: string,
+): Promise<Result<CryptoKey>> {
+  try {
+    const keyMaterial = await crypto.subtle.importKey(
+      "raw",
+      encoder.encode(passphrase),
+      "PBKDF2",
+      false,
+      ["deriveKey"],
+    );
+    const key = await crypto.subtle.deriveKey(
+      {
+        name: "PBKDF2",
+        salt: HMAC_SALT as BufferSource,
+        iterations: CRYPTO.PBKDF2_ITERATIONS,
+        hash: CRYPTO.HASH,
+      },
+      keyMaterial,
+      { name: "HMAC", hash: CRYPTO.HASH, length: CRYPTO.KEY_LENGTH },
+      false,
+      ["sign"],
+    );
+    return ok(key);
+  } catch (e) {
+    return err(`HMAC key derivation failed: ${(e as Error).message}`);
+  }
+}
+
+/**
+ * Compute an HMAC-SHA256 hash of a value, returned as a 64-character hex string.
+ * Used as a deterministic, non-reversible index field in IndexedDB.
+ */
+export async function hmacIndex(
+  key: CryptoKey,
+  value: string,
+): Promise<string> {
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    encoder.encode(value),
+  );
+  return Array.from(new Uint8Array(signature))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 /**

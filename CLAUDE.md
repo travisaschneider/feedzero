@@ -58,8 +58,8 @@ Full-text extraction is user-initiated: in reader panel, click "Extracted" → f
 
 - **src/utils/result.ts** — Generic `Result<T>` type (`ok`/`err`) used by all core functions instead of throwing. Check `.ok` before accessing `.value`. Includes `andThen` for chaining and `fromPromise` for wrapping async calls.
 - **src/utils/constants.ts** — DB name, crypto params, localStorage key constants (`LOCAL_STORAGE`), default passphrase.
-- **src/core/storage/crypto.ts** — PBKDF2 key derivation + AES-GCM encrypt/decrypt via Web Crypto API.
-- **src/core/storage/db.ts** — Dexie-based storage. All data encrypted at rest. Index fields (url, feedId, publishedAt) stored in plaintext for querying; content fields encrypted. Call `open(passphrase)` before any operations.
+- **src/core/storage/crypto.ts** — PBKDF2 key derivation + AES-GCM encrypt/decrypt + HMAC-SHA256 index hashing via Web Crypto API.
+- **src/core/storage/db.ts** — Dexie-based storage. All data encrypted at rest. Index fields (url, feedId, guid) are HMAC-SHA256 hashed before storage for querying without exposing plaintext; content fields AES-GCM encrypted. Call `open(passphrase)` before any operations.
 - **src/core/storage/schema.ts** — `createFeed()`, `createArticle()` factory functions return Result types.
 - **src/core/discovery/discovery.ts** — `discoverFeed(url)` runs a multi-strategy cascade to find a feed from a website URL.
 - **src/core/discovery/strategies.ts** — Pure functions for each discovery strategy.
@@ -277,7 +277,7 @@ Write detailed commit messages. Use conventional commit prefixes (`feat:`, `fix:
 - Core modules have zero React/UI imports — they are the shared backend
 - Sanitization delegated to DOMPurify — `dangerouslySetInnerHTML` only for pre-sanitized content
 - TypeScript strict mode — no `any` except in type declarations for untyped libraries
-- IndexedDB records store encrypted content + plaintext index fields for Dexie queries
+- IndexedDB records store encrypted content + HMAC-hashed index fields for Dexie queries (no plaintext metadata exposed)
 - Feed format detection tries JSON parse first (for JSON Feed), then XML (for RSS/Atom)
 - XML namespace-prefixed elements (`content:encoded`, `dc:creator`) must use `getElementsByTagName`, never `querySelector`
 

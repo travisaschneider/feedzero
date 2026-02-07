@@ -1,6 +1,6 @@
 # Data Schema
 
-## Version: 2
+## Version: 3
 
 ### Feed
 
@@ -28,7 +28,7 @@ Supported feed formats: RSS 2.0, Atom 1.0, JSON Feed 1.1.
 | content     | string  | Sanitized HTML content              |
 | summary     | string  | Sanitized summary/description       |
 | author      | string  | Author name, default ''             |
-| publishedAt | number  | Unix ms timestamp (indexed), nullable |
+| publishedAt | number  | Unix ms timestamp, nullable           |
 | read        | boolean | Read status, default false          |
 | createdAt   | number  | Unix ms timestamp                   |
 
@@ -42,18 +42,18 @@ Supported feed formats: RSS 2.0, Atom 1.0, JSON Feed 1.1.
 ### IndexedDB Stores
 
 - `feeds` — keyPath: `id`, index: `url` (unique)
-- `articles` — keyPath: `id`, indexes: `feedId`, `publishedAt`, `[feedId+guid]` (compound)
+- `articles` — keyPath: `id`, indexes: `feedId`, `[feedId+guid]` (compound)
 - `meta` — keyPath: `key`
 
 ### Encryption at Rest
 
-Feed and Article content is encrypted. Index fields are stored in plaintext for Dexie queries. The actual IndexedDB record structure is:
+Feed and Article content is encrypted with AES-GCM-256. Index fields (`url`, `feedId`, `guid`) are HMAC-SHA256 hashed before storage so Dexie can query them without exposing plaintext values. The HMAC key is derived from the passphrase via PBKDF2 with a domain-separated static salt (`feedzero:index-hmac:v1`). The actual IndexedDB record structure is:
 
 ```json
-{ "id": "uuid", "iv": [12 bytes], "ciphertext": [encrypted JSON], "url": "...", "feedId": "...", "publishedAt": 123 }
+{ "id": "uuid", "iv": [12 bytes], "ciphertext": [encrypted JSON], "url": "<hmac-hex>", "feedId": "<hmac-hex>", "guid": "<hmac-hex>" }
 ```
 
-Only `url`, `feedId`, `guid`, and `publishedAt` are plaintext (for indexing). All other fields (title, content, author, etc.) are inside the encrypted blob.
+Index fields are 64-character hex HMAC hashes (deterministic, non-reversible). All other fields (title, content, author, etc.) are inside the encrypted blob.
 
 The `meta` store is unencrypted (stores encryption salt).
 
