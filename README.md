@@ -1,45 +1,129 @@
 # FeedZero
 
-Privacy-first RSS reader built with vanilla JavaScript and targeted open-source libraries. No tracking, no analytics.
+A privacy-first RSS reader that runs entirely in your browser. No accounts, no tracking, no analytics. Your reading habits stay yours.
 
-## Features
+## What It Does
 
-- RSS 2.0 and Atom 1.0 feed parsing
-- All data encrypted at rest (AES-GCM-256 via Web Crypto API)
-- Production-grade HTML sanitization (DOMPurify)
-- Offline support via Service Worker
-- Keyboard navigation (j/k/Enter/Escape)
-- Accessible (WCAG 2.1 AA: semantic HTML, ARIA, keyboard navigable)
+- Subscribes to RSS, Atom, and JSON Feed sources
+- Stores all data encrypted in your browser (AES-GCM-256)
+- Optionally syncs across devices with end-to-end encryption
+- Extracts full article text when feeds provide only summaries
+- Works offline after first load
+
+## Privacy Model
+
+FeedZero minimizes server-side data exposure:
+
+| Component | What the server sees |
+|-----------|---------------------|
+| **Feed fetching** | Feed URLs (required for CORS proxy) |
+| **Cloud sync** | Encrypted blob + vault ID (cannot decrypt without your passphrase) |
+| **Everything else** | Nothing — parsing, storage, and rendering happen in-browser |
+
+**No telemetry. No analytics. No crash reporting. No third-party tracking.**
+
+For the full threat model, cryptographic details, and honest limitations, see [docs/architecture.md](docs/architecture.md#privacy--threat-model).
+
+### Trust Considerations
+
+The CORS proxy is a trust point. It must see feed URLs to fetch them. If you don't trust the hosted version, you can [self-host](#self-hosting) the entire stack.
 
 ## Quick Start
 
 ```bash
 npm install
-npm run dev        # Starts dev server on http://localhost:3000
+npm run dev
 ```
 
-Open http://localhost:3000 and add a feed URL.
+Open http://localhost:3000. Add a feed URL. That's it.
+
+## Usage
+
+### Adding Feeds
+
+Paste any URL into the "Add feed" input:
+- Direct feed URL: `https://example.com/feed.xml`
+- Website URL: FeedZero will discover the feed automatically
+
+### Keyboard Navigation
+
+| Key | Action |
+|-----|--------|
+| `j` / `k` | Next / previous item |
+| `Enter` | Open selected item |
+| `Escape` | Go back |
+
+### Cloud Sync (Optional)
+
+1. Open Settings → Data & Storage
+2. Enable cloud sync
+3. Save your 4-word passphrase — it's the only way to access your data
+
+Your passphrase never leaves your browser. The server stores only encrypted blobs.
+
+### OPML Import/Export
+
+- **Import**: Settings → Import OPML → select file
+- **Export**: Settings → Export OPML → downloads your feed list
 
 ## Development
 
 ```bash
-npm test             # Run all tests
-npm run test:watch   # Run tests in watch mode
-npm run test:coverage # Run tests with coverage report
-npm run test:e2e     # Run Playwright E2E tests
+npm test              # Unit/integration tests (Vitest)
+npm run test:watch    # Watch mode
+npm run test:coverage # Coverage report (90% threshold)
+npm run test:e2e      # E2E tests (Playwright)
+npx tsc --noEmit      # Type check
 ```
 
-## Architecture
+### Project Structure
 
-See [docs/architecture.md](docs/architecture.md) for system overview, data flow, and module dependency graph.
+```
+src/
+├── core/           # Framework-agnostic business logic
+│   ├── feeds/      # Feed fetching, parsing, refresh
+│   ├── parser/     # RSS/Atom/JSON Feed parsing
+│   ├── storage/    # IndexedDB + encryption
+│   ├── sync/       # E2E encrypted cloud sync
+│   └── extractor/  # Full-text extraction
+├── stores/         # Zustand state management
+├── components/     # React UI components
+└── pages/          # Route components
+```
 
-Key design decisions are documented as ADRs in [docs/decisions/](docs/decisions/).
+See [docs/architecture.md](docs/architecture.md) for detailed architecture documentation.
+
+## Self-Hosting
+
+FeedZero can run entirely on your own infrastructure:
+
+```bash
+npm run build:all
+npm run serve
+```
+
+This starts a standalone Hono server with all API endpoints. Point your reverse proxy at it.
+
+For Vercel deployment, `git push` to a connected repository. The `api/` directory contains serverless function wrappers.
 
 ## Tech Stack
 
-- **Language**: Vanilla JavaScript (ES modules)
-- **UI**: Web Components
-- **Storage**: Dexie.js (IndexedDB) + Web Crypto API
+- **UI**: React 19, TypeScript, Tailwind CSS v4
+- **State**: Zustand
+- **Storage**: Dexie.js (IndexedDB), Web Crypto API
+- **Parsing**: Custom RSS/Atom/JSON Feed parser
 - **Sanitization**: DOMPurify
-- **Offline**: Service Workers
-- **Tests**: Vitest + Playwright
+- **Extraction**: Defuddle
+- **Testing**: Vitest, Playwright, React Testing Library
+
+## Security
+
+Found a vulnerability? See [SECURITY.md](SECURITY.md) for reporting guidelines.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development workflow and guidelines.
+
+## License
+
+MIT

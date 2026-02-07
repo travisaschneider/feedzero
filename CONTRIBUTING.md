@@ -1,0 +1,108 @@
+# Contributing to FeedZero
+
+## Development Workflow
+
+This project follows **Red-Green-Refactor (RGR)** for all code changes:
+
+1. **RED** - Write a failing test first
+2. **GREEN** - Write minimal code to make it pass
+3. **REFACTOR** - Clean up the code (this step is mandatory)
+
+No production code without a failing test. No commit without refactoring.
+
+## Getting Started
+
+```bash
+git clone https://github.com/user/feedzero.git
+cd feedzero
+npm install
+npm run dev     # Dev server at http://localhost:3000
+npm test        # Run tests
+```
+
+## Running Tests
+
+```bash
+npm test              # All unit/integration tests
+npm run test:watch    # Watch mode
+npm run test:coverage # Coverage report (90% threshold enforced)
+npm run test:e2e      # Playwright E2E tests
+npx tsc --noEmit      # Type check
+```
+
+## Code Style
+
+- TypeScript strict mode (no `any` except in type declarations for untyped libraries)
+- No ESLint/Prettier - TypeScript compiler is the primary static analysis tool
+- Self-documenting code: if you need a comment to explain *what*, rename or extract instead
+- Comments only for *why* (intent, trade-offs, non-obvious decisions)
+
+## Architecture Guidelines
+
+### Core Modules Are Framework-Agnostic
+
+Code in `src/core/` and `src/utils/` must have zero React imports. These modules are the shared backend that could be reused in other contexts (CLI, mobile app, etc.).
+
+### Result Types Over Exceptions
+
+All core functions return `Result<T>` types instead of throwing:
+
+```typescript
+const result = await addFeed(url);
+if (!result.ok) {
+  // Handle error via result.error
+  return;
+}
+// Use result.value
+```
+
+### State Lives in Zustand Stores
+
+UI components subscribe to store slices. Stores call core modules directly. URL is the source of truth for navigation.
+
+### Security First
+
+- Sanitize all external content through DOMPurify
+- Use Web Crypto API for encryption (never hand-roll crypto)
+- Validate and block private IPs in proxy endpoints
+- Never trust user or feed input
+
+## Pull Request Process
+
+1. **Branch from `main`**: `git checkout -b feat/your-feature`
+
+2. **Follow RGR**: Tests first, then implementation, then refactor
+
+3. **Verify before pushing**:
+   ```bash
+   npm test
+   npx tsc --noEmit
+   npm run test:e2e  # If touching UI
+   ```
+
+4. **Write descriptive commits**:
+   - Use conventional prefixes: `feat:`, `fix:`, `test:`, `docs:`, `refactor:`, `chore:`
+   - For bug fixes, include: What (symptom), Why (root cause), Fix (what changed), Prevention (tests added)
+
+5. **Keep PRs focused**: One feature or fix per PR. Split large changes.
+
+6. **Update documentation**: If you changed behavior, update `docs/` to match.
+
+## What We're Looking For
+
+- Bug fixes with regression tests
+- Performance improvements with benchmarks
+- Accessibility improvements
+- Feed format compatibility (RSS variants, Atom edge cases)
+- Privacy enhancements that don't compromise usability
+
+## What We're Not Looking For
+
+- Features that require server-side state (beyond encrypted blob storage)
+- Analytics, telemetry, or tracking of any kind
+- Dependencies that make network calls without user action
+- UI redesigns without prior discussion
+
+## Questions?
+
+Open a GitHub issue for discussion before starting significant work. This saves everyone time.
