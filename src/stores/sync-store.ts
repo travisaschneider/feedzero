@@ -102,13 +102,12 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     set({ credentials, status: "syncing", error: null });
     localStorage.setItem(LOCAL_STORAGE.STORAGE_MODE, "sync");
 
-    // Store derived keys (including vault keys), remove raw passphrase
+    // Store derived keys (including vault keys)
     const saltResult = await getSalt();
     const salt = saltResult.ok ? saltResult.value : undefined;
     await deriveAndStoreKeys(passphrase, salt, {
       includeVaultKeys: true,
     });
-    localStorage.removeItem(LOCAL_STORAGE.SYNC_PASSPHRASE);
 
     const result = await pushVault(credentials);
     if (result.ok) {
@@ -135,7 +134,6 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       await deleteVault(credentials);
     }
     clearStoredKeys();
-    localStorage.removeItem(LOCAL_STORAGE.SYNC_PASSPHRASE);
     localStorage.removeItem(LOCAL_STORAGE.STORAGE_MODE);
     set({
       status: "local-only",
@@ -149,7 +147,6 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     clearPendingTimers();
     await deleteDatabase();
     clearStoredKeys();
-    localStorage.removeItem(LOCAL_STORAGE.SYNC_PASSPHRASE);
     localStorage.removeItem(LOCAL_STORAGE.STORAGE_MODE);
     localStorage.removeItem(LOCAL_STORAGE.ONBOARDING_COMPLETE);
     set({
@@ -158,15 +155,8 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       error: null,
       credentials: null,
     });
-    // Lazy imports to avoid circular dependencies at module load time
-    const { useAppStore } = await import("./app-store.ts");
-    const { useFeedStore } = await import("./feed-store.ts");
-    const { useArticleStore } = await import("./article-store.ts");
-    const { useOnboardingStore } = await import("./onboarding-store.ts");
-    useAppStore.setState({ isDbReady: false, hasCompletedOnboarding: false });
-    useFeedStore.setState({ feeds: [], selectedFeedId: null });
-    useArticleStore.setState({ articles: [], selectedArticle: null });
-    useOnboardingStore.getState().reset();
+    const { resetAllStores } = await import("./app-store.ts");
+    await resetAllStores();
   },
 
   push: async () => {
@@ -247,7 +237,6 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       await deriveAndStoreKeys(passphrase, salt, {
         includeVaultKeys: true,
       });
-      localStorage.removeItem(LOCAL_STORAGE.SYNC_PASSPHRASE);
       localStorage.setItem(LOCAL_STORAGE.STORAGE_MODE, "sync");
       set({
         credentials,
@@ -295,7 +284,6 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     await deriveAndStoreKeys(passphrase, salt, {
       includeVaultKeys: true,
     });
-    localStorage.removeItem(LOCAL_STORAGE.SYNC_PASSPHRASE);
     localStorage.setItem(LOCAL_STORAGE.STORAGE_MODE, "sync");
     set({
       credentials,

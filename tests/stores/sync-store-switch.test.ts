@@ -144,9 +144,6 @@ describe("sync-store switchToExistingCloud", () => {
         new Uint8Array([1, 2, 3]),
         { includeVaultKeys: true },
       );
-      expect(localStorageMock.removeItem).toHaveBeenCalledWith(
-        "feedzero:sync-passphrase",
-      );
       expect(localStorageMock.setItem).toHaveBeenCalledWith(
         "feedzero:storage-mode",
         "sync",

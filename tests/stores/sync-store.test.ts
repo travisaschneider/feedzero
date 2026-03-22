@@ -124,7 +124,7 @@ describe("sync-store", () => {
       expect(state.error).toBeNull();
     });
 
-    it("stores derived keys and removes raw passphrase from localStorage", async () => {
+    it("stores derived keys in localStorage", async () => {
       mockPushVault.mockResolvedValue({ ok: true, value: Date.now() });
 
       await useSyncStore.getState().enableSync("test passphrase");
@@ -133,9 +133,6 @@ describe("sync-store", () => {
         "test passphrase",
         new Uint8Array([1, 2, 3]),
         { includeVaultKeys: true },
-      );
-      expect(localStorageMock.removeItem).toHaveBeenCalledWith(
-        "feedzero:sync-passphrase",
       );
       expect(localStorageMock.setItem).toHaveBeenCalledWith(
         "feedzero:storage-mode",
@@ -341,9 +338,6 @@ describe("sync-store", () => {
       expect(state.error).toBeNull();
       expect(clearStoredKeys).toHaveBeenCalled();
       expect(localStorageMock.removeItem).toHaveBeenCalledWith(
-        "feedzero:sync-passphrase",
-      );
-      expect(localStorageMock.removeItem).toHaveBeenCalledWith(
         "feedzero:storage-mode",
       );
     });
@@ -415,9 +409,6 @@ describe("sync-store", () => {
       await useSyncStore.getState().logout();
 
       expect(clearStoredKeys).toHaveBeenCalled();
-      expect(localStorageMock.removeItem).toHaveBeenCalledWith(
-        "feedzero:sync-passphrase",
-      );
       expect(localStorageMock.removeItem).toHaveBeenCalledWith(
         "feedzero:storage-mode",
       );

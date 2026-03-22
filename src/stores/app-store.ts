@@ -4,13 +4,8 @@ import {
   openWithKeys,
   deleteDatabase,
   getFeeds,
-  getSalt,
 } from "../core/storage/db.ts";
-import {
-  DEFAULT_PASSPHRASE,
-  LOCAL_STORAGE,
-  CRYPTO,
-} from "../utils/constants.ts";
+import { LOCAL_STORAGE, CRYPTO } from "../utils/constants.ts";
 import { importCryptoKey } from "../core/storage/crypto.ts";
 import {
   loadStoredKeys,
@@ -23,7 +18,7 @@ interface AppStore {
   error: string | null;
   hasCompletedOnboarding: boolean | null;
   initialize: (passphrase: string) => Promise<void>;
-  /** Initialize DB for returning users. Reads localStorage to determine local-only vs sync mode. */
+  /** Initialize DB for returning users using stored derived keys. */
   initializeReturningUser: () => Promise<void>;
   setError: (error: string | null) => void;
   completeOnboarding: () => void;
@@ -50,55 +45,28 @@ export const useAppStore = create<AppStore>((set) => ({
     const storedKeys = loadStoredKeys();
     const isSyncUser = storageMode === "sync";
 
-    let result;
+    if (!storedKeys) {
+      set({
+        isDbReady: false,
+        error:
+          "No stored keys found. Please reset the app and set up again.",
+      });
+      return;
+    }
 
-    if (storedKeys) {
-      // Use pre-derived keys (no raw passphrase needed)
-      result = await openWithKeys(storedKeys.dbKeyJwk, storedKeys.hmacKeyJwk);
+    const result = await openWithKeys(
+      storedKeys.dbKeyJwk,
+      storedKeys.hmacKeyJwk,
+    );
 
-      if (isSyncUser && storedKeys.vaultId && storedKeys.vaultKeyJwk) {
-        const vaultKey = await importCryptoKey(storedKeys.vaultKeyJwk, {
-          name: CRYPTO.ALGORITHM,
-          length: CRYPTO.KEY_LENGTH,
-        });
-        useSyncStore.setState({
-          credentials: { vaultId: storedKeys.vaultId, vaultKey },
-        });
-      }
-    } else {
-      // Legacy fallback: read passphrase from localStorage
-      const storedPassphrase = localStorage.getItem(
-        LOCAL_STORAGE.SYNC_PASSPHRASE,
-      );
-      const passphrase = storedPassphrase ?? DEFAULT_PASSPHRASE;
-      result = await open(passphrase);
-
-      if (isSyncUser && storedPassphrase) {
-        // Migrate: derive and store keys, remove raw passphrase
-        const { deriveAndStoreKeys } =
-          await import("../core/storage/key-material.ts");
-        const saltResult = await getSalt();
-        const dbSalt = saltResult.ok ? saltResult.value : undefined;
-        const migrateResult = await deriveAndStoreKeys(
-          storedPassphrase,
-          dbSalt,
-          { includeVaultKeys: true },
-        );
-        if (migrateResult.ok) {
-          localStorage.removeItem(LOCAL_STORAGE.SYNC_PASSPHRASE);
-
-          const keys = migrateResult.value;
-          if (keys.vaultId && keys.vaultKeyJwk) {
-            const vaultKey = await importCryptoKey(keys.vaultKeyJwk, {
-              name: CRYPTO.ALGORITHM,
-              length: CRYPTO.KEY_LENGTH,
-            });
-            useSyncStore.setState({
-              credentials: { vaultId: keys.vaultId, vaultKey },
-            });
-          }
-        }
-      }
+    if (isSyncUser && storedKeys.vaultId && storedKeys.vaultKeyJwk) {
+      const vaultKey = await importCryptoKey(storedKeys.vaultKeyJwk, {
+        name: CRYPTO.ALGORITHM,
+        length: CRYPTO.KEY_LENGTH,
+      });
+      useSyncStore.setState({
+        credentials: { vaultId: storedKeys.vaultId, vaultKey },
+      });
     }
 
     if (!result.ok) {
@@ -106,13 +74,9 @@ export const useAppStore = create<AppStore>((set) => ({
       return;
     }
 
-    // Validate that decryption works by attempting to read feeds
     const feedsResult = await getFeeds();
     if (!feedsResult.ok) {
-      set({
-        isDbReady: false,
-        error: feedsResult.error,
-      });
+      set({ isDbReady: false, error: feedsResult.error });
       return;
     }
 
@@ -144,7 +108,20 @@ export const useAppStore = create<AppStore>((set) => ({
     clearStoredKeys();
     localStorage.removeItem(LOCAL_STORAGE.ONBOARDING_COMPLETE);
     localStorage.removeItem(LOCAL_STORAGE.STORAGE_MODE);
-    localStorage.removeItem(LOCAL_STORAGE.SYNC_PASSPHRASE);
     set({ isDbReady: false, error: null, hasCompletedOnboarding: false });
   },
 }));
+
+/**
+ * Reset all stores to initial state. Called by sync-store.logout()
+ * to avoid cross-store knowledge in individual stores.
+ */
+export async function resetAllStores(): Promise<void> {
+  const { useFeedStore } = await import("./feed-store.ts");
+  const { useArticleStore } = await import("./article-store.ts");
+  const { useOnboardingStore } = await import("./onboarding-store.ts");
+  useAppStore.setState({ isDbReady: false, hasCompletedOnboarding: false });
+  useFeedStore.setState({ feeds: [], selectedFeedId: null });
+  useArticleStore.setState({ articles: [], selectedArticle: null });
+  useOnboardingStore.getState().reset();
+}

@@ -199,7 +199,7 @@ Three-tier testing strategy. See [Testing Strategy](docs/testing-strategy.md) fo
 3. **Returning users** (`hasCompletedOnboarding === true`): `initializeReturningUser()` in `app-store.ts` handles the full init flow:
    - Tries `loadStoredKeys()` first — if derived keys exist, uses `openWithKeys()` (no passphrase needed)
    - Falls back to passphrase from localStorage for legacy users (auto-migrates: derives keys, stores them, removes raw passphrase)
-   - Local-only users without stored keys: opens DB with `DEFAULT_PASSPHRASE`
+   - Local-only users without stored keys: shows error (requires re-onboarding)
    - Sync users: reconstructs `SyncCredentials` from stored vault ID + JWK, pulls vault from server
 4. Once `isDbReady`, the main app routes render.
 

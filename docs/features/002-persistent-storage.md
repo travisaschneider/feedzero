@@ -63,7 +63,5 @@ Records encrypted with a previous (wrong) key remain in IndexedDB with valid pla
 
 ## Limitations
 
-- Hardcoded passphrase `"feedzero-default-key"` — encryption is obfuscation, not real protection
 - Data lost if browser storage is cleared
-- No cross-device sync or backup
-- Future: Option B (user passphrase prompt), Option C (encrypted export/import)
+- Derived keys stored in localStorage — if stolen, can decrypt local IndexedDB data (but cannot recover passphrase or access cloud vault)

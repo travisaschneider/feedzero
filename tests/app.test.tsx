@@ -47,7 +47,6 @@ vi.mock("@/core/storage/crypto.ts", () => ({
   importCryptoKey: vi.fn().mockResolvedValue("mock-vault-key"),
 }));
 
-import { pullVault, importVault } from "@/core/sync/sync-service";
 import { refreshAllFeeds } from "@/core/feeds/feed-service";
 import { loadStoredKeys } from "@/core/storage/key-material";
 
@@ -107,7 +106,13 @@ describe("App sync-aware init", () => {
     localStorageMock.clear();
   });
 
-  it("initializes with DEFAULT_PASSPHRASE for local-only returning users", async () => {
+  it("initializes with stored keys for local-only returning users", async () => {
+    const mockKeys = {
+      dbKeyJwk: { kty: "oct" } as JsonWebKey,
+      hmacKeyJwk: { kty: "oct" } as JsonWebKey,
+      dbSalt: [1, 2, 3],
+    };
+    vi.mocked(loadStoredKeys).mockReturnValue(mockKeys);
     localStorageMock.setItem("feedzero:onboarding-complete", "true");
 
     render(<App />);
@@ -122,6 +127,12 @@ describe("App sync-aware init", () => {
   });
 
   it("auto-refreshes all feeds on app load for returning users", async () => {
+    const mockKeys = {
+      dbKeyJwk: { kty: "oct" } as JsonWebKey,
+      hmacKeyJwk: { kty: "oct" } as JsonWebKey,
+      dbSalt: [1, 2, 3],
+    };
+    vi.mocked(loadStoredKeys).mockReturnValue(mockKeys);
     localStorageMock.setItem("feedzero:onboarding-complete", "true");
 
     render(<App />);
@@ -162,21 +173,4 @@ describe("App sync-aware init", () => {
     expect(useSyncStore.getState().status).toBe("synced");
   });
 
-  it("migrates legacy sync users with stored passphrase", async () => {
-    localStorageMock.setItem("feedzero:onboarding-complete", "true");
-    localStorageMock.setItem("feedzero:storage-mode", "sync");
-    localStorageMock.setItem(
-      "feedzero:sync-passphrase",
-      "carbon mango velvet prism",
-    );
-
-    render(<App />);
-
-    await waitFor(() => {
-      expect(useAppStore.getState().isDbReady).toBe(true);
-    });
-
-    expect(pullVault).toHaveBeenCalled();
-    expect(importVault).toHaveBeenCalled();
-  });
 });
