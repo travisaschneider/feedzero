@@ -16,11 +16,33 @@ import { useSyncStore } from "./sync-store.ts";
 type AppStoreSetter = (partial: Partial<AppStore>) => void;
 
 /**
+ * Best-effort cleanup of the server vault using stored credentials.
+ * Called before any full teardown (reset, re-onboarding) to prevent
+ * orphaned encrypted blobs on the server.
+ */
+async function tryDeleteServerVault(): Promise<void> {
+  const storedKeys = loadStoredKeys();
+  if (!storedKeys?.vaultId || !storedKeys?.vaultKeyJwk) return;
+
+  try {
+    const vaultKey = await importCryptoKey(storedKeys.vaultKeyJwk, {
+      name: CRYPTO.ALGORITHM,
+      length: CRYPTO.KEY_LENGTH,
+    });
+    const { deleteVault } = await import("../core/sync/sync-service.ts");
+    await deleteVault({ vaultId: storedKeys.vaultId, vaultKey });
+  } catch {
+    // Best-effort — vault data is encrypted and unreadable without the passphrase
+  }
+}
+
+/**
  * Clear all persisted state and redirect to onboarding.
  * Called when returning-user initialization fails (missing keys, DB gone,
  * decryption mismatch). Avoids showing an error wall — just re-onboard.
  */
 async function forceReOnboarding(set: AppStoreSetter): Promise<void> {
+  await tryDeleteServerVault();
   await deleteDatabase();
   clearStoredKeys();
   localStorage.removeItem(LOCAL_STORAGE.ONBOARDING_COMPLETE);
@@ -47,9 +69,8 @@ export const useAppStore = create<AppStore>((set) => ({
   hasCompletedOnboarding: null,
 
   initialize: async (passphrase) => {
-    // Delete any existing DB first to ensure a clean start for new users.
-    // This prevents stale encrypted data from a previous session leaking
-    // into a fresh onboarding flow.
+    // Clean up any orphaned server vault and local DB to ensure a fresh start.
+    await tryDeleteServerVault();
     await deleteDatabase();
     const result = await open(passphrase);
     if (result.ok) {
@@ -122,6 +143,7 @@ export const useAppStore = create<AppStore>((set) => ({
   },
 
   resetApp: async () => {
+    await tryDeleteServerVault();
     await deleteDatabase();
     clearStoredKeys();
     localStorage.removeItem(LOCAL_STORAGE.ONBOARDING_COMPLETE);

@@ -37,6 +37,7 @@ vi.mock("@/core/sync/sync-service", () => ({
     value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
   }),
   importVault: vi.fn().mockResolvedValue({ ok: true, value: true }),
+  deleteVault: vi.fn().mockResolvedValue({ ok: true, value: true }),
 }));
 
 vi.mock("@/core/sync/vault-crypto", () => ({
@@ -50,6 +51,7 @@ vi.mock("@/core/sync/vault-crypto", () => ({
 
 vi.mock("@/core/storage/key-material", () => ({
   deriveAndStoreKeys: vi.fn().mockResolvedValue({ ok: true, value: {} }),
+  loadStoredKeys: vi.fn().mockReturnValue(null),
   clearStoredKeys: vi.fn(),
 }));
 
