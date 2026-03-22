@@ -28,7 +28,7 @@ async function sendWebResponse(webRes, res) {
   for (const [key, value] of webRes.headers.entries()) {
     res.setHeader(key, value);
   }
-  res.end(await webRes.text());
+  res.end(Buffer.from(await webRes.arrayBuffer()));
 }
 
 /**

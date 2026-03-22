@@ -75,6 +75,27 @@ describe("handleProxyRequest", () => {
     expect(await res.text()).toContain("Network error");
   });
 
+  it("preserves binary data for image responses (uses arrayBuffer, not text)", async () => {
+    // ICO files contain bytes > 127 that get corrupted by UTF-8 text round-trip
+    const binaryData = new Uint8Array([
+      0x00, 0x00, 0x01, 0x00, 0xff, 0xfe, 0x80, 0x90, 0xc0, 0xd0,
+    ]);
+    fetchSpy.mockResolvedValue(
+      new Response(binaryData, {
+        status: 200,
+        headers: { "Content-Type": "image/x-icon" },
+      }),
+    );
+
+    const req = new Request(
+      "http://localhost/api/icon?url=https://example.com/favicon.ico",
+    );
+    const res = await handleProxyRequest(req, "image/x-icon");
+    const resultBytes = new Uint8Array(await res.arrayBuffer());
+    // Every byte must survive the round-trip, including high bytes
+    expect(resultBytes).toEqual(binaryData);
+  });
+
   it("passes through the upstream Content-Type header", async () => {
     fetchSpy.mockResolvedValue(
       new Response("<feed/>", {

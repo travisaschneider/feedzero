@@ -31,4 +31,22 @@ describe("FeedFavicon", () => {
     expect(container.querySelector("svg")).toBeTruthy();
     expect(container.querySelector("img")).toBeNull();
   });
+
+  it("shows fallback icon while image is loading", () => {
+    const { container } = render(<FeedFavicon siteUrl="https://example.com" />);
+    // Before onLoad fires, fallback SVG should be visible
+    expect(container.querySelector("svg")).toBeTruthy();
+    // Img exists but is hidden
+    const img = container.querySelector("img")!;
+    expect(img.classList.contains("hidden")).toBe(true);
+  });
+
+  it("hides fallback icon after image loads successfully", () => {
+    const { container } = render(<FeedFavicon siteUrl="https://example.com" />);
+    const img = container.querySelector("img")!;
+    fireEvent.load(img);
+    // After load, SVG fallback should be gone and img visible
+    expect(container.querySelector("svg")).toBeNull();
+    expect(img.classList.contains("hidden")).toBe(false);
+  });
 });

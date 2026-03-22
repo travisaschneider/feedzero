@@ -30,16 +30,25 @@ export async function handleProxyRequest(
     const response = await fetch(validation.value.href, {
       headers: { "User-Agent": "FeedZero/1.0 (RSS Reader)" },
     });
-    const body = await response.text();
+    const contentType =
+      response.headers.get("content-type") || defaultContentType;
+    // Use arrayBuffer to preserve binary data (favicons, images)
+    const body = await response.arrayBuffer();
     return new Response(body, {
       status: response.status,
-      headers: {
-        "Content-Type":
-          response.headers.get("content-type") || defaultContentType,
-      },
+      headers: { "Content-Type": contentType },
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Unknown error";
+    console.error(
+      JSON.stringify({
+        level: "error",
+        context: "proxy",
+        target: validation.value.href,
+        error: message,
+        timestamp: new Date().toISOString(),
+      }),
+    );
     return new Response(`Proxy error: ${message}`, { status: 502 });
   }
 }
