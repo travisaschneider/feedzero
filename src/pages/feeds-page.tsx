@@ -35,6 +35,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip.tsx";
 import { ArticleList } from "@/components/articles/article-list.tsx";
+import { FeedPackCard } from "@/components/feeds/feed-pack-card.tsx";
+import { feedPacks } from "@/lib/feed-packs.ts";
 import { ReaderPanel } from "@/components/reader/reader-panel.tsx";
 
 /**
@@ -88,18 +90,25 @@ function SidebarAddFeedOpener() {
 /** Shown when the user has no feeds yet. */
 function EmptyFeedsState() {
   return (
-    <Empty className="flex-1">
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <Rss />
-        </EmptyMedia>
-        <EmptyTitle>No feeds yet</EmptyTitle>
-        <EmptyDescription>
-          Add your first feed by clicking the + button in the sidebar or
-          pressing <Kbd>N</Kbd>.
-        </EmptyDescription>
-      </EmptyHeader>
-    </Empty>
+    <div className="flex-1 flex flex-col items-center justify-center p-6 gap-6 max-w-md mx-auto">
+      <Empty>
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <Rss />
+          </EmptyMedia>
+          <EmptyTitle>No feeds yet</EmptyTitle>
+          <EmptyDescription>
+            Add a feed with the <Kbd>N</Kbd> key, or get started with a
+            starter pack below.
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+      <div className="w-full space-y-3">
+        {feedPacks.map((pack) => (
+          <FeedPackCard key={pack.id} pack={pack} />
+        ))}
+      </div>
+    </div>
   );
 }
 
