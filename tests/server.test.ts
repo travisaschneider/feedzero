@@ -257,6 +257,67 @@ describe("server", () => {
     });
   });
 
+  describe("feed stats endpoint", () => {
+    it("GET /api/stats/feeds returns empty array without cache", async () => {
+      const app = createApp();
+      const res = await app.request("/api/stats/feeds");
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.feeds).toEqual([]);
+    });
+
+    it("GET /api/stats/feeds returns feed request counts with cache", async () => {
+      const { createFeedCache } = await import(
+        "../src/core/proxy/feed-cache"
+      );
+      const cache = createFeedCache();
+      const app = createApp(undefined, cache);
+
+      mockFetch.mockResolvedValue(
+        new Response("<rss/>", {
+          headers: { "content-type": "text/xml" },
+        }),
+      );
+
+      // Make two requests to the same feed
+      await app.request("/api/feed?url=https://example.com/feed.xml");
+      await app.request("/api/feed?url=https://example.com/feed.xml");
+
+      const res = await app.request("/api/stats/feeds");
+      const data = await res.json();
+      expect(data.feeds.length).toBeGreaterThan(0);
+      const feed = data.feeds.find(
+        (f: { url: string }) => f.url === "https://example.com/feed.xml",
+      );
+      expect(feed.requests).toBe(2);
+      expect(feed.cached).toBe(true);
+    });
+
+    it("second request for same feed is served from cache", async () => {
+      const { createFeedCache } = await import(
+        "../src/core/proxy/feed-cache"
+      );
+      const cache = createFeedCache();
+      const app = createApp(undefined, cache);
+
+      mockFetch.mockResolvedValue(
+        new Response("<rss/>", {
+          headers: { "content-type": "text/xml" },
+        }),
+      );
+
+      await app.request("/api/feed?url=https://example.com/feed.xml");
+      mockFetch.mockClear();
+
+      // Second request should hit cache, not fetch again
+      const res = await app.request(
+        "/api/feed?url=https://example.com/feed.xml",
+      );
+      expect(res.status).toBe(200);
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+  });
+
   describe("proxy routing contract", () => {
     it("PROXY_SUPPORTED_METHODS lists GET and POST", () => {
       expect(PROXY_SUPPORTED_METHODS).toContain("GET");

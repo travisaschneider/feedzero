@@ -1,4 +1,5 @@
 import { validateProxyUrl } from "./validate-url.ts";
+import type { FeedCache } from "./feed-cache.ts";
 
 /**
  * HTTP methods the proxy handler accepts.
@@ -7,13 +8,20 @@ import { validateProxyUrl } from "./validate-url.ts";
  */
 export const SUPPORTED_METHODS: readonly string[] = ["GET", "POST"];
 
+export interface ProxyOptions {
+  /** Optional feed cache for deduplication across users. */
+  cache?: FeedCache;
+}
+
 /**
  * Shared proxy logic for serverless functions.
  * Validates the target URL, fetches it, and returns the response.
+ * If a cache is provided, feed responses are cached by URL with a TTL.
  */
 export async function handleProxyRequest(
   req: Request,
   defaultContentType: string,
+  options?: ProxyOptions,
 ): Promise<Response> {
   const target = await extractTargetUrl(req);
 
@@ -26,14 +34,33 @@ export async function handleProxyRequest(
     return new Response(validation.error, { status });
   }
 
+  const url = validation.value.href;
+  const cache = options?.cache;
+
+  // Check cache first
+  if (cache) {
+    const cached = cache.get(url);
+    if (cached) {
+      return new Response(cached.body, {
+        status: cached.status,
+        headers: { "Content-Type": cached.contentType },
+      });
+    }
+  }
+
   try {
-    const response = await fetch(validation.value.href, {
+    const response = await fetch(url, {
       headers: { "User-Agent": "FeedZero/1.0 (RSS Reader)" },
     });
     const contentType =
       response.headers.get("content-type") || defaultContentType;
-    // Use arrayBuffer to preserve binary data (favicons, images)
     const body = await response.arrayBuffer();
+
+    // Cache successful feed/page responses
+    if (cache && response.status >= 200 && response.status < 400) {
+      cache.set(url, body, contentType, response.status);
+    }
+
     return new Response(body, {
       status: response.status,
       headers: { "Content-Type": contentType },
@@ -44,7 +71,7 @@ export async function handleProxyRequest(
       JSON.stringify({
         level: "error",
         context: "proxy",
-        target: validation.value.href,
+        target: url,
         error: message,
         timestamp: new Date().toISOString(),
       }),

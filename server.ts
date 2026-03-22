@@ -3,7 +3,9 @@ import { handleProxyRequest } from "./src/core/proxy/proxy-handler";
 import { handleSyncRequest } from "./src/core/sync/sync-handler";
 import { createMemoryAdapter } from "./src/core/sync/adapters/memory-adapter";
 import { resolveAdapter } from "./src/core/sync/adapters/resolve-adapter";
+import { createFeedCache } from "./src/core/proxy/feed-cache";
 import type { SyncStorageAdapter } from "./src/core/sync/types";
+import type { FeedCache } from "./src/core/proxy/feed-cache";
 
 /**
  * Simple in-memory rate limiter using a sliding window per IP.
@@ -32,7 +34,10 @@ function createRateLimiter(maxRequests = 100, windowMs = 60_000) {
  * Accepts an optional storage adapter; defaults to resolveAdapter()
  * in production, memory adapter in tests.
  */
-export function createApp(adapter?: SyncStorageAdapter): Hono {
+export function createApp(
+  adapter?: SyncStorageAdapter,
+  feedCache?: FeedCache,
+): Hono {
   const syncAdapter = adapter ?? createMemoryAdapter();
   const app = new Hono();
   const isAllowed = createRateLimiter();
@@ -78,16 +83,30 @@ export function createApp(adapter?: SyncStorageAdapter): Hono {
 
   // Health/diagnostics endpoint
   app.get("/api/diagnostics", (c) =>
-    c.json({ status: "ok", timestamp: new Date().toISOString() }),
+    c.json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      cache: feedCache ? { entries: feedCache.size } : null,
+    }),
   );
 
+  // Anonymous aggregate feed stats — no user identity, no correlation
+  app.get("/api/stats/feeds", (c) => {
+    if (!feedCache) return c.json({ feeds: [] });
+    return c.json({ feeds: feedCache.getStats() });
+  });
+
+  const cacheOpts = feedCache ? { cache: feedCache } : undefined;
+
   app.on(["GET", "POST"], "/api/feed", (c) =>
-    handleProxyRequest(c.req.raw, "text/xml"),
+    handleProxyRequest(c.req.raw, "text/xml", cacheOpts),
   );
   app.on(["GET", "POST"], "/api/page", (c) =>
-    handleProxyRequest(c.req.raw, "text/html"),
+    handleProxyRequest(c.req.raw, "text/html", cacheOpts),
   );
-  app.get("/api/icon", (c) => handleProxyRequest(c.req.raw, "image/x-icon"));
+  app.get("/api/icon", (c) =>
+    handleProxyRequest(c.req.raw, "image/x-icon", cacheOpts),
+  );
   app.all("/api/sync", (c) => handleSyncRequest(c.req.raw, syncAdapter));
 
   return app;
@@ -99,7 +118,8 @@ async function startServer(): Promise<void> {
   const { serveStatic } = await import("@hono/node-server/serve-static");
 
   const adapter = resolveAdapter();
-  const app = createApp(adapter);
+  const cache = createFeedCache();
+  const app = createApp(adapter, cache);
 
   app.use("/*", serveStatic({ root: "./dist" }));
   app.get("/*", serveStatic({ path: "./dist/index.html" }));
