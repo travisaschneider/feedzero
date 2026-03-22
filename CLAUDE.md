@@ -301,6 +301,7 @@ FeedZero exists to protect its users. It is used by journalists, activists, and 
 - IndexedDB records store encrypted content + HMAC-hashed index fields for Dexie queries (no plaintext metadata exposed)
 - Feed format detection tries JSON parse first (for JSON Feed), then XML (for RSS/Atom)
 - XML namespace-prefixed elements (`content:encoded`, `dc:creator`) must use `getElementsByTagName`, never `querySelector`
+- **Key-data coupling invariant:** Stored derived keys (`feedzero:derived-keys` in localStorage) must always be able to decrypt local IndexedDB data. Only two operations may break this coupling: `open(passphrase)` (which derives fresh keys and re-opens the DB) and `importAll()` (which clears and re-encrypts all data). Any operation that modifies stored keys without re-encrypting data, or re-encrypts data without updating stored keys, is a bug. When transitioning between sync modes, use `exportCurrentKeys()` to persist the in-memory keys rather than deriving new ones.
 
 ---
 
