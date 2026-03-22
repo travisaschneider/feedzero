@@ -5,7 +5,6 @@ import {
   CRYPTO,
   SCHEMA_VERSION,
   LOCAL_STORAGE,
-  DEFAULT_PASSPHRASE,
   ALL_FEEDS_ID,
 } from "../../src/utils/constants.ts";
 
@@ -18,7 +17,7 @@ describe("Constants", () => {
   it("should define crypto params with secure defaults", () => {
     expect(CRYPTO.ALGORITHM).toBe("AES-GCM");
     expect(CRYPTO.KEY_LENGTH).toBe(256);
-    expect(CRYPTO.PBKDF2_ITERATIONS).toBeGreaterThanOrEqual(100_000);
+    expect(CRYPTO.PBKDF2_ITERATIONS).toBeGreaterThanOrEqual(600_000);
   });
 
   it("should define schema version", () => {
@@ -29,12 +28,7 @@ describe("Constants", () => {
     expect(LOCAL_STORAGE.ONBOARDING_COMPLETE).toBe(
       "feedzero:onboarding-complete",
     );
-    expect(LOCAL_STORAGE.SYNC_PASSPHRASE).toBe("feedzero:sync-passphrase");
     expect(LOCAL_STORAGE.STORAGE_MODE).toBe("feedzero:storage-mode");
-  });
-
-  it("should define default passphrase", () => {
-    expect(DEFAULT_PASSPHRASE).toBe("feedzero-default-key");
   });
 
   it("should define ALL_FEEDS_ID for global feed view", () => {

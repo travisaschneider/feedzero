@@ -29,6 +29,35 @@ describe("server", () => {
       const csp = res.headers.get("Content-Security-Policy");
       expect(csp).toBeNull();
     });
+
+    it("sets Strict-Transport-Security on HTML responses", async () => {
+      const res = await createApp().request("/");
+      const hsts = res.headers.get("Strict-Transport-Security");
+      expect(hsts).toBeTruthy();
+      expect(hsts).toContain("max-age=");
+    });
+
+    it("sets X-Content-Type-Options on HTML responses", async () => {
+      const res = await createApp().request("/");
+      expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    });
+
+    it("sets Referrer-Policy on HTML responses", async () => {
+      const res = await createApp().request("/");
+      expect(res.headers.get("Referrer-Policy")).toBe("no-referrer");
+    });
+
+    it("sets Permissions-Policy on HTML responses", async () => {
+      const res = await createApp().request("/");
+      const pp = res.headers.get("Permissions-Policy");
+      expect(pp).toBeTruthy();
+      expect(pp).toContain("camera=()");
+    });
+
+    it("sets X-Frame-Options on HTML responses", async () => {
+      const res = await createApp().request("/");
+      expect(res.headers.get("X-Frame-Options")).toBe("DENY");
+    });
   });
 
   describe("GET /api/feed", () => {
@@ -186,6 +215,45 @@ describe("server", () => {
           `Hono server returned unexpected status for ${method}`,
         ).not.toBe(405);
       }
+    });
+  });
+
+  describe("rate limiting", () => {
+    it("allows requests within the limit and blocks after exceeding it", async () => {
+      const app = createApp();
+      mockFetch.mockResolvedValue(
+        new Response("<rss/>", {
+          headers: { "content-type": "text/xml" },
+        }),
+      );
+
+      // First request should succeed
+      const first = await app.request(
+        "/api/feed?url=https://example.com/feed.xml",
+      );
+      expect(first.status).toBe(200);
+
+      // Exhaust the remaining limit
+      for (let i = 1; i < 100; i++) {
+        await app.request("/api/feed?url=https://example.com/feed.xml");
+      }
+
+      // The 101st request should be rate-limited
+      const blocked = await app.request(
+        "/api/feed?url=https://example.com/feed.xml",
+      );
+      expect(blocked.status).toBe(429);
+    });
+  });
+
+  describe("diagnostics endpoint", () => {
+    it("GET /api/diagnostics returns health status", async () => {
+      const app = createApp();
+      const res = await app.request("/api/diagnostics");
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data).toHaveProperty("status", "ok");
+      expect(data).toHaveProperty("timestamp");
     });
   });
 

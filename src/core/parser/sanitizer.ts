@@ -60,6 +60,8 @@ const PURIFY_CONFIG = {
   ],
   ALLOW_DATA_ATTR: false,
   ADD_ATTR: ["target", "rel"],
+  ALLOWED_URI_REGEXP:
+    /^(?:(?:https?|mailto|tel):|[^a-z]|[a-z+.-]+(?:[^a-z+.\-:]|$))/i,
 };
 
 // Force all links to open in new tab safely

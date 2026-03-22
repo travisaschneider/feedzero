@@ -61,13 +61,15 @@ These are documented trade-offs, not bugs:
 
 4. **4-word passphrase entropy**: 51.7 bits is strong against online attacks but potentially vulnerable to offline brute-force if an attacker obtains the encrypted vault.
 
+5. **HMAC index metadata leakage**: While HMAC-SHA256 indexes hide individual field values, an attacker with access to IndexedDB can observe: the number of feeds (distinct `feedId` hashes), articles per feed (cardinality of `[feedId+guid]` pairs), and subscription patterns over time (new hashes added or removed). This reveals reading habits without revealing content. Mitigation: use full-disk encryption and browser-level protections. Future enhancement: record-count padding to fixed multiples.
+
 ## Encryption Details
 
 | Component | Algorithm | Parameters |
 |-----------|-----------|------------|
 | Local storage | AES-GCM-256 | 12-byte random IV per record |
 | Index hashing | HMAC-SHA256 | Dedicated key derived from passphrase |
-| Key derivation | PBKDF2-SHA256 | 100,000 iterations |
+| Key derivation | PBKDF2-SHA256 | 600,000 iterations |
 | Key storage | JWK export | Derived keys persisted, passphrase discarded |
 | Cloud sync | AES-GCM-256 | 12-byte random IV per vault |
 | Vault ID | PBKDF2-SHA256 | Different salt than encryption key |

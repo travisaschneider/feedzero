@@ -6,6 +6,28 @@ import { resolveAdapter } from "./src/core/sync/adapters/resolve-adapter";
 import type { SyncStorageAdapter } from "./src/core/sync/types";
 
 /**
+ * Simple in-memory rate limiter using a sliding window per IP.
+ * Returns true if the request should be allowed, false if rate-limited.
+ */
+function createRateLimiter(maxRequests = 100, windowMs = 60_000) {
+  const hits = new Map<string, { count: number; resetAt: number }>();
+
+  return function isAllowed(ip: string): boolean {
+    const now = Date.now();
+    const entry = hits.get(ip);
+
+    if (!entry || now > entry.resetAt) {
+      hits.set(ip, { count: 1, resetAt: now + windowMs });
+      return true;
+    }
+
+    if (entry.count >= maxRequests) return false;
+    entry.count++;
+    return true;
+  };
+}
+
+/**
  * Creates the Hono app with all API routes mounted.
  * Accepts an optional storage adapter; defaults to resolveAdapter()
  * in production, memory adapter in tests.
@@ -13,6 +35,7 @@ import type { SyncStorageAdapter } from "./src/core/sync/types";
 export function createApp(adapter?: SyncStorageAdapter): Hono {
   const syncAdapter = adapter ?? createMemoryAdapter();
   const app = new Hono();
+  const isAllowed = createRateLimiter();
 
   const CSP = [
     "default-src 'self'",
@@ -29,8 +52,34 @@ export function createApp(adapter?: SyncStorageAdapter): Hono {
     await next();
     if (!c.req.path.startsWith("/api/")) {
       c.header("Content-Security-Policy", CSP);
+      c.header(
+        "Strict-Transport-Security",
+        "max-age=31536000; includeSubDomains; preload",
+      );
+      c.header("X-Content-Type-Options", "nosniff");
+      c.header("X-Frame-Options", "DENY");
+      c.header("Referrer-Policy", "no-referrer");
+      c.header(
+        "Permissions-Policy",
+        "geolocation=(), microphone=(), camera=()",
+      );
     }
   });
+
+  // Rate limit API endpoints
+  app.use("/api/*", async (c, next) => {
+    const ip =
+      c.req.header("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    if (!isAllowed(ip)) {
+      return c.text("Too many requests", 429);
+    }
+    await next();
+  });
+
+  // Health/diagnostics endpoint
+  app.get("/api/diagnostics", (c) =>
+    c.json({ status: "ok", timestamp: new Date().toISOString() }),
+  );
 
   app.on(["GET", "POST"], "/api/feed", (c) =>
     handleProxyRequest(c.req.raw, "text/xml"),

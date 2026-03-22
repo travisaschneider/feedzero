@@ -70,6 +70,24 @@ describe("Sanitizer", () => {
     expect(result).not.toContain("comment");
   });
 
+  it("should strip data: URIs from img src", () => {
+    const html = '<img src="data:text/html,<script>alert(1)</script>">';
+    const result = sanitize(html);
+    expect(result).not.toContain("data:");
+  });
+
+  it("should strip vbscript: URIs from links", () => {
+    const html = '<a href="vbscript:MsgBox(1)">Click</a>';
+    const result = sanitize(html);
+    expect(result).not.toContain("vbscript:");
+  });
+
+  it("should allow mailto: URIs in links", () => {
+    const html = '<a href="mailto:user@example.com">Email</a>';
+    const result = sanitize(html);
+    expect(result).toContain('href="mailto:user@example.com"');
+  });
+
   it("should strip SVG with event handlers", () => {
     const html = '<svg onload="void(0)"><circle r="10"/></svg>';
     const result = sanitize(html);

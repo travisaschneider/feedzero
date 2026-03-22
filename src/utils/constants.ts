@@ -6,20 +6,17 @@ export const CRYPTO = {
   KEY_LENGTH: 256,
   IV_LENGTH: 12,
   SALT_LENGTH: 16,
-  PBKDF2_ITERATIONS: 100_000,
+  PBKDF2_ITERATIONS: 600_000,
   HASH: "SHA-256",
 } as const;
 
 export const SCHEMA_VERSION = 1;
-
-export const DEFAULT_PASSPHRASE = "feedzero-default-key";
 
 /** Special feed ID for the global "All items" view. */
 export const ALL_FEEDS_ID = "all";
 
 export const LOCAL_STORAGE = {
   ONBOARDING_COMPLETE: "feedzero:onboarding-complete",
-  SYNC_PASSPHRASE: "feedzero:sync-passphrase",
   STORAGE_MODE: "feedzero:storage-mode",
   DERIVED_KEYS: "feedzero:derived-keys",
 } as const;

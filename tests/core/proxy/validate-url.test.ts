@@ -111,6 +111,69 @@ describe("validateProxyUrl", () => {
     });
   });
 
+  describe("SSRF bypass prevention", () => {
+    it("blocks IPv6-mapped IPv4 loopback (::ffff:127.0.0.1)", () => {
+      const result = expectErr(
+        validateProxyUrl("http://[::ffff:127.0.0.1]/feed"),
+      );
+      expect(result.error).toBe("Access to internal addresses is blocked");
+    });
+
+    it("blocks IPv6-mapped private 10.x (::ffff:10.0.0.1)", () => {
+      const result = expectErr(
+        validateProxyUrl("http://[::ffff:10.0.0.1]/feed"),
+      );
+      expect(result.error).toBe("Access to internal addresses is blocked");
+    });
+
+    it("blocks IPv6-mapped private 192.168.x (::ffff:192.168.1.1)", () => {
+      const result = expectErr(
+        validateProxyUrl("http://[::ffff:192.168.1.1]/feed"),
+      );
+      expect(result.error).toBe("Access to internal addresses is blocked");
+    });
+
+    it("blocks IPv6-mapped metadata service (::ffff:169.254.169.254)", () => {
+      const result = expectErr(
+        validateProxyUrl("http://[::ffff:169.254.169.254]/feed"),
+      );
+      expect(result.error).toBe("Access to internal addresses is blocked");
+    });
+
+    it("blocks decimal IP for loopback (2130706433)", () => {
+      const result = expectErr(
+        validateProxyUrl("http://2130706433/feed"),
+      );
+      expect(result.error).toBe("Access to internal addresses is blocked");
+    });
+
+    it("blocks octal IP for loopback (0177.0.0.1)", () => {
+      const result = expectErr(
+        validateProxyUrl("http://0177.0.0.1/feed"),
+      );
+      expect(result.error).toBe("Access to internal addresses is blocked");
+    });
+
+    it("blocks hex IP for loopback (0x7f.0.0.1)", () => {
+      const result = expectErr(
+        validateProxyUrl("http://0x7f000001/feed"),
+      );
+      expect(result.error).toBe("Access to internal addresses is blocked");
+    });
+
+    it("blocks IPv6-mapped 172.16.x (::ffff:172.16.0.1)", () => {
+      const result = expectErr(
+        validateProxyUrl("http://[::ffff:172.16.0.1]/feed"),
+      );
+      expect(result.error).toBe("Access to internal addresses is blocked");
+    });
+
+    it("allows IPv6-mapped public IP (::ffff:8.8.8.8)", () => {
+      const result = validateProxyUrl("http://[::ffff:8.8.8.8]/feed");
+      expect(result.ok).toBe(true);
+    });
+  });
+
   it("returns error for malformed URL", () => {
     expectErr(validateProxyUrl("not-a-url"));
   });

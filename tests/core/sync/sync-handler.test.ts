@@ -227,6 +227,29 @@ describe("sync-handler", () => {
     });
   });
 
+  describe("security headers", () => {
+    it("sets X-Content-Type-Options: nosniff on JSON responses", async () => {
+      const vaultId = "a".repeat(64);
+      const response = await handleSyncRequest(
+        makeGetRequest(vaultId),
+        adapter,
+      );
+      expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    });
+
+    it("sets X-Content-Type-Options: nosniff on PUT responses", async () => {
+      const vaultId = "a".repeat(64);
+      const response = await handleSyncRequest(
+        makePutRequest({
+          vaultId,
+          vault: { version: 1, iv: [1], ciphertext: "abc" },
+        }),
+        adapter,
+      );
+      expect(response.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    });
+  });
+
   describe("unsupported method", () => {
     it("returns 405 for PATCH", async () => {
       const request = new Request("http://localhost/api/sync", {

@@ -3,14 +3,14 @@ import type { SyncStorageAdapter } from "./types.ts";
 
 const VAULT_ID_PATTERN = /^[0-9a-f]{64}$/;
 
+const API_HEADERS = {
+  "Content-Type": "application/json",
+  "Access-Control-Allow-Origin": "*",
+  "X-Content-Type-Options": "nosniff",
+} as const;
+
 function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-    },
-  });
+  return new Response(JSON.stringify(body), { status, headers: API_HEADERS });
 }
 
 function errorResponse(message: string, status: number): Response {
@@ -35,13 +35,7 @@ async function handleGet(
   if (!result.ok) return errorResponse(result.error, 500);
   if (result.value === null) return errorResponse("Vault not found", 404);
 
-  return new Response(result.value, {
-    status: 200,
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-    },
-  });
+  return new Response(result.value, { status: 200, headers: API_HEADERS });
 }
 
 async function handlePut(
