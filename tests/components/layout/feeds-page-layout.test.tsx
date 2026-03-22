@@ -210,17 +210,12 @@ describe("FeedsPage layout — mobile", () => {
     expect(main!.className).toContain("min-h-0");
   });
 
-  it("shows Back button when feedId is in URL", () => {
-    const { container } = renderPage("/feeds/f1");
-    const buttons = Array.from(container.querySelectorAll("button"));
-    const backBtn = buttons.find((b) => b.textContent?.includes("←"));
-    expect(backBtn).not.toBeUndefined();
-  });
-
-  it("does not show Back button at /feeds root", () => {
-    const { container } = renderPage("/feeds");
-    const buttons = Array.from(container.querySelectorAll("button"));
-    const backBtn = buttons.find((b) => b.textContent?.includes("←"));
-    expect(backBtn).toBeUndefined();
+  it("does not show Back button on article list or feeds root", () => {
+    for (const path of ["/feeds/f1", "/feeds"]) {
+      const { container } = renderPage(path);
+      const buttons = Array.from(container.querySelectorAll("button"));
+      const backBtn = buttons.find((b) => b.textContent?.includes("←"));
+      expect(backBtn).toBeUndefined();
+    }
   });
 });

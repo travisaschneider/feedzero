@@ -305,22 +305,13 @@ describe("FeedsPage behavior — mobile", () => {
     expect(currentUrl).toBe("/feeds/feed-1");
   });
 
-  it("Back button navigates from article list to /feeds", async () => {
+  it("Back button is not shown on article list (only on article reader)", () => {
     const { container } = renderPage("/feeds/feed-1");
 
     const backBtn = Array.from(container.querySelectorAll("button")).find((b) =>
       b.textContent?.includes("←"),
     );
-    expect(backBtn).toBeDefined();
-
-    await act(async () => {
-      backBtn!.click();
-    });
-
-    // Observable: URL changes to /feeds
-    await vi.waitFor(() => {
-      expect(currentUrl).toBe("/feeds");
-    });
+    expect(backBtn).toBeUndefined();
   });
 
   it("Back button is not shown at /feeds root", () => {

@@ -179,11 +179,6 @@ export function FeedsPage() {
     }
   }
 
-  function handleBack() {
-    skipAutoSelectRef.current = true;
-    navigate("/feeds");
-  }
-
   // Mobile: sidebar is offcanvas, show one content panel at a time
   if (!isDesktop) {
     return (
@@ -204,19 +199,13 @@ export function FeedsPage() {
             <HeaderBreadcrumbs fallback={feedId ? "Articles" : "Feeds"} />
           </header>
           <main role="main" className="flex-1 flex flex-col min-h-0">
-            {(feedId || articleId) && (
+            {articleId && feedId && (
               <Button
                 variant="link"
                 size="sm"
                 onClick={() => {
-                  if (articleId && feedId) {
-                    // Viewing article → go back to article list
-                    skipAutoSelectRef.current = true;
-                    navigate(`/feeds/${feedId}`);
-                  } else {
-                    // Viewing article list → go back to feeds
-                    handleBack();
-                  }
+                  skipAutoSelectRef.current = true;
+                  navigate(`/feeds/${feedId}`);
                 }}
                 className="justify-start"
               >
