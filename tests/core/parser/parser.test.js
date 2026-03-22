@@ -286,4 +286,75 @@ describe("Parser", () => {
       expect(isErr(parse("", "https://example.com"))).toBe(true);
     });
   });
+
+  describe("XML attack prevention", () => {
+    it("should not expand internal entity declarations (XXE)", () => {
+      const xxePayload = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE foo [
+  <!ENTITY xxe "INJECTED_ENTITY_CONTENT">
+]>
+<rss version="2.0">
+  <channel>
+    <title>&xxe;</title>
+    <link>https://example.com</link>
+    <description>Test</description>
+    <item>
+      <title>&xxe;</title>
+      <link>https://example.com/1</link>
+    </item>
+  </channel>
+</rss>`;
+      const result = parse(xxePayload, "https://example.com/feed");
+      // Either parsing fails entirely or the entity is not expanded
+      if (isOk(result)) {
+        const { feed, articles } = unwrap(result);
+        expect(feed.title).not.toContain("INJECTED_ENTITY_CONTENT");
+        if (articles.length > 0) {
+          expect(articles[0].title).not.toContain("INJECTED_ENTITY_CONTENT");
+        }
+      }
+      // If it returns Err, that's also acceptable — entity attack rejected
+    });
+
+    it("should not expand external entity declarations", () => {
+      const xxeExternal = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE foo [
+  <!ENTITY xxe SYSTEM "file:///etc/passwd">
+]>
+<rss version="2.0">
+  <channel>
+    <title>&xxe;</title>
+    <link>https://example.com</link>
+    <description>Test</description>
+  </channel>
+</rss>`;
+      const result = parse(xxeExternal, "https://example.com/feed");
+      if (isOk(result)) {
+        expect(unwrap(result).feed.title).not.toContain("root:");
+      }
+    });
+
+    it("should handle billion laughs (XML bomb) without hanging", () => {
+      const bomb = `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE lolz [
+  <!ENTITY lol "lol">
+  <!ENTITY lol2 "&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;">
+  <!ENTITY lol3 "&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;">
+  <!ENTITY lol4 "&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;">
+]>
+<rss version="2.0">
+  <channel>
+    <title>&lol4;</title>
+    <link>https://example.com</link>
+    <description>Test</description>
+  </channel>
+</rss>`;
+      // Must complete quickly (not hang) — either returns Err or safe result
+      const result = parse(bomb, "https://example.com/feed");
+      if (isOk(result)) {
+        // If it parses, the title should not contain exponentially expanded content
+        expect(unwrap(result).feed.title.length).toBeLessThan(10000);
+      }
+    });
+  });
 });
