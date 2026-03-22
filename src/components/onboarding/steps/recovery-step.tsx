@@ -12,10 +12,9 @@ import {
 import { useOnboardingStore } from "@/stores/onboarding-store";
 import { useAppStore } from "@/stores/app-store";
 import { useSyncStore } from "@/stores/sync-store";
-import { open, getSalt } from "@/core/storage/db";
+import { initFresh } from "@/core/storage/key-manager";
 import { pullVault, importVault } from "@/core/sync/sync-service";
-import { deriveAndStoreKeys } from "@/core/storage/key-material";
-import { deriveVaultId, deriveVaultKey } from "@/core/sync/vault-crypto";
+import { rekeyFromPassphrase } from "@/core/storage/key-manager";
 
 export function RecoveryStep() {
   const [passphrase, setPassphrase] = useState("");
@@ -32,36 +31,29 @@ export function RecoveryStep() {
     setError(null);
 
     const trimmed = passphrase.trim();
-    const result = await open(trimmed);
 
-    if (!result.ok) {
-      setError("Could not open database. Please check your passphrase.");
+    // Initialize fresh with the recovery passphrase (sync enabled)
+    const initResult = await initFresh(trimmed, { sync: true });
+    if (!initResult.ok) {
+      setError("Could not initialize. Please check your passphrase.");
       setIsLoading(false);
       return;
     }
 
-    // Store derived keys, remove raw passphrase from persistence
-    const saltResult = await getSalt();
-    const salt = saltResult.ok ? saltResult.value : undefined;
-    await deriveAndStoreKeys(trimmed, salt, { includeVaultKeys: true });
+    const credentials = initResult.value.credentials;
 
-    // Attempt cloud pull — if vault exists on server, import it
-    const [vaultIdResult, vaultKeyResult] = await Promise.all([
-      deriveVaultId(trimmed),
-      deriveVaultKey(trimmed),
-    ]);
-    if (vaultIdResult.ok && vaultKeyResult.ok) {
-      const credentials = {
-        vaultId: vaultIdResult.value,
-        vaultKey: vaultKeyResult.value,
-      };
+    // Attempt cloud pull — if vault exists on server, import and rekey
+    if (credentials) {
       const pullResult = await pullVault(credentials);
       if (pullResult.ok) {
         await importVault(pullResult.value);
+        // After importAll, re-derive keys since data is now re-encrypted
+        await rekeyFromPassphrase(trimmed, { sync: true });
         useSyncStore.getState().restoreSync(credentials);
       }
     }
 
+    useAppStore.setState({ isDbReady: true });
     completeOnboarding();
   };
 

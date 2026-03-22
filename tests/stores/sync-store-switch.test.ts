@@ -11,13 +11,6 @@ vi.mock("../../src/core/sync/sync-service", () => ({
   mergeVaults: vi.fn(),
 }));
 
-vi.mock("../../src/core/storage/db", () => ({
-  deleteDatabase: vi.fn().mockResolvedValue({ ok: true, value: true }),
-  getSalt: vi
-    .fn()
-    .mockResolvedValue({ ok: true, value: new Uint8Array([1, 2, 3]) }),
-}));
-
 vi.mock("../../src/core/sync/vault-crypto", () => ({
   deriveVaultId: vi
     .fn()
@@ -27,9 +20,11 @@ vi.mock("../../src/core/sync/vault-crypto", () => ({
     .mockResolvedValue({ ok: true, value: "mock-vault-key" }),
 }));
 
-vi.mock("../../src/core/storage/key-material", () => ({
-  deriveAndStoreKeys: vi.fn().mockResolvedValue({ ok: true, value: {} }),
-  clearStoredKeys: vi.fn(),
+vi.mock("../../src/core/storage/key-manager", () => ({
+  addVaultKeys: vi.fn(),
+  removeVaultKeys: vi.fn(),
+  destroyLocal: vi.fn().mockResolvedValue(undefined),
+  rekeyFromPassphrase: vi.fn().mockResolvedValue({ ok: true, value: {} }),
 }));
 
 import {
@@ -128,26 +123,20 @@ describe("sync-store switchToExistingCloud", () => {
       expect(state.error).toBeNull();
     });
 
-    it("stores derived keys and storage mode to localStorage", async () => {
+    it("re-keys from cloud passphrase after import", async () => {
       mockPullVault.mockResolvedValue({ ok: true, value: makeVaultData() });
       mockImportVault.mockResolvedValue({ ok: true, value: true });
 
-      const { deriveAndStoreKeys } =
-        await import("../../src/core/storage/key-material");
+      const { rekeyFromPassphrase } =
+        await import("../../src/core/storage/key-manager");
 
       await useSyncStore
         .getState()
         .switchToExistingCloud("cloud-passphrase", "replace");
 
-      expect(deriveAndStoreKeys).toHaveBeenCalledWith(
-        "cloud-passphrase",
-        new Uint8Array([1, 2, 3]),
-        { includeVaultKeys: true },
-      );
-      expect(localStorageMock.setItem).toHaveBeenCalledWith(
-        "feedzero:storage-mode",
-        "sync",
-      );
+      expect(rekeyFromPassphrase).toHaveBeenCalledWith("cloud-passphrase", {
+        sync: true,
+      });
     });
 
     it("sets status to syncing during operation", async () => {

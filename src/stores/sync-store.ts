@@ -9,12 +9,12 @@ import {
 } from "../core/sync/sync-service";
 import type { SyncCredentials } from "../core/sync/sync-service";
 import { deriveVaultId, deriveVaultKey } from "../core/sync/vault-crypto.ts";
-import { deleteDatabase, getSalt } from "../core/storage/db.ts";
-import { LOCAL_STORAGE } from "../utils/constants.ts";
 import {
-  deriveAndStoreKeys,
-  clearStoredKeys,
-} from "../core/storage/key-material.ts";
+  addVaultKeys,
+  removeVaultKeys,
+  destroyLocal,
+  rekeyFromPassphrase,
+} from "../core/storage/key-manager.ts";
 import type { Result } from "../utils/result.ts";
 import { ok, err } from "../utils/result.ts";
 
@@ -32,26 +32,14 @@ interface SyncStore {
   credentials: SyncCredentials | null;
   dialogOpen: boolean;
 
-  /** Enable sync: derive keys, push vault, transition to synced. */
   enableSync: (passphrase: string) => Promise<void>;
-  /** Restore sync state from pre-derived credentials without pushing. */
   restoreSync: (credentials: SyncCredentials) => void;
-  /** Disable sync: delete server vault, reset state, clear persisted data. */
   disableSync: () => Promise<void>;
-  /** Log out: clear local data and reset to onboarding. Cloud vault is preserved. */
   logout: () => Promise<void>;
-  /** Push local data to the server. */
   push: () => Promise<void>;
-  /** Pull data from the server and import into local DB. */
   pull: () => Promise<void>;
-  /** Schedule a debounced push (5s after last call). */
   scheduleSyncPush: () => void;
   setDialogOpen: (open: boolean) => void;
-  /**
-   * Switch from local-only to an existing cloud account.
-   * - replace: Delete local data, import cloud data.
-   * - merge: Merge local and cloud data, push merged result.
-   */
   switchToExistingCloud: (
     passphrase: string,
     mode: SwitchMode,
@@ -92,46 +80,18 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
   dialogOpen: false,
 
   enableSync: async (passphrase) => {
-    const credsResult = await deriveSyncCredentials(passphrase);
-    if (!credsResult.ok) {
-      set({ status: "error", error: credsResult.error });
+    // Derive vault keys and persist alongside existing DB keys
+    const keysResult = await addVaultKeys(passphrase);
+    if (!keysResult.ok) {
+      set({ status: "error", error: keysResult.error });
       return;
     }
-    const credentials = credsResult.value;
+    const credentials = keysResult.value;
 
     set({ credentials, status: "syncing", error: null });
-    localStorage.setItem(LOCAL_STORAGE.STORAGE_MODE, "sync");
 
-    // Persist the current in-memory DB keys (which can decrypt local data)
-    // alongside the new vault keys derived from the sync passphrase.
-    // We must NOT re-derive DB keys from the new passphrase — local data
-    // is encrypted with the original onboarding passphrase's keys.
-    const { exportCurrentKeys } = await import("../core/storage/db.ts");
-    const currentKeys = await exportCurrentKeys();
-    if (currentKeys.ok) {
-      const saltResult = await getSalt();
-      const dbSalt = saltResult.ok ? Array.from(saltResult.value) : [];
-      const vaultIdResult = await deriveVaultId(passphrase);
-      const vaultKeyResult = await deriveVaultKey(passphrase, {
-        extractable: true,
-      });
-      if (vaultIdResult.ok && vaultKeyResult.ok) {
-        const { exportCryptoKey } = await import("../core/storage/crypto.ts");
-        const vaultKeyJwk = await exportCryptoKey(vaultKeyResult.value);
-        const material = {
-          dbKeyJwk: currentKeys.value.dbKeyJwk,
-          hmacKeyJwk: currentKeys.value.hmacKeyJwk,
-          dbSalt,
-          vaultId: vaultIdResult.value,
-          vaultKeyJwk,
-        };
-        localStorage.setItem(
-          LOCAL_STORAGE.DERIVED_KEYS,
-          JSON.stringify(material),
-        );
-      }
-    }
-
+    // Push local data to vault — if this fails, keys are already stored
+    // (next session will have sync mode set, and can retry push)
     const result = await pushVault(credentials);
     if (result.ok) {
       set({ status: "synced", lastSyncedAt: result.value, error: null });
@@ -141,7 +101,6 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
   },
 
   restoreSync: (credentials) => {
-    localStorage.setItem(LOCAL_STORAGE.STORAGE_MODE, "sync");
     set({
       credentials,
       status: "synced",
@@ -157,7 +116,6 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     if (credentials) {
       const deleteResult = await deleteVault(credentials);
       if (!deleteResult.ok) {
-        // Retry once — transient network failures shouldn't leave orphaned vaults
         const retry = await deleteVault(credentials);
         if (!retry.ok) {
           set({
@@ -169,25 +127,8 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       }
     }
 
-    // Re-persist current DB keys without vault keys so local data
-    // remains accessible in future sessions after switching to local-only.
-    const { exportCurrentKeys } = await import("../core/storage/db.ts");
-    const currentKeys = await exportCurrentKeys();
-    if (currentKeys.ok) {
-      const saltResult = await getSalt();
-      const dbSalt = saltResult.ok ? Array.from(saltResult.value) : [];
-      const material = {
-        dbKeyJwk: currentKeys.value.dbKeyJwk,
-        hmacKeyJwk: currentKeys.value.hmacKeyJwk,
-        dbSalt,
-      };
-      localStorage.setItem(
-        LOCAL_STORAGE.DERIVED_KEYS,
-        JSON.stringify(material),
-      );
-    }
-
-    localStorage.removeItem(LOCAL_STORAGE.STORAGE_MODE);
+    // Vault confirmed deleted — strip vault keys, keep DB keys
+    removeVaultKeys();
     set({
       status: "local-only",
       lastSyncedAt: null,
@@ -198,10 +139,8 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
 
   logout: async () => {
     clearPendingTimers();
-    await deleteDatabase();
-    clearStoredKeys();
-    localStorage.removeItem(LOCAL_STORAGE.STORAGE_MODE);
-    localStorage.removeItem(LOCAL_STORAGE.ONBOARDING_COMPLETE);
+    // Preserve cloud vault (intentional — for recovery on another device)
+    await destroyLocal();
     set({
       status: "local-only",
       lastSyncedAt: null,
@@ -284,13 +223,14 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
         return importResult;
       }
 
-      // Store derived keys, remove raw passphrase
-      const saltResult = await getSalt();
-      const salt = saltResult.ok ? saltResult.value : undefined;
-      await deriveAndStoreKeys(passphrase, salt, {
-        includeVaultKeys: true,
-      });
-      localStorage.setItem(LOCAL_STORAGE.STORAGE_MODE, "sync");
+      // importAll re-encrypts data with current keys, but we need keys
+      // derived from the cloud passphrase for future sessions
+      const rekeyResult = await rekeyFromPassphrase(passphrase, { sync: true });
+      if (!rekeyResult.ok) {
+        set({ status: "error", error: rekeyResult.error });
+        return rekeyResult;
+      }
+
       set({
         credentials,
         status: "synced",
@@ -331,13 +271,12 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
       return err(pushResult.error);
     }
 
-    // Store derived keys, remove raw passphrase
-    const saltResult = await getSalt();
-    const salt = saltResult.ok ? saltResult.value : undefined;
-    await deriveAndStoreKeys(passphrase, salt, {
-      includeVaultKeys: true,
-    });
-    localStorage.setItem(LOCAL_STORAGE.STORAGE_MODE, "sync");
+    const rekeyResult = await rekeyFromPassphrase(passphrase, { sync: true });
+    if (!rekeyResult.ok) {
+      set({ status: "error", error: rekeyResult.error });
+      return rekeyResult;
+    }
+
     set({
       credentials,
       status: "synced",

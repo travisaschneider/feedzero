@@ -4,8 +4,6 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useAppStore } from "@/stores/app-store";
 import { useOnboardingStore } from "@/stores/onboarding-store";
 import { useSyncStore } from "@/stores/sync-store";
-import { deriveAndStoreKeys } from "@/core/storage/key-material";
-import { getSalt } from "@/core/storage/db";
 import { WelcomeStep } from "./steps/welcome-step";
 import { StorageChoiceStep } from "./steps/storage-choice-step";
 import { PassphraseDisplayStep } from "./steps/passphrase-display-step";
@@ -34,14 +32,11 @@ export function OnboardingModal() {
 
   useEffect(() => {
     if (step === "initializing" && generatedPassphrase) {
-      initialize(generatedPassphrase).then(async () => {
-        if (storageMode === "sync") {
+      const isSync = storageMode === "sync";
+
+      initialize(generatedPassphrase, { sync: isSync }).then(async () => {
+        if (isSync) {
           await enableSync(generatedPassphrase);
-        } else {
-          const saltResult = await getSalt();
-          const salt = saltResult.ok ? saltResult.value : undefined;
-          await deriveAndStoreKeys(generatedPassphrase, salt);
-          localStorage.setItem("feedzero:storage-mode", "local");
         }
         completeOnboarding();
       });

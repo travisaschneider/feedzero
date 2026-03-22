@@ -6,24 +6,20 @@ import { useOnboardingStore } from "@/stores/onboarding-store";
 import { useAppStore } from "@/stores/app-store";
 import { useSyncStore } from "@/stores/sync-store";
 
-vi.mock("@/core/storage/db.ts", () => ({
-  open: vi.fn().mockResolvedValue({ ok: true, value: true }),
-  deleteDatabase: vi.fn().mockResolvedValue({ ok: true, value: true }),
-  getSalt: vi
-    .fn()
-    .mockResolvedValue({ ok: true, value: new Uint8Array([1, 2, 3]) }),
-  exportCurrentKeys: vi.fn().mockResolvedValue({
+vi.mock("@/core/storage/key-manager", () => ({
+  initFresh: vi.fn().mockResolvedValue({
     ok: true,
-    value: {
-      dbKeyJwk: { kty: "oct", k: "db-key" },
-      hmacKeyJwk: { kty: "oct", k: "hmac-key" },
-    },
+    value: { credentials: null },
   }),
-}));
-
-vi.mock("@/core/storage/crypto.ts", () => ({
-  exportCryptoKey: vi.fn().mockResolvedValue({ kty: "oct", k: "vault-key" }),
-  importCryptoKey: vi.fn().mockResolvedValue("mock-key"),
+  restore: vi.fn().mockResolvedValue({ status: "no-keys" }),
+  destroy: vi.fn().mockResolvedValue(undefined),
+  addVaultKeys: vi.fn().mockResolvedValue({
+    ok: true,
+    value: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" },
+  }),
+  removeVaultKeys: vi.fn(),
+  destroyLocal: vi.fn().mockResolvedValue(undefined),
+  rekeyFromPassphrase: vi.fn().mockResolvedValue({ ok: true, value: {} }),
 }));
 
 vi.mock("@/core/crypto/passphrase-generator", () => ({
@@ -47,12 +43,6 @@ vi.mock("@/core/sync/vault-crypto", () => ({
   deriveVaultKey: vi
     .fn()
     .mockResolvedValue({ ok: true, value: "mock-vault-key" }),
-}));
-
-vi.mock("@/core/storage/key-material", () => ({
-  deriveAndStoreKeys: vi.fn().mockResolvedValue({ ok: true, value: {} }),
-  loadStoredKeys: vi.fn().mockReturnValue(null),
-  clearStoredKeys: vi.fn(),
 }));
 
 const localStorageMock = (() => {
@@ -242,10 +232,9 @@ describe("OnboardingModal", () => {
       expect(syncState.lastSyncedAt).not.toBeNull();
     });
 
-    it("stores derived keys for local-only onboarding instead of raw passphrase", async () => {
+    it("uses initFresh for local-only onboarding", async () => {
       const user = userEvent.setup();
-      const { deriveAndStoreKeys } =
-        await import("@/core/storage/key-material");
+      const { initFresh } = await import("@/core/storage/key-manager");
       render(<OnboardingModal />);
 
       await user.click(screen.getByRole("button", { name: /get started/i }));
@@ -256,19 +245,10 @@ describe("OnboardingModal", () => {
         expect(useAppStore.getState().hasCompletedOnboarding).toBe(true);
       });
 
-      // Should store derived keys with the DB salt, not raw passphrase
-      expect(deriveAndStoreKeys).toHaveBeenCalledWith(
+      // Should call initFresh with local mode (sync: false)
+      expect(initFresh).toHaveBeenCalledWith(
         "carbon mango velvet prism",
-        new Uint8Array([1, 2, 3]),
-      );
-      expect(localStorageMock.setItem).toHaveBeenCalledWith(
-        "feedzero:storage-mode",
-        "local",
-      );
-      // Raw passphrase should NOT be stored
-      expect(localStorageMock.setItem).not.toHaveBeenCalledWith(
-        "feedzero:sync-passphrase",
-        expect.anything(),
+        { sync: false },
       );
     });
 

@@ -7,11 +7,9 @@ import { useOnboardingStore } from "@/stores/onboarding-store";
 import { useAppStore } from "@/stores/app-store";
 import { useSyncStore } from "@/stores/sync-store";
 
-vi.mock("@/core/storage/db", () => ({
-  open: vi.fn(),
-  getSalt: vi
-    .fn()
-    .mockResolvedValue({ ok: true, value: new Uint8Array([1, 2, 3]) }),
+vi.mock("@/core/storage/key-manager", () => ({
+  initFresh: vi.fn(),
+  rekeyFromPassphrase: vi.fn().mockResolvedValue({ ok: true, value: {} }),
 }));
 
 vi.mock("@/core/sync/sync-service", () => ({
@@ -20,23 +18,8 @@ vi.mock("@/core/sync/sync-service", () => ({
   importVault: vi.fn().mockResolvedValue({ ok: true, value: true }),
 }));
 
-vi.mock("@/core/storage/key-material", () => ({
-  deriveAndStoreKeys: vi.fn().mockResolvedValue({ ok: true, value: {} }),
-  clearStoredKeys: vi.fn(),
-}));
-
-vi.mock("@/core/sync/vault-crypto", () => ({
-  deriveVaultId: vi
-    .fn()
-    .mockResolvedValue({ ok: true, value: "mock-vault-id" }),
-  deriveVaultKey: vi
-    .fn()
-    .mockResolvedValue({ ok: true, value: "mock-vault-key" }),
-}));
-
-import { open } from "@/core/storage/db";
+import { initFresh } from "@/core/storage/key-manager";
 import { pullVault, importVault } from "@/core/sync/sync-service";
-import { deriveAndStoreKeys } from "@/core/storage/key-material";
 
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
@@ -125,7 +108,7 @@ describe("RecoveryStep", () => {
 
   it("shows error when db open fails", async () => {
     const user = userEvent.setup();
-    vi.mocked(open).mockResolvedValue({
+    vi.mocked(initFresh).mockResolvedValue({
       ok: false,
       error: "Invalid passphrase",
     });
@@ -139,13 +122,18 @@ describe("RecoveryStep", () => {
     await user.click(screen.getByRole("button", { name: /recover/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/could not open database/i)).toBeInTheDocument();
+      expect(screen.getByText(/could not initialize/i)).toBeInTheDocument();
     });
   });
 
   it("completes onboarding when passphrase is valid (local-only)", async () => {
     const user = userEvent.setup();
-    vi.mocked(open).mockResolvedValue({ ok: true, value: true });
+    vi.mocked(initFresh).mockResolvedValue({
+      ok: true,
+      value: {
+        credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey },
+      },
+    });
 
     renderInDialog(<RecoveryStep />);
 
@@ -162,7 +150,12 @@ describe("RecoveryStep", () => {
 
   it("stores derived keys on recovery", async () => {
     const user = userEvent.setup();
-    vi.mocked(open).mockResolvedValue({ ok: true, value: true });
+    vi.mocked(initFresh).mockResolvedValue({
+      ok: true,
+      value: {
+        credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey },
+      },
+    });
 
     renderInDialog(<RecoveryStep />);
 
@@ -176,10 +169,9 @@ describe("RecoveryStep", () => {
       expect(useAppStore.getState().hasCompletedOnboarding).toBe(true);
     });
 
-    expect(deriveAndStoreKeys).toHaveBeenCalledWith(
+    expect(initFresh).toHaveBeenCalledWith(
       "carbon mango velvet prism",
-      new Uint8Array([1, 2, 3]),
-      { includeVaultKeys: true },
+      { sync: true },
     );
   });
 
@@ -211,7 +203,12 @@ describe("RecoveryStep", () => {
         ],
         articles: [],
       };
-      vi.mocked(open).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(initFresh).mockResolvedValue({
+      ok: true,
+      value: {
+        credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey },
+      },
+    });
       vi.mocked(pullVault).mockResolvedValue({ ok: true, value: vaultData });
       vi.mocked(importVault).mockResolvedValue({ ok: true, value: true });
 
@@ -234,7 +231,12 @@ describe("RecoveryStep", () => {
 
     it("sets sync store credentials after cloud pull recovery", async () => {
       const user = userEvent.setup();
-      vi.mocked(open).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(initFresh).mockResolvedValue({
+      ok: true,
+      value: {
+        credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey },
+      },
+    });
       vi.mocked(pullVault).mockResolvedValue({
         ok: true,
         value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
@@ -255,9 +257,14 @@ describe("RecoveryStep", () => {
       expect(useSyncStore.getState().status).toBe("synced");
     });
 
-    it("persists storage mode to localStorage after cloud recovery", async () => {
+    it("initializes with sync mode for cloud recovery", async () => {
       const user = userEvent.setup();
-      vi.mocked(open).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(initFresh).mockResolvedValue({
+      ok: true,
+      value: {
+        credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey },
+      },
+    });
       vi.mocked(pullVault).mockResolvedValue({
         ok: true,
         value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
@@ -273,9 +280,9 @@ describe("RecoveryStep", () => {
       await user.click(screen.getByRole("button", { name: /recover/i }));
 
       await waitFor(() => {
-        expect(localStorageMock.setItem).toHaveBeenCalledWith(
-          "feedzero:storage-mode",
-          "sync",
+        expect(initFresh).toHaveBeenCalledWith(
+          "carbon mango velvet prism",
+          { sync: true },
         );
       });
     });
@@ -288,7 +295,12 @@ describe("RecoveryStep", () => {
 
     it("submits on Enter key in input field", async () => {
       const user = userEvent.setup();
-      vi.mocked(open).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(initFresh).mockResolvedValue({
+      ok: true,
+      value: {
+        credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey },
+      },
+    });
 
       renderInDialog(<RecoveryStep />);
 
@@ -304,7 +316,12 @@ describe("RecoveryStep", () => {
 
     it("completes onboarding even if pull fails (falls back to local)", async () => {
       const user = userEvent.setup();
-      vi.mocked(open).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(initFresh).mockResolvedValue({
+      ok: true,
+      value: {
+        credentials: { vaultId: "mock-vault-id", vaultKey: "mock-vault-key" as unknown as CryptoKey },
+      },
+    });
       vi.mocked(pullVault).mockResolvedValue({
         ok: false,
         error: "Not found",

@@ -1,61 +1,19 @@
 import { create } from "zustand";
 import {
-  open,
-  openWithKeys,
-  deleteDatabase,
-  getFeeds,
-} from "../core/storage/db.ts";
-import { LOCAL_STORAGE, CRYPTO } from "../utils/constants.ts";
-import { importCryptoKey } from "../core/storage/crypto.ts";
-import {
-  loadStoredKeys,
-  clearStoredKeys,
-} from "../core/storage/key-material.ts";
+  initFresh,
+  restore,
+  destroy,
+} from "../core/storage/key-manager.ts";
+import { LOCAL_STORAGE } from "../utils/constants.ts";
 import { useSyncStore } from "./sync-store.ts";
-
-type AppStoreSetter = (partial: Partial<AppStore>) => void;
-
-/**
- * Best-effort cleanup of the server vault using stored credentials.
- * Called before any full teardown (reset, re-onboarding) to prevent
- * orphaned encrypted blobs on the server.
- */
-async function tryDeleteServerVault(): Promise<void> {
-  const storedKeys = loadStoredKeys();
-  if (!storedKeys?.vaultId || !storedKeys?.vaultKeyJwk) return;
-
-  try {
-    const vaultKey = await importCryptoKey(storedKeys.vaultKeyJwk, {
-      name: CRYPTO.ALGORITHM,
-      length: CRYPTO.KEY_LENGTH,
-    });
-    const { deleteVault } = await import("../core/sync/sync-service.ts");
-    await deleteVault({ vaultId: storedKeys.vaultId, vaultKey });
-  } catch {
-    // Best-effort — vault data is encrypted and unreadable without the passphrase
-  }
-}
-
-/**
- * Clear all persisted state and redirect to onboarding.
- * Called when returning-user initialization fails (missing keys, DB gone,
- * decryption mismatch). Avoids showing an error wall — just re-onboard.
- */
-async function forceReOnboarding(set: AppStoreSetter): Promise<void> {
-  await tryDeleteServerVault();
-  await deleteDatabase();
-  clearStoredKeys();
-  localStorage.removeItem(LOCAL_STORAGE.ONBOARDING_COMPLETE);
-  localStorage.removeItem(LOCAL_STORAGE.STORAGE_MODE);
-  set({ isDbReady: false, error: null, hasCompletedOnboarding: false });
-}
 
 interface AppStore {
   isDbReady: boolean;
   error: string | null;
   hasCompletedOnboarding: boolean | null;
-  initialize: (passphrase: string) => Promise<void>;
-  /** Initialize DB for returning users using stored derived keys. */
+  /** Initialize a fresh DB for new users (onboarding). */
+  initialize: (passphrase: string, options?: { sync: boolean }) => Promise<void>;
+  /** Restore DB for returning users from stored keys. */
   initializeReturningUser: () => Promise<void>;
   setError: (error: string | null) => void;
   completeOnboarding: () => void;
@@ -68,60 +26,37 @@ export const useAppStore = create<AppStore>((set) => ({
   error: null,
   hasCompletedOnboarding: null,
 
-  initialize: async (passphrase) => {
-    // Clean up any orphaned server vault and local DB to ensure a fresh start.
-    await tryDeleteServerVault();
-    await deleteDatabase();
-    const result = await open(passphrase);
-    if (result.ok) {
-      set({ isDbReady: true, error: null });
-    } else {
+  initialize: async (passphrase, options) => {
+    const result = await initFresh(passphrase, options);
+    if (!result.ok) {
       set({ isDbReady: false, error: result.error });
+      return;
     }
+
+    if (result.value.credentials) {
+      useSyncStore.setState({ credentials: result.value.credentials });
+    }
+
+    set({ isDbReady: true, error: null });
   },
 
   initializeReturningUser: async () => {
-    const storageMode = localStorage.getItem(LOCAL_STORAGE.STORAGE_MODE);
-    const storedKeys = loadStoredKeys();
-    const isSyncUser = storageMode === "sync";
+    const status = await restore();
 
-    if (!storedKeys) {
-      // No keys — force re-onboarding instead of showing an error
-      await forceReOnboarding(set);
+    if (status.status !== "ready") {
+      // Keys missing or invalid — clean slate, re-onboard
+      await destroy();
+      set({ isDbReady: false, error: null, hasCompletedOnboarding: false });
       return;
     }
 
-    const result = await openWithKeys(
-      storedKeys.dbKeyJwk,
-      storedKeys.hmacKeyJwk,
-    );
-
-    if (!result.ok) {
-      // DB open failed (deleted, corrupted, etc.) — force re-onboarding
-      await forceReOnboarding(set);
-      return;
-    }
-
-    if (isSyncUser && storedKeys.vaultId && storedKeys.vaultKeyJwk) {
-      const vaultKey = await importCryptoKey(storedKeys.vaultKeyJwk, {
-        name: CRYPTO.ALGORITHM,
-        length: CRYPTO.KEY_LENGTH,
-      });
-      useSyncStore.setState({
-        credentials: { vaultId: storedKeys.vaultId, vaultKey },
-      });
-    }
-
-    const feedsResult = await getFeeds();
-    if (!feedsResult.ok) {
-      // Decryption failed — keys don't match data, force re-onboarding
-      await forceReOnboarding(set);
-      return;
+    if (status.credentials) {
+      useSyncStore.setState({ credentials: status.credentials });
     }
 
     set({ isDbReady: true, error: null });
 
-    if (isSyncUser) {
+    if (status.isSyncUser) {
       await useSyncStore.getState().pull();
       if (useSyncStore.getState().status !== "error") {
         useSyncStore.setState({ status: "synced", lastSyncedAt: Date.now() });
@@ -143,11 +78,7 @@ export const useAppStore = create<AppStore>((set) => ({
   },
 
   resetApp: async () => {
-    await tryDeleteServerVault();
-    await deleteDatabase();
-    clearStoredKeys();
-    localStorage.removeItem(LOCAL_STORAGE.ONBOARDING_COMPLETE);
-    localStorage.removeItem(LOCAL_STORAGE.STORAGE_MODE);
+    await destroy();
     set({ isDbReady: false, error: null, hasCompletedOnboarding: false });
     await resetAllStores();
   },

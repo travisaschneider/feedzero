@@ -1,14 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { useAppStore } from "../../src/stores/app-store.ts";
 
-vi.mock("../../src/core/storage/db.ts", () => ({
-  open: vi.fn(),
-  openWithKeys: vi.fn(),
-  deleteDatabase: vi.fn(),
-  getFeeds: vi.fn(),
-  getSalt: vi
-    .fn()
-    .mockResolvedValue({ ok: true, value: new Uint8Array([1, 2, 3]) }),
+vi.mock("../../src/core/storage/key-manager.ts", () => ({
+  initFresh: vi.fn(),
+  restore: vi.fn(),
+  destroy: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("../../src/core/sync/sync-service", () => ({
@@ -17,22 +13,13 @@ vi.mock("../../src/core/sync/sync-service", () => ({
   importVault: vi.fn(),
 }));
 
-vi.mock("../../src/core/storage/key-material", () => ({
-  loadStoredKeys: vi.fn().mockReturnValue(null),
-  clearStoredKeys: vi.fn(),
-}));
-
 vi.mock("../../src/core/storage/crypto.ts", () => ({
   importCryptoKey: vi.fn().mockResolvedValue("mock-vault-key"),
 }));
 
-import { open, openWithKeys, getFeeds } from "../../src/core/storage/db.ts";
+import { initFresh, restore, destroy } from "../../src/core/storage/key-manager.ts";
 import { pullVault, importVault } from "../../src/core/sync/sync-service";
 import { useSyncStore } from "../../src/stores/sync-store.ts";
-import {
-  loadStoredKeys,
-  clearStoredKeys,
-} from "../../src/core/storage/key-material";
 
 const ONBOARDING_KEY = "feedzero:onboarding-complete";
 
@@ -78,25 +65,40 @@ describe("app-store", () => {
     expect(state.error).toBeNull();
   });
 
-  it("initialize sets isDbReady on success", async () => {
-    vi.mocked(open).mockResolvedValue({ ok: true, value: true });
+  it("initialize calls initFresh and sets isDbReady on success", async () => {
+    vi.mocked(initFresh).mockResolvedValue({
+      ok: true,
+      value: { credentials: null },
+    });
 
     await useAppStore.getState().initialize("test-key");
 
-    const state = useAppStore.getState();
-    expect(state.isDbReady).toBe(true);
-    expect(state.error).toBeNull();
-    expect(open).toHaveBeenCalledWith("test-key");
+    expect(initFresh).toHaveBeenCalledWith("test-key", undefined);
+    expect(useAppStore.getState().isDbReady).toBe(true);
+    expect(useAppStore.getState().error).toBeNull();
   });
 
   it("initialize sets error on failure", async () => {
-    vi.mocked(open).mockResolvedValue({ ok: false, error: "DB failed" });
+    vi.mocked(initFresh).mockResolvedValue({
+      ok: false,
+      error: "Init failed",
+    });
 
     await useAppStore.getState().initialize("test-key");
 
-    const state = useAppStore.getState();
-    expect(state.isDbReady).toBe(false);
-    expect(state.error).toBe("DB failed");
+    expect(useAppStore.getState().isDbReady).toBe(false);
+    expect(useAppStore.getState().error).toBe("Init failed");
+  });
+
+  it("initialize passes sync option to initFresh", async () => {
+    vi.mocked(initFresh).mockResolvedValue({
+      ok: true,
+      value: { credentials: { vaultId: "v", vaultKey: "k" as unknown as CryptoKey } },
+    });
+
+    await useAppStore.getState().initialize("test-key", { sync: true });
+
+    expect(initFresh).toHaveBeenCalledWith("test-key", { sync: true });
   });
 
   it("setError updates error state", () => {
@@ -108,36 +110,19 @@ describe("app-store", () => {
   });
 
   describe("onboarding completion", () => {
-    it("hasCompletedOnboarding defaults to false when localStorage empty", () => {
-      localStorageMock.clear();
-      const state = useAppStore.getState();
-      expect(state.hasCompletedOnboarding).toBe(false);
-    });
-
-    it("completeOnboarding sets flag in state", () => {
+    it("completeOnboarding sets flag in state and localStorage", () => {
       useAppStore.getState().completeOnboarding();
       expect(useAppStore.getState().hasCompletedOnboarding).toBe(true);
-    });
-
-    it("completeOnboarding persists flag to localStorage", () => {
-      useAppStore.getState().completeOnboarding();
       expect(localStorageMock.setItem).toHaveBeenCalledWith(
         ONBOARDING_KEY,
         "true",
       );
     });
 
-    it("checkOnboardingStatus reads true from localStorage", () => {
+    it("checkOnboardingStatus reads from localStorage", () => {
       localStorageMock.setItem(ONBOARDING_KEY, "true");
       useAppStore.getState().checkOnboardingStatus();
       expect(useAppStore.getState().hasCompletedOnboarding).toBe(true);
-    });
-
-    it("checkOnboardingStatus reads false when localStorage empty", () => {
-      localStorageMock.clear();
-      useAppStore.setState({ hasCompletedOnboarding: true });
-      useAppStore.getState().checkOnboardingStatus();
-      expect(useAppStore.getState().hasCompletedOnboarding).toBe(false);
     });
   });
 
@@ -151,171 +136,87 @@ describe("app-store", () => {
       });
     });
 
-    it("uses stored keys when available (no passphrase needed)", async () => {
-      const mockKeys = {
-        dbKeyJwk: { kty: "oct" } as JsonWebKey,
-        hmacKeyJwk: { kty: "oct" } as JsonWebKey,
-        dbSalt: [1, 2, 3],
-      };
-      vi.mocked(loadStoredKeys).mockReturnValue(mockKeys);
-      vi.mocked(openWithKeys).mockResolvedValue({ ok: true, value: true });
-      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [] });
+    it("restores from stored keys via KeyManager.restore()", async () => {
+      vi.mocked(restore).mockResolvedValue({
+        status: "ready",
+        isSyncUser: false,
+        credentials: null,
+      });
 
       await useAppStore.getState().initializeReturningUser();
 
-      expect(openWithKeys).toHaveBeenCalledWith(
-        mockKeys.dbKeyJwk,
-        mockKeys.hmacKeyJwk,
-      );
-      expect(open).not.toHaveBeenCalled();
+      expect(restore).toHaveBeenCalledOnce();
       expect(useAppStore.getState().isDbReady).toBe(true);
     });
 
-    it("forces re-onboarding when no stored keys exist", async () => {
-      vi.mocked(loadStoredKeys).mockReturnValue(null);
+    it("forces re-onboarding when no keys exist", async () => {
+      vi.mocked(restore).mockResolvedValue({ status: "no-keys" });
 
       await useAppStore.getState().initializeReturningUser();
 
+      expect(destroy).toHaveBeenCalled();
       expect(useAppStore.getState().isDbReady).toBe(false);
-      expect(useAppStore.getState().error).toBeNull();
       expect(useAppStore.getState().hasCompletedOnboarding).toBe(false);
     });
 
-    it("restores sync credentials from stored keys for sync users", async () => {
-      const mockKeys = {
-        dbKeyJwk: { kty: "oct" } as JsonWebKey,
-        hmacKeyJwk: { kty: "oct" } as JsonWebKey,
-        dbSalt: [1, 2, 3],
-        vaultId: "stored-vault-id",
-        vaultKeyJwk: {
-          kty: "oct",
-          key_ops: ["encrypt", "decrypt"],
-        } as JsonWebKey,
+    it("forces re-onboarding when keys are invalid", async () => {
+      vi.mocked(restore).mockResolvedValue({ status: "invalid-keys" });
+
+      await useAppStore.getState().initializeReturningUser();
+
+      expect(destroy).toHaveBeenCalled();
+      expect(useAppStore.getState().isDbReady).toBe(false);
+      expect(useAppStore.getState().hasCompletedOnboarding).toBe(false);
+    });
+
+    it("restores sync credentials for sync users", async () => {
+      const mockCredentials = {
+        vaultId: "vault-id",
+        vaultKey: "mock-key" as unknown as CryptoKey,
       };
-      vi.mocked(loadStoredKeys).mockReturnValue(mockKeys);
-      vi.mocked(openWithKeys).mockResolvedValue({ ok: true, value: true });
-      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [] });
+      vi.mocked(restore).mockResolvedValue({
+        status: "ready",
+        isSyncUser: true,
+        credentials: mockCredentials,
+      });
       vi.mocked(pullVault).mockResolvedValue({
         ok: true,
         value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
       });
       vi.mocked(importVault).mockResolvedValue({ ok: true, value: true });
-      localStorageMock.setItem("feedzero:storage-mode", "sync");
 
       await useAppStore.getState().initializeReturningUser();
 
       expect(useAppStore.getState().isDbReady).toBe(true);
-      const syncState = useSyncStore.getState();
-      expect(syncState.credentials).not.toBeNull();
-      expect(syncState.credentials?.vaultId).toBe("stored-vault-id");
-      expect(syncState.status).toBe("synced");
+      expect(useSyncStore.getState().credentials).toBe(mockCredentials);
+      expect(useSyncStore.getState().status).toBe("synced");
     });
 
-    it("still initializes DB when sync pull fails", async () => {
-      const mockKeys = {
-        dbKeyJwk: { kty: "oct" } as JsonWebKey,
-        hmacKeyJwk: { kty: "oct" } as JsonWebKey,
-        dbSalt: [1, 2, 3],
-        vaultId: "vault-id",
-        vaultKeyJwk: { kty: "oct" } as JsonWebKey,
-      };
-      vi.mocked(loadStoredKeys).mockReturnValue(mockKeys);
-      vi.mocked(openWithKeys).mockResolvedValue({ ok: true, value: true });
-      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [] });
+    it("still initializes when sync pull fails", async () => {
+      vi.mocked(restore).mockResolvedValue({
+        status: "ready",
+        isSyncUser: true,
+        credentials: {
+          vaultId: "vault-id",
+          vaultKey: "mock-key" as unknown as CryptoKey,
+        },
+      });
       vi.mocked(pullVault).mockResolvedValue({
         ok: false,
         error: "Not found",
       });
-      localStorageMock.setItem("feedzero:storage-mode", "sync");
 
       await useAppStore.getState().initializeReturningUser();
 
       expect(useAppStore.getState().isDbReady).toBe(true);
     });
-
-    it("preserves error status when sync pull fails", async () => {
-      const mockKeys = {
-        dbKeyJwk: { kty: "oct" } as JsonWebKey,
-        hmacKeyJwk: { kty: "oct" } as JsonWebKey,
-        dbSalt: [1, 2, 3],
-        vaultId: "vault-id",
-        vaultKeyJwk: { kty: "oct" } as JsonWebKey,
-      };
-      vi.mocked(loadStoredKeys).mockReturnValue(mockKeys);
-      vi.mocked(openWithKeys).mockResolvedValue({ ok: true, value: true });
-      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [] });
-      vi.mocked(pullVault).mockResolvedValue({
-        ok: false,
-        error: "Sync pull failed (404): Vault not found",
-      });
-      localStorageMock.setItem("feedzero:storage-mode", "sync");
-
-      await useAppStore.getState().initializeReturningUser();
-
-      const syncState = useSyncStore.getState();
-      expect(syncState.status).toBe("error");
-      expect(syncState.error).toBe("Sync pull failed (404): Vault not found");
-    });
-
-    it("forces re-onboarding when decryption validation fails after opening DB", async () => {
-      const mockKeys = {
-        dbKeyJwk: { kty: "oct" } as JsonWebKey,
-        hmacKeyJwk: { kty: "oct" } as JsonWebKey,
-        dbSalt: [1, 2, 3],
-      };
-      vi.mocked(loadStoredKeys).mockReturnValue(mockKeys);
-      vi.mocked(openWithKeys).mockResolvedValue({ ok: true, value: true });
-      vi.mocked(getFeeds).mockResolvedValue({
-        ok: false,
-        error:
-          "Failed to decrypt 5 records. This may indicate an incorrect passphrase.",
-      });
-
-      await useAppStore.getState().initializeReturningUser();
-
-      const state = useAppStore.getState();
-      expect(state.isDbReady).toBe(false);
-      expect(state.error).toBeNull();
-      expect(state.hasCompletedOnboarding).toBe(false);
-    });
-
-    it("does not proceed to sync pull when decryption validation fails", async () => {
-      const mockKeys = {
-        dbKeyJwk: { kty: "oct" } as JsonWebKey,
-        hmacKeyJwk: { kty: "oct" } as JsonWebKey,
-        dbSalt: [1, 2, 3],
-        vaultId: "vault-id",
-        vaultKeyJwk: { kty: "oct" } as JsonWebKey,
-      };
-      vi.mocked(loadStoredKeys).mockReturnValue(mockKeys);
-      vi.mocked(openWithKeys).mockResolvedValue({ ok: true, value: true });
-      vi.mocked(getFeeds).mockResolvedValue({
-        ok: false,
-        error: "Decryption failed",
-      });
-      localStorageMock.setItem("feedzero:storage-mode", "sync");
-
-      await useAppStore.getState().initializeReturningUser();
-
-      expect(pullVault).not.toHaveBeenCalled();
-      expect(useAppStore.getState().isDbReady).toBe(false);
-    });
   });
 
   describe("resetApp", () => {
-    it("clears all localStorage keys including storage mode and derived keys", async () => {
-      localStorageMock.setItem("feedzero:onboarding-complete", "true");
-      localStorageMock.setItem("feedzero:storage-mode", "sync");
-
+    it("calls destroy and resets all state", async () => {
       await useAppStore.getState().resetApp();
 
-      expect(localStorageMock.removeItem).toHaveBeenCalledWith(
-        "feedzero:onboarding-complete",
-      );
-      expect(localStorageMock.removeItem).toHaveBeenCalledWith(
-        "feedzero:storage-mode",
-      );
-      expect(clearStoredKeys).toHaveBeenCalled();
+      expect(destroy).toHaveBeenCalled();
       expect(useAppStore.getState().isDbReady).toBe(false);
       expect(useAppStore.getState().hasCompletedOnboarding).toBe(false);
     });

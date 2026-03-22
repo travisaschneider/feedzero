@@ -4,14 +4,21 @@ import { useAppStore } from "@/stores/app-store";
 import { useFeedStore } from "@/stores/feed-store";
 import { useSyncStore } from "@/stores/sync-store";
 
-vi.mock("@/core/storage/db.ts", () => ({
-  open: vi.fn().mockResolvedValue({ ok: true, value: true }),
-  openWithKeys: vi.fn().mockResolvedValue({ ok: true, value: true }),
-  getFeeds: vi.fn().mockResolvedValue({ ok: true, value: [] }),
-  getSalt: vi
-    .fn()
-    .mockResolvedValue({ ok: true, value: new Uint8Array([1, 2, 3]) }),
-  deleteDatabase: vi.fn().mockResolvedValue(undefined),
+vi.mock("@/core/storage/key-manager", () => ({
+  initFresh: vi.fn().mockResolvedValue({
+    ok: true,
+    value: { credentials: null },
+  }),
+  restore: vi.fn().mockResolvedValue({
+    status: "ready",
+    isSyncUser: false,
+    credentials: null,
+  }),
+  destroy: vi.fn().mockResolvedValue(undefined),
+  addVaultKeys: vi.fn(),
+  removeVaultKeys: vi.fn(),
+  destroyLocal: vi.fn().mockResolvedValue(undefined),
+  rekeyFromPassphrase: vi.fn().mockResolvedValue({ ok: true, value: {} }),
 }));
 
 vi.mock("@/core/feeds/feed-service.ts", () => ({
@@ -26,29 +33,20 @@ vi.mock("@/core/sync/sync-service", () => ({
     value: { version: 1, exportedAt: Date.now(), feeds: [], articles: [] },
   }),
   importVault: vi.fn().mockResolvedValue({ ok: true, value: true }),
+  deleteVault: vi.fn().mockResolvedValue({ ok: true, value: true }),
 }));
 
-vi.mock("@/core/storage/key-material", () => ({
-  loadStoredKeys: vi.fn().mockReturnValue(null),
-  deriveAndStoreKeys: vi.fn().mockResolvedValue({
-    ok: true,
-    value: {
-      dbKeyJwk: { kty: "oct" },
-      hmacKeyJwk: { kty: "oct" },
-      dbSalt: [1, 2, 3],
-      vaultId: "migrated-vault-id",
-      vaultKeyJwk: { kty: "oct", key_ops: ["encrypt", "decrypt"] },
-    },
-  }),
-  clearStoredKeys: vi.fn(),
+vi.mock("@/core/sync/vault-crypto", () => ({
+  deriveVaultId: vi.fn().mockResolvedValue({ ok: true, value: "mock-vault-id" }),
+  deriveVaultKey: vi.fn().mockResolvedValue({ ok: true, value: "mock-vault-key" }),
 }));
 
-vi.mock("@/core/storage/crypto.ts", () => ({
-  importCryptoKey: vi.fn().mockResolvedValue("mock-vault-key"),
+vi.mock("@/core/storage/db.ts", () => ({
+  getFeeds: vi.fn().mockResolvedValue({ ok: true, value: [] }),
 }));
 
 import { refreshAllFeeds } from "@/core/feeds/feed-service";
-import { loadStoredKeys } from "@/core/storage/key-material";
+import { restore } from "@/core/storage/key-manager";
 
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
@@ -71,14 +69,12 @@ Object.defineProperty(globalThis, "localStorage", {
   writable: true,
 });
 
-// Lazy import App so mocks are set up first
 let App: typeof import("@/app").App;
 
 describe("App sync-aware init", () => {
   beforeEach(async () => {
     localStorageMock.clear();
     vi.clearAllMocks();
-    vi.mocked(loadStoredKeys).mockReturnValue(null);
     useAppStore.setState({
       isDbReady: false,
       error: null,
@@ -106,13 +102,12 @@ describe("App sync-aware init", () => {
     localStorageMock.clear();
   });
 
-  it("initializes with stored keys for local-only returning users", async () => {
-    const mockKeys = {
-      dbKeyJwk: { kty: "oct" } as JsonWebKey,
-      hmacKeyJwk: { kty: "oct" } as JsonWebKey,
-      dbSalt: [1, 2, 3],
-    };
-    vi.mocked(loadStoredKeys).mockReturnValue(mockKeys);
+  it("initializes for local-only returning users", async () => {
+    vi.mocked(restore).mockResolvedValue({
+      status: "ready",
+      isSyncUser: false,
+      credentials: null,
+    });
     localStorageMock.setItem("feedzero:onboarding-complete", "true");
 
     render(<App />);
@@ -121,18 +116,15 @@ describe("App sync-aware init", () => {
       expect(useAppStore.getState().isDbReady).toBe(true);
     });
 
-    // Should not touch sync store
     expect(useSyncStore.getState().status).toBe("local-only");
-    expect(useSyncStore.getState().credentials).toBeNull();
   });
 
   it("auto-refreshes all feeds on app load for returning users", async () => {
-    const mockKeys = {
-      dbKeyJwk: { kty: "oct" } as JsonWebKey,
-      hmacKeyJwk: { kty: "oct" } as JsonWebKey,
-      dbSalt: [1, 2, 3],
-    };
-    vi.mocked(loadStoredKeys).mockReturnValue(mockKeys);
+    vi.mocked(restore).mockResolvedValue({
+      status: "ready",
+      isSyncUser: false,
+      credentials: null,
+    });
     localStorageMock.setItem("feedzero:onboarding-complete", "true");
 
     render(<App />);
@@ -141,26 +133,22 @@ describe("App sync-aware init", () => {
       expect(useAppStore.getState().isDbReady).toBe(true);
     });
 
-    // Observable: refreshAllFeeds is called after DB is ready
     await waitFor(() => {
       expect(refreshAllFeeds).toHaveBeenCalled();
     });
   });
 
-  it("restores sync state for returning sync users with stored keys", async () => {
-    const mockKeys = {
-      dbKeyJwk: { kty: "oct" } as JsonWebKey,
-      hmacKeyJwk: { kty: "oct" } as JsonWebKey,
-      dbSalt: [1, 2, 3],
+  it("restores sync state for returning sync users", async () => {
+    const mockCredentials = {
       vaultId: "stored-vault-id",
-      vaultKeyJwk: {
-        kty: "oct",
-        key_ops: ["encrypt", "decrypt"],
-      } as JsonWebKey,
+      vaultKey: "mock-key" as unknown as CryptoKey,
     };
-    vi.mocked(loadStoredKeys).mockReturnValue(mockKeys);
+    vi.mocked(restore).mockResolvedValue({
+      status: "ready",
+      isSyncUser: true,
+      credentials: mockCredentials,
+    });
     localStorageMock.setItem("feedzero:onboarding-complete", "true");
-    localStorageMock.setItem("feedzero:storage-mode", "sync");
 
     render(<App />);
 
@@ -168,9 +156,7 @@ describe("App sync-aware init", () => {
       expect(useAppStore.getState().isDbReady).toBe(true);
     });
 
-    // Should restore sync store credentials from stored keys
     expect(useSyncStore.getState().credentials).not.toBeNull();
     expect(useSyncStore.getState().status).toBe("synced");
   });
-
 });
