@@ -24,6 +24,12 @@ describe("server", () => {
       expect(csp).toContain("script-src 'self'");
     });
 
+    it("allows external HTTPS images in CSP", async () => {
+      const res = await createApp().request("/");
+      const csp = res.headers.get("Content-Security-Policy");
+      expect(csp).toContain("img-src 'self' data: https:");
+    });
+
     it("does not set CSP on API responses", async () => {
       const res = await createApp().request("/api/feed");
       const csp = res.headers.get("Content-Security-Policy");
