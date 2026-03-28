@@ -102,45 +102,41 @@ function FeedRow({
           )}
         </button>
         <div className="flex items-center gap-1 shrink-0">
-          <div className="flex flex-col items-center gap-0.5">
+          {isSelected && <Kbd className="h-4 text-[9px] px-1">p</Kbd>}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 text-muted-foreground hover:text-foreground"
+            onClick={(e) => { e.stopPropagation(); setPreviewOpen(!previewOpen); }}
+            data-action="preview"
+            title="Preview feed"
+          >
+            <Eye className="size-3.5" />
+          </Button>
+          {added ? (
             <Button
               variant="ghost"
-              size="icon"
-              className="size-8 text-muted-foreground hover:text-foreground"
-              onClick={(e) => { e.stopPropagation(); setPreviewOpen(!previewOpen); }}
-              data-action="preview"
-              title="Preview feed"
+              size="sm"
+              onClick={(e) => { e.stopPropagation(); handleRemove(); }}
+              data-action="add"
+              className="text-muted-foreground hover:text-destructive"
             >
-              <Eye className="size-3.5" />
+              <Minus className="size-3.5" />
+              <span>Remove</span>
             </Button>
-            {isSelected && <Kbd className="h-4 text-[9px] px-1">p</Kbd>}
-          </div>
-          <div className="flex flex-col items-center gap-0.5">
-            {added ? (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => { e.stopPropagation(); handleRemove(); }}
-                data-action="add"
-                className="text-muted-foreground hover:text-destructive"
-              >
-                <Minus className="size-3.5" />
-                <span>Remove</span>
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={isAdding}
-                onClick={(e) => { e.stopPropagation(); handleAdd(); }}
-                data-action="add"
-              >
-                <Plus className="size-3.5" />
-                <span>Add</span>
-              </Button>
-            )}
-            {isSelected && <Kbd className="h-4 text-[9px] px-1">Enter</Kbd>}
-          </div>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isAdding}
+              onClick={(e) => { e.stopPropagation(); handleAdd(); }}
+              data-action="add"
+            >
+              <Plus className="size-3.5" />
+              <span>Add</span>
+            </Button>
+          )}
+          {isSelected && <Kbd className="h-4 text-[9px] px-1">Enter</Kbd>}
         </div>
       </div>
       <FeedPreviewSheet
@@ -793,7 +789,7 @@ export function ExploreCatalog({ onFeedAdded }: ExploreCatalogProps) {
             className="pl-9 pr-9"
             disabled={isAddingFeed}
           />
-          {searchQuery && (
+          {searchQuery ? (
             <button
               type="button"
               onClick={() => { setSearchQuery(""); setSelectedFeedUrl(null); }}
@@ -801,6 +797,8 @@ export function ExploreCatalog({ onFeedAdded }: ExploreCatalogProps) {
             >
               <X className="size-4" />
             </button>
+          ) : !searchFocused && (
+            <Kbd className="absolute right-3 top-1/2 -translate-y-1/2">/</Kbd>
           )}
         </div>
         {isUrlInput && searchQuery.trim() ? (

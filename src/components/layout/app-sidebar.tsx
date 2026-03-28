@@ -353,7 +353,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                         <span>All items</span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
-                    <SidebarSeparator className="my-1" />
+                    <SidebarSeparator className="mx-0 my-1" />
                     {feeds.map((feed) => (
                       <SidebarMenuItem key={feed.id}>
                         <SidebarMenuButton
