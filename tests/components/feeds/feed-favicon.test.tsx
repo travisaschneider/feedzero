@@ -1,8 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { render, fireEvent } from "@testing-library/react";
-import { FeedFavicon } from "@/components/feeds/feed-favicon";
+import { FeedFavicon, clearFaviconCache } from "@/components/feeds/feed-favicon";
 
 describe("FeedFavicon", () => {
+  beforeEach(() => {
+    clearFaviconCache();
+  });
+
   it("routes favicon requests through the proxy to prevent IP leakage", () => {
     const { container } = render(<FeedFavicon siteUrl="https://example.com" />);
     const img = container.querySelector("img");
@@ -18,10 +22,33 @@ describe("FeedFavicon", () => {
     expect(container.querySelector("img")).toBeNull();
   });
 
-  it("shows fallback icon on image load error", () => {
+  it("tries favicon.png after favicon.ico fails", () => {
     const { container } = render(<FeedFavicon siteUrl="https://example.com" />);
     const img = container.querySelector("img")!;
     fireEvent.error(img);
+    const newImg = container.querySelector("img")!;
+    expect(newImg.getAttribute("src")).toBe(
+      "/api/icon?url=https%3A%2F%2Fexample.com%2Ffavicon.png",
+    );
+  });
+
+  it("tries apple-touch-icon.png after favicon.png fails", () => {
+    const { container } = render(<FeedFavicon siteUrl="https://example.com" />);
+    const img = container.querySelector("img")!;
+    fireEvent.error(img); // favicon.ico fails
+    fireEvent.error(container.querySelector("img")!); // favicon.png fails
+    const newImg = container.querySelector("img")!;
+    expect(newImg.getAttribute("src")).toBe(
+      "/api/icon?url=https%3A%2F%2Fexample.com%2Fapple-touch-icon.png",
+    );
+  });
+
+  it("shows RSS fallback after all paths exhausted", () => {
+    const { container } = render(<FeedFavicon siteUrl="https://example.com" />);
+    const img = container.querySelector("img")!;
+    fireEvent.error(img); // favicon.ico
+    fireEvent.error(container.querySelector("img")!); // favicon.png
+    fireEvent.error(container.querySelector("img")!); // apple-touch-icon.png
     expect(container.querySelector("img")).toBeNull();
     expect(container.querySelector("svg")).toBeTruthy();
   });
@@ -34,9 +61,7 @@ describe("FeedFavicon", () => {
 
   it("shows fallback icon while image is loading", () => {
     const { container } = render(<FeedFavicon siteUrl="https://example.com" />);
-    // Before onLoad fires, fallback SVG should be visible
     expect(container.querySelector("svg")).toBeTruthy();
-    // Img exists but is hidden
     const img = container.querySelector("img")!;
     expect(img.classList.contains("hidden")).toBe(true);
   });
@@ -45,7 +70,6 @@ describe("FeedFavicon", () => {
     const { container } = render(<FeedFavicon siteUrl="https://example.com" />);
     const img = container.querySelector("img")!;
     fireEvent.load(img);
-    // After load, SVG fallback should be gone and img visible
     expect(container.querySelector("svg")).toBeNull();
     expect(img.classList.contains("hidden")).toBe(false);
   });

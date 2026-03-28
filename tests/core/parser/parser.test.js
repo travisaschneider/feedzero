@@ -151,6 +151,59 @@ describe("Parser", () => {
       expect(articles[0].summary).toContain("short summary");
       expect(articles[0].summary).not.toContain("multiple paragraphs");
     });
+
+    it("should strip Python None artifacts from content:encoded", () => {
+      const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0">
+  <channel>
+    <title>Test</title>
+    <link>https://example.com</link>
+    <item>
+      <title>Article with None</title>
+      <link>https://example.com/1</link>
+      <description></description>
+      <content:encoded><![CDATA[<a href="https://example.com/1"><img src="https://example.com/img.jpg"></a> None]]></content:encoded>
+    </item>
+  </channel>
+</rss>`;
+      const { articles } = unwrap(parse(feed, "https://example.com/feed"));
+      expect(articles[0].content).not.toContain("None");
+    });
+
+    it("should strip standalone None from description", () => {
+      const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Test</title>
+    <link>https://example.com</link>
+    <item>
+      <title>Article</title>
+      <link>https://example.com/1</link>
+      <description>None</description>
+    </item>
+  </channel>
+</rss>`;
+      const { articles } = unwrap(parse(feed, "https://example.com/feed"));
+      expect(articles[0].content).toBe("");
+      expect(articles[0].summary).toBe("");
+    });
+
+    it("should preserve None when part of real content", () => {
+      const feed = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Test</title>
+    <link>https://example.com</link>
+    <item>
+      <title>Article</title>
+      <link>https://example.com/1</link>
+      <description>None of these options are valid</description>
+    </item>
+  </channel>
+</rss>`;
+      const { articles } = unwrap(parse(feed, "https://example.com/feed"));
+      expect(articles[0].content).toContain("None of these options");
+    });
   });
 
   describe("Atom 1.0", () => {

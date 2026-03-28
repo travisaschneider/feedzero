@@ -195,6 +195,36 @@ describe("useKeyboardNav", () => {
 
       vi.useRealTimers();
     });
+
+    it("ArrowDown works as alias for j", () => {
+      const listbox = createListbox(3, 0);
+      let clicked = -1;
+      Array.from(listbox.children).forEach((item, i) =>
+        item.addEventListener("click", () => {
+          clicked = i;
+        }),
+      );
+      renderHook(() => useKeyboardNav());
+
+      pressKey("ArrowDown");
+
+      expect(clicked).toBe(1);
+    });
+
+    it("ArrowUp works as alias for k", () => {
+      const listbox = createListbox(3, 2);
+      let clicked = -1;
+      Array.from(listbox.children).forEach((item, i) =>
+        item.addEventListener("click", () => {
+          clicked = i;
+        }),
+      );
+      renderHook(() => useKeyboardNav());
+
+      pressKey("ArrowUp");
+
+      expect(clicked).toBe(1);
+    });
   });
 
   it("ignores keys when an input element is focused", () => {
@@ -408,12 +438,12 @@ describe("useKeyboardNav", () => {
     });
   });
 
-  describe("toggle view (e)", () => {
+  describe("toggle view (h)", () => {
     it("toggles from feed to extracted mode", () => {
       useExtractionStore.setState({ viewMode: "feed" });
       renderHook(() => useKeyboardNav());
 
-      pressKey("e");
+      pressKey("h");
 
       expect(useExtractionStore.getState().viewMode).toBe("extracted");
     });
@@ -422,7 +452,7 @@ describe("useKeyboardNav", () => {
       useExtractionStore.setState({ viewMode: "extracted" });
       renderHook(() => useKeyboardNav());
 
-      pressKey("e");
+      pressKey("h");
 
       expect(useExtractionStore.getState().viewMode).toBe("feed");
     });
@@ -451,7 +481,7 @@ describe("useKeyboardNav", () => {
       });
       renderHook(() => useKeyboardNav());
 
-      pressKey("e");
+      pressKey("h");
 
       expect(fetchExtracted).toHaveBeenCalledWith(
         "https://example.com/article",
@@ -482,7 +512,7 @@ describe("useKeyboardNav", () => {
       });
       renderHook(() => useKeyboardNav());
 
-      pressKey("e");
+      pressKey("h");
 
       expect(fetchExtracted).not.toHaveBeenCalled();
     });
@@ -497,16 +527,16 @@ describe("useKeyboardNav", () => {
       useArticleStore.setState({ selectedArticle: null });
       renderHook(() => useKeyboardNav());
 
-      pressKey("e");
+      pressKey("h");
 
       expect(fetchExtracted).not.toHaveBeenCalled();
     });
   });
 
   describe("add feed (n)", () => {
-    it("dispatches feedzero:add-feed custom event", () => {
+    it("dispatches feedzero:navigate-explore custom event", () => {
       let eventFired = false;
-      document.addEventListener("feedzero:add-feed", () => {
+      document.addEventListener("feedzero:navigate-explore", () => {
         eventFired = true;
       });
       renderHook(() => useKeyboardNav());

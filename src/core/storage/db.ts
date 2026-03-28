@@ -288,20 +288,20 @@ export async function addArticles(
 }
 
 /**
- * Decrypt raw article records and sort by publishedAt descending.
+ * Decrypt raw article records in parallel and sort by publishedAt descending.
  */
 async function decryptAndSortArticles(raws: DexieRecord[]): Promise<Article[]> {
   const { cryptoKey: key } = requireOpen();
-  const results: Article[] = [];
-  for (const raw of raws) {
-    if (!raw.iv || !raw.ciphertext) continue;
-    const r = await decrypt(
-      key,
-      new Uint8Array(raw.iv),
-      new Uint8Array(raw.ciphertext),
-    );
-    if (r.ok) results.push(r.value as Article);
-  }
+  const decrypted = await Promise.all(
+    raws
+      .filter((raw) => raw.iv && raw.ciphertext)
+      .map((raw) =>
+        decrypt(key, new Uint8Array(raw.iv!), new Uint8Array(raw.ciphertext!)),
+      ),
+  );
+  const results = decrypted
+    .filter((r) => r.ok)
+    .map((r) => r.value as Article);
   results.sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0));
   return results;
 }
@@ -309,7 +309,10 @@ async function decryptAndSortArticles(raws: DexieRecord[]): Promise<Article[]> {
 /**
  * Get all articles for a feed (decrypted), sorted by publishedAt descending.
  */
-export async function getArticles(feedId: string): Promise<Result<Article[]>> {
+export async function getArticles(
+  feedId: string,
+  limit?: number,
+): Promise<Result<Article[]>> {
   try {
     const ctx = requireOpen();
     const hashedFeedId = await hmacIndex(ctx.hmacKey, feedId);
@@ -318,7 +321,8 @@ export async function getArticles(feedId: string): Promise<Result<Article[]>> {
       .where("feedId")
       .equals(hashedFeedId)
       .toArray();
-    return ok(await decryptAndSortArticles(raws));
+    const articles = await decryptAndSortArticles(raws);
+    return ok(limit ? articles.slice(0, limit) : articles);
   } catch (e) {
     return err(`Failed to get articles: ${(e as Error).message}`);
   }
@@ -326,12 +330,16 @@ export async function getArticles(feedId: string): Promise<Result<Article[]>> {
 
 /**
  * Get all articles from all feeds (decrypted), sorted by publishedAt descending.
+ * Optional limit caps the number of returned articles for performance.
  */
-export async function getAllArticles(): Promise<Result<Article[]>> {
+export async function getAllArticles(
+  limit?: number,
+): Promise<Result<Article[]>> {
   try {
     const ctx = requireOpen();
     const raws: DexieRecord[] = await ctx.db.table("articles").toArray();
-    return ok(await decryptAndSortArticles(raws));
+    const articles = await decryptAndSortArticles(raws);
+    return ok(limit ? articles.slice(0, limit) : articles);
   } catch (e) {
     return err(`Failed to get all articles: ${(e as Error).message}`);
   }

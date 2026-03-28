@@ -141,11 +141,10 @@ describe("extraction-store", () => {
         .switchToExtracted("https://example.com/post");
 
       expect(useExtractionStore.getState().viewMode).toBe("extracted");
-      expect(fetch).toHaveBeenCalledWith("/api/page", {
+      expect(fetch).toHaveBeenCalledWith("/api/page", expect.objectContaining({
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: "https://example.com/post" }),
-      });
+      }));
     });
 
     it("does not fetch if content is already cached", () => {
@@ -204,6 +203,34 @@ describe("extraction-store", () => {
 
       expect(useExtractionStore.getState().viewMode).toBe("feed");
       expect(fetch).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("cache eviction", () => {
+    it("evicts oldest entries when cache exceeds max size", async () => {
+      // Pre-fill cache with 50 entries
+      const cache: Record<string, string> = {};
+      for (let i = 0; i < 50; i++) {
+        cache[`https://example.com/${i}`] = `content-${i}`;
+      }
+      useExtractionStore.setState({ cache });
+
+      // Mock a successful extraction for one more
+      vi.mocked(fetch).mockResolvedValueOnce(
+        new Response("<p>hello</p>", { status: 200 }),
+      );
+      vi.mocked(extract).mockReturnValue({
+        ok: true,
+        value: { content: "new-content", title: "", author: "", excerpt: "" },
+      });
+
+      await useExtractionStore.getState().fetchExtracted("https://example.com/new");
+
+      const state = useExtractionStore.getState();
+      expect(state.cache["https://example.com/new"]).toBe("new-content");
+      expect(Object.keys(state.cache).length).toBeLessThanOrEqual(50);
+      // Oldest entry should be evicted
+      expect(state.cache["https://example.com/0"]).toBeUndefined();
     });
   });
 });

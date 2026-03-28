@@ -3,20 +3,20 @@ import { generatePassphrase } from "@/core/crypto/passphrase-generator";
 import { EFF_WORDLIST } from "@/core/crypto/eff-wordlist";
 
 describe("generatePassphrase", () => {
-  it("generates 4 words by default", () => {
-    const passphrase = generatePassphrase();
+  it("generates 4 words by default", async () => {
+    const passphrase = await generatePassphrase();
     const words = passphrase.split(" ");
     expect(words).toHaveLength(4);
   });
 
-  it("generates the specified number of words", () => {
-    const passphrase = generatePassphrase(6);
+  it("generates the specified number of words", async () => {
+    const passphrase = await generatePassphrase(6);
     const words = passphrase.split(" ");
     expect(words).toHaveLength(6);
   });
 
-  it("uses only words from the EFF wordlist", () => {
-    const passphrase = generatePassphrase();
+  it("uses only words from the EFF wordlist", async () => {
+    const passphrase = await generatePassphrase();
     const words = passphrase.split(" ");
     const wordlistSet = new Set(EFF_WORDLIST);
     for (const word of words) {
@@ -24,21 +24,21 @@ describe("generatePassphrase", () => {
     }
   });
 
-  it("uses only lowercase words", () => {
-    const passphrase = generatePassphrase();
+  it("uses only lowercase words", async () => {
+    const passphrase = await generatePassphrase();
     expect(passphrase).toBe(passphrase.toLowerCase());
   });
 
-  it("produces different passphrases on consecutive calls", () => {
+  it("produces different passphrases on consecutive calls", async () => {
     const results = new Set<string>();
     for (let i = 0; i < 10; i++) {
-      results.add(generatePassphrase());
+      results.add(await generatePassphrase());
     }
     expect(results.size).toBeGreaterThan(1);
   });
 
-  it("words are separated by single spaces", () => {
-    const passphrase = generatePassphrase();
+  it("words are separated by single spaces", async () => {
+    const passphrase = await generatePassphrase();
     expect(passphrase).not.toMatch(/  /);
     expect(passphrase).not.toMatch(/^ /);
     expect(passphrase).not.toMatch(/ $/);

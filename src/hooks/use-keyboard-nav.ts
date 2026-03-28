@@ -8,26 +8,37 @@ import { useExtractionStore } from "@/stores/extraction-store.ts";
  *
  * Article nav:  j/k (next/prev — directly opens article)
  * Feed nav:     u/i (next/prev feed)
- * Actions:      o (open original), e (toggle view), n (add feed)
+ * Actions:      o (open original), e (toggle view), n (explore/add feed)
  */
 export function useKeyboardNav() {
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    // Cmd/Ctrl+, opens settings (works even in inputs)
+    if (e.key === "," && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      document.dispatchEvent(new CustomEvent("feedzero:open-settings"));
+      return;
+    }
+
     const target = e.target as HTMLElement;
 
-    // Skip when user is typing in an input
+    // Skip when user is typing in an input or navigating a menu/dialog
     if (
       target.tagName === "INPUT" ||
       target.tagName === "TEXTAREA" ||
-      target.isContentEditable
+      target.isContentEditable ||
+      (target.closest &&
+        target.closest('[role="menu"], [role="dialog"], [role="alertdialog"]'))
     ) {
       return;
     }
 
     switch (e.key) {
       case "j":
+      case "ArrowDown":
         moveArticle(1);
         break;
       case "k":
+      case "ArrowUp":
         moveArticle(-1);
         break;
       case "u":
@@ -39,14 +50,17 @@ export function useKeyboardNav() {
       case "o":
         openOriginal();
         break;
-      case "e":
+      case "h":
         toggleView();
         break;
       case "n":
-        requestAddFeed();
+        navigateToExplore();
         break;
       case "[":
         toggleSidebar();
+        break;
+      case " ":
+        scrollReader(e.shiftKey ? -1 : 1);
         break;
       case "r":
         refreshAllFeeds();
@@ -128,8 +142,19 @@ function toggleView() {
   toggleViewMode(selectedArticle?.link);
 }
 
-function requestAddFeed() {
-  document.dispatchEvent(new CustomEvent("feedzero:add-feed"));
+/** Scroll the reader panel by one viewport height. Shift+Space scrolls up. */
+function scrollReader(direction: 1 | -1) {
+  // Find the reader's scroll container (the ScrollArea viewport wrapping the reader)
+  const reader = document.querySelector("article")?.closest(
+    '[data-radix-scroll-area-viewport]',
+  ) as HTMLElement | null;
+  if (reader) {
+    reader.scrollBy({ top: direction * reader.clientHeight * 0.8, behavior: "smooth" });
+  }
+}
+
+function navigateToExplore() {
+  document.dispatchEvent(new CustomEvent("feedzero:navigate-explore"));
 }
 
 function toggleSidebar() {

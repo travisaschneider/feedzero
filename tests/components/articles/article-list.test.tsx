@@ -130,12 +130,13 @@ describe("ArticleList", () => {
       isLoading: false,
     });
 
-    render(<ArticleList />);
-    // Unread items use text-foreground, read items use text-muted-foreground with opacity
-    expect(screen.getByText("Unread").className).toContain("text-foreground");
-    expect(screen.getByText("Read").className).toContain(
-      "text-muted-foreground",
-    );
+    const { container } = render(<ArticleList />);
+    // Unread items have a visible dot, read items have a transparent dot
+    const dots = container.querySelectorAll(".rounded-full.size-1\\.5");
+    const unreadDot = dots[0];
+    const readDot = dots[1];
+    expect(unreadDot.className).toContain("bg-blue-400");
+    expect(readDot.className).toContain("bg-transparent");
   });
 
   describe("global view (ALL_FEEDS_ID)", () => {

@@ -74,7 +74,7 @@ describe("ReaderPanel", () => {
 
     render(<ReaderPanel />);
     expect(screen.getByText("Feed")).toBeInTheDocument();
-    expect(screen.getByText("Extracted")).toBeInTheDocument();
+    expect(screen.getByText("Full text")).toBeInTheDocument();
     expect(screen.getByText("Original")).toBeInTheDocument();
   });
 
@@ -130,7 +130,7 @@ describe("ReaderPanel", () => {
     });
 
     const { container } = render(<ReaderPanel />);
-    await user.click(screen.getByRole("radio", { name: "Extracted" }));
+    await user.click(screen.getByRole("radio", { name: "Full text" }));
     expect(container.textContent).toContain("expanded");
   });
 
@@ -145,7 +145,7 @@ describe("ReaderPanel", () => {
     const originalLink = screen.getByText("Original").closest("a");
     const kbd = originalLink?.querySelector("kbd");
     expect(kbd).toBeTruthy();
-    expect(kbd?.textContent).toBe("O");
+    expect(kbd?.textContent).toBe("o");
   });
 
   describe("timestamp display (006-S11)", () => {

@@ -51,44 +51,44 @@ describe("onboarding-store", () => {
   });
 
   describe("storage mode selection", () => {
-    it("chooseStorageMode('local') sets mode to local", () => {
-      useOnboardingStore.getState().chooseStorageMode("local");
+    it("chooseStorageMode('local') sets mode to local", async () => {
+      await useOnboardingStore.getState().chooseStorageMode("local");
       expect(useOnboardingStore.getState().storageMode).toBe("local");
     });
 
-    it("chooseStorageMode('local') generates a random passphrase", () => {
-      useOnboardingStore.getState().chooseStorageMode("local");
+    it("chooseStorageMode('local') generates a random passphrase", async () => {
+      await useOnboardingStore.getState().chooseStorageMode("local");
       expect(useOnboardingStore.getState().generatedPassphrase).toBe(
         "carbon mango velvet prism",
       );
     });
 
-    it("chooseStorageMode('local') goes to initializing step", () => {
-      useOnboardingStore.getState().chooseStorageMode("local");
+    it("chooseStorageMode('local') goes to initializing step", async () => {
+      await useOnboardingStore.getState().chooseStorageMode("local");
       expect(useOnboardingStore.getState().step).toBe("initializing");
     });
 
-    it("chooseStorageMode('sync') sets mode to sync", () => {
-      useOnboardingStore.getState().chooseStorageMode("sync");
+    it("chooseStorageMode('sync') sets mode to sync", async () => {
+      await useOnboardingStore.getState().chooseStorageMode("sync");
       expect(useOnboardingStore.getState().storageMode).toBe("sync");
     });
 
-    it("chooseStorageMode('sync') generates a passphrase", () => {
-      useOnboardingStore.getState().chooseStorageMode("sync");
+    it("chooseStorageMode('sync') generates a passphrase", async () => {
+      await useOnboardingStore.getState().chooseStorageMode("sync");
       expect(useOnboardingStore.getState().generatedPassphrase).toBe(
         "carbon mango velvet prism",
       );
     });
 
-    it("chooseStorageMode('sync') goes to passphrase-display step", () => {
-      useOnboardingStore.getState().chooseStorageMode("sync");
+    it("chooseStorageMode('sync') goes to passphrase-display step", async () => {
+      await useOnboardingStore.getState().chooseStorageMode("sync");
       expect(useOnboardingStore.getState().step).toBe("passphrase-display");
     });
   });
 
   describe("passphrase generation", () => {
-    it("generateNewPassphrase creates a passphrase", () => {
-      useOnboardingStore.getState().generateNewPassphrase();
+    it("generateNewPassphrase creates a passphrase", async () => {
+      await useOnboardingStore.getState().generateNewPassphrase();
       expect(useOnboardingStore.getState().generatedPassphrase).toBe(
         "carbon mango velvet prism",
       );

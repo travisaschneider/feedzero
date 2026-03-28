@@ -191,7 +191,7 @@ Feature: Keyboard navigation
 2. Listener checks if target is input/textarea/contenteditable — if so, returns early
 3. Switch statement routes key to appropriate handler function
 4. Handler functions either:
-   - Dispatch custom events (`feedzero:add-feed`, `feedzero:toggle-sidebar`)
+   - Dispatch custom events (`feedzero:navigate-explore`, `feedzero:toggle-sidebar`)
    - Call store actions directly (`refreshAll`, `toggleViewMode`)
    - Simulate DOM clicks on UI elements (article items, feed buttons)
 5. `e.preventDefault()` stops default browser behavior for handled keys
@@ -212,8 +212,7 @@ Article navigation (J/K) and feed navigation (U/I) work by finding and clicking 
 | `src/hooks/use-keyboard-nav.ts` | Keyboard event handling, routing to actions |
 | `src/stores/extraction-store.ts` | `toggleViewMode()` action for E key |
 | `src/stores/feed-store.ts` | `refreshAll()` action for R key |
-| `src/components/layout/app-sidebar.tsx` | Listens for `feedzero:add-feed` event |
-| `src/pages/feeds-page.tsx` | Listens for `feedzero:toggle-sidebar` event |
+| `src/pages/feeds-page.tsx` | Listens for `feedzero:navigate-explore` and `feedzero:toggle-sidebar` events |
 
 ### Tests
 

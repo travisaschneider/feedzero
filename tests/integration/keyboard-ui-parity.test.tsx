@@ -132,7 +132,7 @@ describe("keyboard-UI behavior parity", () => {
     });
   });
 
-  describe("E key vs View Toggle click", () => {
+  describe("H key vs View Toggle click", () => {
     it("both use toggleViewMode for switching modes", () => {
       const article = mockArticle("a1", "f1");
       useArticleStore.setState({ selectedArticle: article });
@@ -144,7 +144,7 @@ describe("keyboard-UI behavior parity", () => {
 
       // Keyboard path
       renderHook(() => useKeyboardNav());
-      pressKey("e");
+      pressKey("h");
 
       expect(useExtractionStore.getState().viewMode).toBe("extracted");
       const keyboardFetchCalls = vi.mocked(fetch).mock.calls.length;
@@ -164,21 +164,17 @@ describe("keyboard-UI behavior parity", () => {
     });
   });
 
-  describe("N key vs Add Feed button", () => {
-    it("both dispatch the same custom event", () => {
+  describe("N key navigates to explore", () => {
+    it("dispatches feedzero:navigate-explore", () => {
       const eventHandler = vi.fn();
-      document.addEventListener("feedzero:add-feed", eventHandler);
+      document.addEventListener("feedzero:navigate-explore", eventHandler);
 
-      // Keyboard path
       renderHook(() => useKeyboardNav());
       pressKey("n");
 
       expect(eventHandler).toHaveBeenCalledTimes(1);
 
-      // UI path (what the Add Feed button does via the event system)
-      // The button in app-sidebar calls setAddFormOpen, but both keyboard
-      // and button ultimately trigger the same form opening
-      document.removeEventListener("feedzero:add-feed", eventHandler);
+      document.removeEventListener("feedzero:navigate-explore", eventHandler);
     });
   });
 

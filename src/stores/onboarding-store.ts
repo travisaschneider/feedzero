@@ -39,8 +39,8 @@ export const useOnboardingStore = create<OnboardingStore>((set, get) => ({
 
   setStep: (step) => set({ step }),
 
-  chooseStorageMode: (mode) => {
-    const passphrase = generatePassphrase();
+  chooseStorageMode: async (mode) => {
+    const passphrase = await generatePassphrase();
     if (mode === "local") {
       set({
         storageMode: mode,
@@ -56,8 +56,8 @@ export const useOnboardingStore = create<OnboardingStore>((set, get) => ({
     }
   },
 
-  generateNewPassphrase: () => {
-    set({ generatedPassphrase: generatePassphrase() });
+  generateNewPassphrase: async () => {
+    set({ generatedPassphrase: await generatePassphrase() });
   },
 
   setConfirmationInput: (value) => {

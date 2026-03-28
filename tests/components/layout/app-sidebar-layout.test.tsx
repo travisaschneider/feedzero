@@ -45,15 +45,11 @@ describe("AppSidebar layout structure", () => {
     expect(rail).not.toBeNull();
   });
 
-  it("SidebarHeader contains add button (refresh only when feeds exist)", () => {
+  it("SidebarHeader hides refresh when no feeds exist", () => {
     const { container } = renderSidebar();
     const header = container.querySelector("[data-sidebar='header']");
     expect(header).not.toBeNull();
-    // Refresh button is hidden when no feeds exist
     expect(screen.queryByRole("button", { name: /refresh/i })).toBeNull();
-    expect(
-      screen.getByRole("button", { name: /add feed/i }),
-    ).toBeInTheDocument();
   });
 
   it("SidebarHeader shows refresh button when feeds exist", () => {
@@ -80,9 +76,6 @@ describe("AppSidebar layout structure", () => {
     expect(header).not.toBeNull();
     expect(
       screen.getByRole("button", { name: /refresh/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /add feed/i }),
     ).toBeInTheDocument();
   });
 

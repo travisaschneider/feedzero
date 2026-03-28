@@ -6,6 +6,9 @@ import {
 } from "@/components/ui/dialog.tsx";
 import { Kbd } from "@/components/ui/kbd.tsx";
 
+const isMac =
+  typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent);
+
 interface ShortcutGroup {
   title: string;
   shortcuts: { keys: string[]; description: string }[];
@@ -15,30 +18,35 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     title: "Navigation",
     shortcuts: [
-      { keys: ["J"], description: "Next article" },
-      { keys: ["K"], description: "Previous article" },
-      { keys: ["U"], description: "Previous feed" },
-      { keys: ["I"], description: "Next feed" },
+      { keys: ["j", "↓"], description: "Next article" },
+      { keys: ["k", "↑"], description: "Previous article" },
+      { keys: ["u"], description: "Next feed" },
+      { keys: ["i"], description: "Previous feed" },
+      { keys: ["Space"], description: "Scroll article down" },
       { keys: ["["], description: "Toggle sidebar" },
     ],
   },
   {
     title: "Actions",
     shortcuts: [
-      { keys: ["O"], description: "Open original article" },
-      { keys: ["E"], description: "Toggle extracted view" },
-      { keys: ["N"], description: "Add new feed" },
-      { keys: ["R"], description: "Refresh all feeds" },
+      { keys: ["Enter"], description: "Add selected feed" },
+      { keys: ["p"], description: "Preview feed" },
+      { keys: ["o"], description: "Open original article" },
+      { keys: ["h"], description: "Toggle full text view" },
+      { keys: ["r"], description: "Refresh all feeds" },
+      { keys: [isMac ? "⌘," : "Ctrl+,"], description: "Open settings" },
     ],
   },
   {
     title: "Explore",
     shortcuts: [
+      { keys: ["n"], description: "Go to Explore" },
       { keys: ["/"], description: "Focus search" },
+      { keys: ["Tab", "↓"], description: "Exit search into list" },
       { keys: ["1"], description: "Featured tab" },
       { keys: ["2"], description: "Topics tab" },
       { keys: ["3"], description: "Countries tab" },
-      { keys: ["Esc"], description: "Clear search" },
+      { keys: ["Esc"], description: "Deselect / clear search" },
     ],
   },
 ];

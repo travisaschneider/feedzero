@@ -13,7 +13,7 @@ describe("ViewToggle", () => {
       />,
     );
     expect(screen.getByText("Feed")).toBeInTheDocument();
-    expect(screen.getByText("Extracted")).toBeInTheDocument();
+    expect(screen.getByText("Full text")).toBeInTheDocument();
     expect(screen.getByText("Original")).toBeInTheDocument();
   });
 
@@ -39,7 +39,7 @@ describe("ViewToggle", () => {
     expect(screen.getByText("Feed")).toBeInTheDocument();
   });
 
-  it("calls onModeChange when Extracted clicked", async () => {
+  it("calls onModeChange when Full text clicked", async () => {
     const user = userEvent.setup();
     const onModeChange = vi.fn();
     render(
@@ -49,7 +49,7 @@ describe("ViewToggle", () => {
         onModeChange={onModeChange}
       />,
     );
-    await user.click(screen.getByRole("radio", { name: /Extracted/ }));
+    await user.click(screen.getByRole("radio", { name: /Full text/ }));
     expect(onModeChange).toHaveBeenCalledWith("extracted");
   });
 
@@ -65,7 +65,7 @@ describe("ViewToggle", () => {
     expect(feedBtn).toHaveAttribute("data-state", "on");
   });
 
-  it("shows Kbd E hint on the Extracted button", () => {
+  it("shows Kbd h hint on the Full text button", () => {
     const { container } = render(
       <ViewToggle
         activeMode="feed"
@@ -76,7 +76,7 @@ describe("ViewToggle", () => {
     const kbdTexts = Array.from(container.querySelectorAll("kbd")).map(
       (k) => k.textContent,
     );
-    expect(kbdTexts).toContain("E");
+    expect(kbdTexts).toContain("h");
   });
 
   it("shows Kbd O hint on the Original button", () => {
@@ -91,10 +91,10 @@ describe("ViewToggle", () => {
     const kbdTexts = Array.from(container.querySelectorAll("kbd")).map(
       (k) => k.textContent,
     );
-    expect(kbdTexts).toContain("O");
+    expect(kbdTexts).toContain("o");
   });
 
-  describe("Extracted button states", () => {
+  describe("Full text button states", () => {
     it("is clickable when status is idle", () => {
       render(
         <ViewToggle
@@ -103,7 +103,7 @@ describe("ViewToggle", () => {
           onModeChange={vi.fn()}
         />,
       );
-      const btn = screen.getByRole("radio", { name: /Extracted/ });
+      const btn = screen.getByRole("radio", { name: /Full text/ });
       expect(btn).not.toBeDisabled();
     });
 
@@ -115,7 +115,7 @@ describe("ViewToggle", () => {
           onModeChange={vi.fn()}
         />,
       );
-      const btn = screen.getByRole("radio", { name: /Extracted/ });
+      const btn = screen.getByRole("radio", { name: /Full text/ });
       expect(btn).toBeDisabled();
       // Spinner SVG (Loader2) should be present
       expect(container.querySelector(".animate-spin")).toBeInTheDocument();
@@ -129,7 +129,7 @@ describe("ViewToggle", () => {
           onModeChange={vi.fn()}
         />,
       );
-      const btn = screen.getByRole("radio", { name: /Extracted/ });
+      const btn = screen.getByRole("radio", { name: /Full text/ });
       expect(btn).not.toBeDisabled();
     });
 
@@ -141,7 +141,7 @@ describe("ViewToggle", () => {
           onModeChange={vi.fn()}
         />,
       );
-      const btn = screen.getByRole("radio", { name: /Extracted/ });
+      const btn = screen.getByRole("radio", { name: /Full text/ });
       expect(btn).toBeDisabled();
       expect(btn).toHaveAttribute(
         "title",

@@ -101,9 +101,8 @@ Feature: Add a feed URL and display its articles
 | `src/core/parser/parser.js` | Parses all three formats into `{feed, articles}`. Decodes double-encoded HTML entities from malformed feeds. |
 | `src/core/parser/sanitizer.js` | DOMPurify wrapper for HTML content |
 | `src/stores/feed-store.ts` | `addFeed()` action, auto-selects new feed |
-| `src/components/feeds/add-feed-form.tsx` | Add-feed form, calls `onFeedSelect` after success |
-| `src/components/layout/app-sidebar.tsx` | Listens for `feedzero:add-feed` event (N key) |
-| `src/hooks/use-keyboard-nav.ts` | N key dispatches add-feed event |
+| `src/components/explore/explore-catalog.tsx` | Unified search bar with URL detection, adds feeds on Enter |
+| `src/hooks/use-keyboard-nav.ts` | N key dispatches `feedzero:navigate-explore` event |
 | `vite.config.js` | Dev-only CORS proxy plugin |
 
 ### Tests

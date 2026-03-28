@@ -6,9 +6,9 @@ import { generatePassphrase } from "@/core/crypto/passphrase-generator.ts";
 import { Toaster } from "@/components/ui/sonner.tsx";
 import { SyncSetupDialog } from "@/components/sync/sync-setup-dialog.tsx";
 import {
-  ChangelogDialog,
+  ChangelogBentoDialog,
   shouldShowChangelog,
-} from "@/components/layout/changelog-dialog.tsx";
+} from "@/components/layout/changelog-bento.tsx";
 import { FeedsPage } from "@/pages/feeds-page.tsx";
 import { Button } from "@/components/ui/button.tsx";
 
@@ -39,8 +39,8 @@ function AppInit({ children }: { children: React.ReactNode }) {
   // New users: auto-initialize with local-only mode (no onboarding modal)
   useEffect(() => {
     if (hasCompletedOnboarding === false && !isDbReady) {
-      const passphrase = generatePassphrase();
-      initialize(passphrase, { sync: false }).then(() => {
+      generatePassphrase().then((passphrase) =>
+      initialize(passphrase, { sync: false })).then(() => {
         completeOnboarding();
       });
     }
@@ -95,7 +95,7 @@ function StartupChangelog() {
     }
   }, [isDbReady]);
 
-  return <ChangelogDialog open={open} onOpenChange={setOpen} />;
+  return <ChangelogBentoDialog open={open} onOpenChange={setOpen} />;
 }
 
 export function App() {

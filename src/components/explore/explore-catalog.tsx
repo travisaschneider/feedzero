@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { ArrowLeft, Eye, Plus, Loader2, Search, X, Minus } from "lucide-react";
+import { useState, useEffect, useMemo, useRef, useCallback, useId } from "react";
+import { ArrowLeft, Eye, Plus, Loader2, Search, X, Minus, FileUp } from "lucide-react";
 import { toast } from "sonner";
 import {
   feedCatalog,
@@ -19,8 +19,11 @@ import {
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import { FeedPreviewSheet } from "@/components/explore/feed-preview-sheet.tsx";
+import { SettingsDialog } from "@/components/settings/settings-dialog.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { Input } from "@/components/ui/input.tsx";
+import { Kbd } from "@/components/ui/kbd.tsx";
+import { looksLikeUrl } from "@/lib/url-detection.ts";
 import type { Feed } from "@/types/index.ts";
 
 type BrowseTab = "featured" | "topics" | "countries";
@@ -32,9 +35,10 @@ interface FeedRowProps {
   feedUrl: string;
   siteUrl: string;
   description?: string;
-  tags?: string[];
   subscribed: boolean;
   subscribedFeeds: Feed[];
+  selectedRowId?: string | null;
+  onSelectRow?: (rowId: string) => void;
 }
 
 function FeedRow({
@@ -42,10 +46,14 @@ function FeedRow({
   feedUrl,
   siteUrl,
   description,
-  tags,
   subscribed,
   subscribedFeeds,
+  selectedRowId,
+  onSelectRow,
 }: FeedRowProps) {
+  const rowId = useId();
+  const isSelected = selectedRowId === rowId;
+  const rowRef = useRef<HTMLDivElement>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -76,60 +84,63 @@ function FeedRow({
 
   return (
     <>
-      <div className="flex items-start gap-3 py-2">
+      <div
+        ref={rowRef}
+        role="option"
+        aria-selected={isSelected}
+        onClick={() => onSelectRow?.(rowId)}
+        className="flex items-start gap-3 py-2 px-2 -mx-2 rounded cursor-pointer aria-selected:bg-accent"
+      >
         <FeedFavicon siteUrl={siteUrl} />
         <button
           className="flex-1 min-w-0 text-left hover:underline decoration-muted-foreground/40"
-          onClick={() => setPreviewOpen(true)}
+          onClick={(e) => { e.stopPropagation(); setPreviewOpen(true); }}
         >
           <div className="font-medium text-sm">{name}</div>
           {description && (
             <div className="text-xs text-muted-foreground">{description}</div>
           )}
-          {tags && tags.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1">
-              {tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
         </button>
         <div className="flex items-center gap-1 shrink-0">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-8 text-muted-foreground hover:text-foreground"
-            onClick={() => setPreviewOpen(true)}
-            title="Preview feed"
-          >
-            <Eye className="size-3.5" />
-          </Button>
-          {added ? (
+          <div className="flex flex-col items-center gap-0.5">
             <Button
               variant="ghost"
-              size="sm"
-              onClick={handleRemove}
-              className="text-muted-foreground hover:text-destructive"
+              size="icon"
+              className="size-8 text-muted-foreground hover:text-foreground"
+              onClick={(e) => { e.stopPropagation(); setPreviewOpen(!previewOpen); }}
+              data-action="preview"
+              title="Preview feed"
             >
-              <Minus className="size-3.5" />
-              <span>Remove</span>
+              <Eye className="size-3.5" />
             </Button>
-          ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={isAdding}
-              onClick={handleAdd}
-            >
-              <Plus className="size-3.5" />
-              <span>Add</span>
-            </Button>
-          )}
+            {isSelected && <Kbd className="h-4 text-[9px] px-1">p</Kbd>}
+          </div>
+          <div className="flex flex-col items-center gap-0.5">
+            {added ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => { e.stopPropagation(); handleRemove(); }}
+                data-action="add"
+                className="text-muted-foreground hover:text-destructive"
+              >
+                <Minus className="size-3.5" />
+                <span>Remove</span>
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={isAdding}
+                onClick={(e) => { e.stopPropagation(); handleAdd(); }}
+                data-action="add"
+              >
+                <Plus className="size-3.5" />
+                <span>Add</span>
+              </Button>
+            )}
+            {isSelected && <Kbd className="h-4 text-[9px] px-1">Enter</Kbd>}
+          </div>
         </div>
       </div>
       <FeedPreviewSheet
@@ -149,7 +160,15 @@ function FeedRow({
 
 // --- Featured view (existing curated categories) ---
 
-function FeaturedView({ subscribedFeeds }: { subscribedFeeds: Feed[] }) {
+function FeaturedView({
+  subscribedFeeds,
+  selectedRowId,
+  onSelectRow,
+}: {
+  subscribedFeeds: Feed[];
+  selectedRowId: string | null;
+  onSelectRow: (url: string) => void;
+}) {
   return (
     <div className="space-y-8">
       {feedCatalog.map((category) => (
@@ -157,6 +176,8 @@ function FeaturedView({ subscribedFeeds }: { subscribedFeeds: Feed[] }) {
           key={category.id}
           category={category}
           subscribedFeeds={subscribedFeeds}
+          selectedRowId={selectedRowId}
+          onSelectRow={onSelectRow}
         />
       ))}
     </div>
@@ -166,9 +187,13 @@ function FeaturedView({ subscribedFeeds }: { subscribedFeeds: Feed[] }) {
 function FeaturedCategorySection({
   category,
   subscribedFeeds,
+  selectedRowId,
+  onSelectRow,
 }: {
   category: CatalogCategory;
   subscribedFeeds: Feed[];
+  selectedRowId: string | null;
+  onSelectRow: (url: string) => void;
 }) {
   const [isAdding, setIsAdding] = useState(false);
   const addFeed = useFeedStore((s) => s.addFeed);
@@ -209,9 +234,10 @@ function FeaturedCategorySection({
             feedUrl={feed.feedUrl}
             siteUrl={feed.siteUrl}
             description={feed.description}
-            tags={feed.tags}
             subscribed={isSubscribed(feed.feedUrl, subscribedFeeds)}
             subscribedFeeds={subscribedFeeds}
+            selectedRowId={selectedRowId}
+            onSelectRow={onSelectRow}
           />
         ))}
       </div>
@@ -262,12 +288,16 @@ function CategoryDetail({
   feeds,
   subscribedFeeds,
   onBack,
+  selectedRowId,
+  onSelectRow,
 }: {
   title: string;
   subtitle?: string;
   feeds: AwesomeFeed[];
   subscribedFeeds: Feed[];
   onBack: () => void;
+  selectedRowId?: string | null;
+  onSelectRow?: (url: string) => void;
 }) {
   const [isAdding, setIsAdding] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
@@ -345,6 +375,8 @@ function CategoryDetail({
             siteUrl={feed.siteUrl}
             subscribed={isSubscribed(feed.feedUrl, subscribedFeeds)}
             subscribedFeeds={subscribedFeeds}
+            selectedRowId={selectedRowId}
+            onSelectRow={onSelectRow}
           />
         ))}
       </div>
@@ -358,10 +390,14 @@ function SectionDetail({
   section,
   subscribedFeeds,
   onBack,
+  selectedRowId,
+  onSelectRow,
 }: {
   section: CatalogSection;
   subscribedFeeds: Feed[];
   onBack: () => void;
+  selectedRowId?: string | null;
+  onSelectRow?: (url: string) => void;
 }) {
   const [selectedSubId, setSelectedSubId] = useState<string | null>(null);
   const selectedSub = section.subcategories.find(
@@ -375,6 +411,8 @@ function SectionDetail({
         feeds={selectedSub.feeds}
         subscribedFeeds={subscribedFeeds}
         onBack={() => setSelectedSubId(null)}
+        selectedRowId={selectedRowId}
+        onSelectRow={onSelectRow}
       />
     );
   }
@@ -388,6 +426,8 @@ function SectionDetail({
         feeds={section.subcategories[0].feeds}
         subscribedFeeds={subscribedFeeds}
         onBack={onBack}
+        selectedRowId={selectedRowId}
+        onSelectRow={onSelectRow}
       />
     );
   }
@@ -418,9 +458,13 @@ function SectionDetail({
 function TopicsView({
   catalog,
   subscribedFeeds,
+  selectedRowId,
+  onSelectRow,
 }: {
   catalog: GeneratedCatalog;
   subscribedFeeds: Feed[];
+  selectedRowId: string | null;
+  onSelectRow: (url: string) => void;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = catalog.sections.find((s) => s.id === selectedId);
@@ -431,6 +475,8 @@ function TopicsView({
         section={selected}
         subscribedFeeds={subscribedFeeds}
         onBack={() => setSelectedId(null)}
+        selectedRowId={selectedRowId}
+        onSelectRow={onSelectRow}
       />
     );
   }
@@ -453,9 +499,13 @@ function TopicsView({
 function CountriesView({
   catalog,
   subscribedFeeds,
+  selectedRowId,
+  onSelectRow,
 }: {
   catalog: GeneratedCatalog;
   subscribedFeeds: Feed[];
+  selectedRowId: string | null;
+  onSelectRow: (url: string) => void;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = catalog.countries.find((c) => c.id === selectedId);
@@ -468,6 +518,8 @@ function CountriesView({
         feeds={selected.feeds}
         subscribedFeeds={subscribedFeeds}
         onBack={() => setSelectedId(null)}
+        selectedRowId={selectedRowId}
+        onSelectRow={onSelectRow}
       />
     );
   }
@@ -490,27 +542,19 @@ function SearchResultsView({
   results,
   subscribedFeeds,
   query,
-  onSearchEverywhere,
-  isEverywhere,
+  selectedRowId,
+  onSelectRow,
 }: {
   results: SearchableItem[];
   subscribedFeeds: Feed[];
   query: string;
-  onSearchEverywhere?: () => void;
-  isEverywhere: boolean;
+  selectedRowId: string | null;
+  onSelectRow: (url: string) => void;
 }) {
   if (results.length === 0) {
     return (
       <div className="py-8 text-center text-muted-foreground">
         <p>No feeds matching &ldquo;{query}&rdquo;</p>
-        {!isEverywhere && onSearchEverywhere && (
-          <button
-            onClick={onSearchEverywhere}
-            className="mt-2 text-sm underline hover:text-foreground"
-          >
-            Search everywhere instead
-          </button>
-        )}
       </div>
     );
   }
@@ -539,42 +583,73 @@ function SearchResultsView({
                 siteUrl={item.siteUrl}
                 subscribed={isSubscribed(item.feedUrl, subscribedFeeds)}
                 subscribedFeeds={subscribedFeeds}
+                selectedRowId={selectedRowId}
+                onSelectRow={onSelectRow}
               />
             ))}
           </div>
         </div>
       ))}
-      {!isEverywhere && onSearchEverywhere && (
-        <div className="text-center">
-          <button
-            onClick={onSearchEverywhere}
-            className="text-sm text-muted-foreground underline hover:text-foreground"
-          >
-            Search everywhere for &ldquo;{query}&rdquo;
-          </button>
-        </div>
-      )}
     </div>
   );
 }
 
+interface ExploreCatalogProps {
+  onFeedAdded?: (feedId: string) => void;
+}
+
 /** Curated feed library for discovering new feeds. */
-export function ExploreCatalog() {
+export function ExploreCatalog({ onFeedAdded }: ExploreCatalogProps) {
   const feeds = useFeedStore((s) => s.feeds);
+  const addFeed = useFeedStore((s) => s.addFeed);
   const [activeTab, setActiveTab] = useState<BrowseTab>("featured");
   const [catalog, setCatalog] = useState<GeneratedCatalog | null>(null);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchEverywhere, setSearchEverywhere] = useState(false);
+  const [isAddingFeed, setIsAddingFeed] = useState(false);
+  const [importExportOpen, setImportExportOpen] = useState(false);
+  const [selectedRowId, setSelectedFeedUrl] = useState<string | null>(null);
+  const [searchFocused, setSearchFocused] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const handleTabChange = useCallback((tab: BrowseTab) => {
     setActiveTab(tab);
     setSearchQuery("");
-    setSearchEverywhere(false);
+    setSelectedFeedUrl(null);
   }, []);
 
-  // Keyboard shortcuts for explore: / to search, 1/2/3 for tabs, Escape to clear
+  // Focus search input when navigated here via N key or Plus button
+  useEffect(() => {
+    const handler = () => searchRef.current?.focus();
+    document.addEventListener("feedzero:focus-explore-search", handler);
+    return () =>
+      document.removeEventListener("feedzero:focus-explore-search", handler);
+  }, []);
+
+  const isUrlInput = looksLikeUrl(searchQuery);
+
+  async function handleUrlSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!isUrlInput) return;
+    const url = searchQuery.trim();
+    if (!url) return;
+
+    const toastId = toast.loading("Discovering feed…");
+    setIsAddingFeed(true);
+    const result = await addFeed(url);
+    setIsAddingFeed(false);
+
+    if (result.ok) {
+      toast.success("Feed added", { id: toastId });
+      setSearchQuery("");
+      const newFeedId = useFeedStore.getState().selectedFeedId;
+      if (newFeedId && onFeedAdded) onFeedAdded(newFeedId);
+    } else {
+      toast.error(result.error || "Failed to add feed", { id: toastId });
+    }
+  }
+
+  // Keyboard shortcuts for explore
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       const target = e.target as HTMLElement;
@@ -582,8 +657,17 @@ export function ExploreCatalog() {
 
       if (e.key === "Escape" && isInput) {
         setSearchQuery("");
-        setSearchEverywhere(false);
+        setSelectedFeedUrl(null);
         searchRef.current?.blur();
+        return;
+      }
+
+      // ArrowDown/Tab in search input → exit search, select first feed
+      if ((e.key === "ArrowDown" || e.key === "Tab") && isInput) {
+        e.preventDefault();
+        searchRef.current?.blur();
+        const first = document.querySelector<HTMLElement>('[role="option"]');
+        if (first) first.click();
         return;
       }
 
@@ -591,7 +675,32 @@ export function ExploreCatalog() {
 
       if (e.key === "/") {
         e.preventDefault();
+        setSelectedFeedUrl(null);
         searchRef.current?.focus();
+      } else if (e.key === "Escape") {
+        if (selectedRowId) {
+          setSelectedFeedUrl(null);
+        } else {
+          searchRef.current?.focus();
+        }
+      } else if (e.key === "Enter") {
+        // Add/remove the selected feed
+        const selected = document.querySelector<HTMLElement>(
+          '[role="option"][aria-selected="true"] [data-action="add"]',
+        );
+        if (selected) {
+          e.preventDefault();
+          selected.click();
+        }
+      } else if (e.key === "p") {
+        // Preview the selected feed
+        const selected = document.querySelector<HTMLElement>(
+          '[role="option"][aria-selected="true"] [data-action="preview"]',
+        );
+        if (selected) {
+          e.preventDefault();
+          selected.click();
+        }
       } else if (e.key === "1") {
         handleTabChange("featured");
       } else if (e.key === "2") {
@@ -602,63 +711,10 @@ export function ExploreCatalog() {
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [handleTabChange]);
+  }, [handleTabChange, selectedRowId]);
 
+  // Eagerly load generated catalog for global search and Topics/Countries tabs
   useEffect(() => {
-    if (activeTab !== "featured" && !catalog) {
-      setLoading(true);
-      loadGeneratedCatalog().then((data) => {
-        setCatalog(data);
-        setLoading(false);
-      });
-    }
-  }, [activeTab, catalog]);
-
-  // Build search index when catalog is loaded
-  const searchIndex = useMemo(() => {
-    if (!catalog) return null;
-    return buildSearchIndex(feedCatalog, catalog);
-  }, [catalog]);
-
-  // Scoped search: filter results by current tab
-  const scopedResults = useMemo(() => {
-    const q = searchQuery.trim();
-    if (!q) return null;
-
-    if (searchEverywhere && searchIndex) {
-      return searchFeeds(searchIndex, q);
-    }
-
-    // Scoped to current tab
-    if (activeTab === "featured") {
-      const allFeatured = feedCatalog.flatMap((c) =>
-        c.feeds.map((f) => ({
-          name: f.name,
-          feedUrl: f.feedUrl,
-          siteUrl: f.siteUrl,
-          category: c.name,
-          categoryType: "featured" as const,
-          searchText: `${f.name} ${c.name}`.toLowerCase(),
-        })),
-      );
-      return searchFeeds(allFeatured, q);
-    }
-
-    if (searchIndex) {
-      const typeFilter =
-        activeTab === "topics" ? "topic" : "country";
-      const scoped = searchIndex.filter(
-        (i) => i.categoryType === typeFilter || i.categoryType === "featured",
-      );
-      return searchFeeds(scoped, q);
-    }
-
-    return null;
-  }, [searchQuery, searchEverywhere, activeTab, searchIndex]);
-
-  function handleSearchEverywhere() {
-    setSearchEverywhere(true);
-    // Load catalog if not yet loaded (needed for full index)
     if (!catalog) {
       setLoading(true);
       loadGeneratedCatalog().then((data) => {
@@ -666,7 +722,36 @@ export function ExploreCatalog() {
         setLoading(false);
       });
     }
-  }
+  }, [catalog]);
+
+  // Build search index when catalog is loaded
+  const searchIndex = useMemo(() => {
+    if (!catalog) return null;
+    return buildSearchIndex(feedCatalog, catalog);
+  }, [catalog]);
+
+  // Global search across all feeds (skip for URL inputs, wait for 3+ chars)
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim();
+    if (!q || isUrlInput || q.length < 3) return null;
+
+    if (searchIndex) {
+      return searchFeeds(searchIndex, q);
+    }
+
+    // Catalog not loaded yet — search featured only as fallback
+    const allFeatured = feedCatalog.flatMap((c) =>
+      c.feeds.map((f) => ({
+        name: f.name,
+        feedUrl: f.feedUrl,
+        siteUrl: f.siteUrl,
+        category: c.name,
+        categoryType: "featured" as const,
+        searchText: `${f.name} ${c.name}`.toLowerCase(),
+      })),
+    );
+    return searchFeeds(allFeatured, q);
+  }, [searchQuery, isUrlInput, searchIndex]);
 
   const tabs: { id: BrowseTab; label: string }[] = [
     { id: "featured", label: "Featured" },
@@ -678,37 +763,57 @@ export function ExploreCatalog() {
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold">Explore feeds</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Discover feeds from our curated library
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-semibold">Explore feeds</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Discover feeds from our curated library
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setImportExportOpen(true)}
+        >
+          <FileUp className="mr-2 size-4" />
+          Import / Export
+        </Button>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-        <Input
-          ref={searchRef}
-          placeholder={`Search ${activeTab === "featured" ? "featured" : activeTab}... (press /)`}
-          value={searchQuery}
-          onChange={(e) => {
-            setSearchQuery(e.target.value);
-            setSearchEverywhere(false);
-          }}
-          className="pl-9 pr-9"
-        />
-        {searchQuery && (
-          <button
-            onClick={() => {
-              setSearchQuery("");
-              setSearchEverywhere(false);
-            }}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-          >
-            <X className="size-4" />
-          </button>
+      <form onSubmit={handleUrlSubmit}>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+          <Input
+            ref={searchRef}
+            placeholder="Search feeds or paste a URL..."
+            value={searchQuery}
+            onChange={(e) => { setSearchQuery(e.target.value); setSelectedFeedUrl(null); }}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
+            className="pl-9 pr-9"
+            disabled={isAddingFeed}
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => { setSearchQuery(""); setSelectedFeedUrl(null); }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="size-4" />
+            </button>
+          )}
+        </div>
+        {isUrlInput && searchQuery.trim() ? (
+          <p className="text-sm text-muted-foreground mt-2">
+            Press Enter to add this feed
+          </p>
+        ) : searchFocused && (
+          <p className="flex items-center gap-3 text-xs text-muted-foreground mt-2">
+            <span><Kbd>↓</Kbd> or <Kbd>Tab</Kbd> to browse</span>
+            <span><Kbd>Esc</Kbd> to clear</span>
+          </p>
         )}
-      </div>
+      </form>
 
       <div className="flex gap-1 border-b">
         {tabs.map((tab) => (
@@ -726,38 +831,64 @@ export function ExploreCatalog() {
         ))}
       </div>
 
-      {isSearching && scopedResults ? (
-        <SearchResultsView
-          results={scopedResults}
-          subscribedFeeds={feeds}
-          query={searchQuery}
-          onSearchEverywhere={
-            !searchEverywhere ? handleSearchEverywhere : undefined
-          }
-          isEverywhere={searchEverywhere}
-        />
-      ) : (
-        <>
-          {activeTab === "featured" && (
-            <FeaturedView subscribedFeeds={feeds} />
-          )}
-
-          {activeTab !== "featured" && loading && (
-            <div className="flex items-center justify-center py-12 text-muted-foreground">
-              <Loader2 className="size-5 animate-spin mr-2" />
-              Loading catalog...
-            </div>
-          )}
-
-          {activeTab === "topics" && catalog && (
-            <TopicsView catalog={catalog} subscribedFeeds={feeds} />
-          )}
-
-          {activeTab === "countries" && catalog && (
-            <CountriesView catalog={catalog} subscribedFeeds={feeds} />
-          )}
-        </>
+      {selectedRowId && (
+        <div className="flex items-center gap-3 text-xs text-muted-foreground py-2">
+          <span><Kbd>j</Kbd> <Kbd>k</Kbd> navigate</span>
+          <span><Kbd>/</Kbd> search</span>
+        </div>
       )}
+
+      <div role="listbox" aria-label="Feeds">
+        {isSearching && searchResults ? (
+          <SearchResultsView
+            results={searchResults}
+            subscribedFeeds={feeds}
+            query={searchQuery}
+            selectedRowId={selectedRowId}
+            onSelectRow={setSelectedFeedUrl}
+          />
+        ) : (
+          <>
+            {activeTab === "featured" && (
+              <FeaturedView
+                subscribedFeeds={feeds}
+                selectedRowId={selectedRowId}
+                onSelectRow={setSelectedFeedUrl}
+              />
+            )}
+
+            {activeTab !== "featured" && loading && (
+              <div className="flex items-center justify-center py-12 text-muted-foreground">
+                <Loader2 className="size-5 animate-spin mr-2" />
+                Loading catalog...
+              </div>
+            )}
+
+            {activeTab === "topics" && catalog && (
+              <TopicsView
+                catalog={catalog}
+                subscribedFeeds={feeds}
+                selectedRowId={selectedRowId}
+                onSelectRow={setSelectedFeedUrl}
+              />
+            )}
+
+            {activeTab === "countries" && catalog && (
+              <CountriesView
+                catalog={catalog}
+                subscribedFeeds={feeds}
+                selectedRowId={selectedRowId}
+                onSelectRow={setSelectedFeedUrl}
+              />
+            )}
+          </>
+        )}
+      </div>
+
+      <SettingsDialog
+        open={importExportOpen}
+        onOpenChange={setImportExportOpen}
+      />
     </div>
   );
 }

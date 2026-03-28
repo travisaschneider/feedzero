@@ -56,17 +56,16 @@ describe("view toggle behavior parity", () => {
     });
   });
 
-  it("E key triggers extraction fetch (keyboard path)", () => {
+  it("H key triggers extraction fetch (keyboard path)", () => {
     renderHook(() => useKeyboardNav());
 
-    pressKey("e");
+    pressKey("h");
 
     expect(useExtractionStore.getState().viewMode).toBe("extracted");
-    expect(fetch).toHaveBeenCalledWith("/api/page", {
+    expect(fetch).toHaveBeenCalledWith("/api/page", expect.objectContaining({
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url: "https://example.com/article" }),
-    });
+    }));
   });
 
   it("switchToExtracted triggers extraction fetch (click path)", () => {
@@ -74,17 +73,16 @@ describe("view toggle behavior parity", () => {
     useExtractionStore.getState().switchToExtracted(testArticle.link);
 
     expect(useExtractionStore.getState().viewMode).toBe("extracted");
-    expect(fetch).toHaveBeenCalledWith("/api/page", {
+    expect(fetch).toHaveBeenCalledWith("/api/page", expect.objectContaining({
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url: "https://example.com/article" }),
-    });
+    }));
   });
 
   it("both paths use identical fetch URL encoding", () => {
     // Keyboard path
     renderHook(() => useKeyboardNav());
-    pressKey("e");
+    pressKey("h");
     const keyboardFetchUrl = vi.mocked(fetch).mock.calls[0][0];
 
     // Reset for click path
@@ -107,7 +105,7 @@ describe("view toggle behavior parity", () => {
 
     // Keyboard path
     renderHook(() => useKeyboardNav());
-    pressKey("e");
+    pressKey("h");
     expect(fetch).not.toHaveBeenCalled();
     expect(useExtractionStore.getState().viewMode).toBe("extracted");
 
@@ -126,7 +124,7 @@ describe("view toggle behavior parity", () => {
 
     // Keyboard path
     renderHook(() => useKeyboardNav());
-    pressKey("e");
+    pressKey("h");
     expect(useExtractionStore.getState().viewMode).toBe("feed");
     expect(fetch).not.toHaveBeenCalled();
 
