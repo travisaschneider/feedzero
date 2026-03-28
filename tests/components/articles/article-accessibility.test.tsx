@@ -113,7 +113,7 @@ describe("ArticleItem keyboard interaction", () => {
     expect(onSelect).toHaveBeenCalledWith(article);
   });
 
-  it("Space key fires onSelect", async () => {
+  it("Space key does not fire onSelect (reserved for scrolling reader)", async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
     const article = mockArticle("a1", "Test");
@@ -124,7 +124,7 @@ describe("ArticleItem keyboard interaction", () => {
     await user.click(item);
     onSelect.mockClear();
     await user.keyboard(" ");
-    expect(onSelect).toHaveBeenCalledWith(article);
+    expect(onSelect).not.toHaveBeenCalled();
   });
 
   it("unread articles have text-foreground on title", () => {

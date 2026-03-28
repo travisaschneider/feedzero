@@ -10,12 +10,46 @@ import { ALL_FEEDS_ID } from "../utils/constants.ts";
 import type { Article } from "../types/index.ts";
 
 interface ArticleStore {
+  /** Currently visible articles (derived from cache for the active feed). */
   articles: Article[];
   selectedArticle: Article | null;
   isLoading: boolean;
   loadArticles: (feedId: string) => Promise<void>;
   selectArticle: (article: Article | null) => Promise<void>;
   markAsRead: (articleId: string) => Promise<void>;
+  markAllAsRead: () => Promise<void>;
+}
+
+/** Delay before an opened article is marked as read (ms). */
+const MARK_AS_READ_DELAY = 1000;
+const PAGE_SIZE = 25;
+let markAsReadTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Per-feed article cache — instant switching, no flicker. */
+const articleCache = new Map<string, Article[]>();
+
+/** Clear the article cache (used by tests). */
+export function clearArticleCache() {
+  articleCache.clear();
+}
+
+/** Update an article in the cache (e.g., after marking as read). */
+function updateCachedArticle(article: Article) {
+  for (const [feedId, cached] of articleCache) {
+    const idx = cached.findIndex((a) => a.id === article.id);
+    if (idx !== -1) {
+      cached[idx] = article;
+      // Also update the "all" cache if it exists and this isn't the "all" feed
+      if (feedId !== ALL_FEEDS_ID) {
+        const allCached = articleCache.get(ALL_FEEDS_ID);
+        if (allCached) {
+          const allIdx = allCached.findIndex((a) => a.id === article.id);
+          if (allIdx !== -1) allCached[allIdx] = article;
+        }
+      }
+      break;
+    }
+  }
 }
 
 export const useArticleStore = create<ArticleStore>((set, get) => ({
@@ -24,18 +58,45 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
   isLoading: false,
 
   loadArticles: async (feedId) => {
-    set({ articles: [], selectedArticle: null, isLoading: true });
+    // Show cached articles instantly if available (no loading state)
+    const cached = articleCache.get(feedId);
+    if (cached) {
+      set({ articles: cached, selectedArticle: null, isLoading: false });
+    } else {
+      set({ articles: [], selectedArticle: null, isLoading: true });
+    }
+
+    // Fetch fresh data in background
     const result =
       feedId === ALL_FEEDS_ID
-        ? await getAllArticles()
-        : await getArticles(feedId);
-    set({
-      articles: result.ok ? result.value : [],
-      isLoading: false,
-    });
+        ? await getAllArticles(PAGE_SIZE)
+        : await getArticles(feedId, PAGE_SIZE);
+
+    const fresh = result.ok ? result.value : [];
+    articleCache.set(feedId, fresh);
+    set({ articles: fresh, isLoading: false });
   },
 
   selectArticle: async (article) => {
+    // Flush any pending mark-as-read immediately (don't lose the read state)
+    if (markAsReadTimer) {
+      clearTimeout(markAsReadTimer);
+      markAsReadTimer = null;
+      const prev = get().selectedArticle;
+      if (prev && !prev.read) {
+        const updated = { ...prev, read: true };
+        updateCachedArticle(updated);
+        set({
+          articles: get().articles.map((a) =>
+            a.id === prev.id ? updated : a,
+          ),
+        });
+        updateArticle(updated).then(() => {
+          useSyncStore.getState().scheduleSyncPush();
+        });
+      }
+    }
+
     if (!article) {
       set({ selectedArticle: null });
       return;
@@ -55,21 +116,23 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
       return;
     }
 
+    set({ selectedArticle: article });
+
     if (!article.read) {
-      const updated = { ...article, read: true };
-      // Batch both updates atomically to prevent intermediate render states
-      set({
-        selectedArticle: updated,
-        articles: get().articles.map((a) =>
-          a.id === article.id ? updated : a,
-        ),
-      });
-      // Persist to DB after UI update (fire-and-forget for responsiveness)
-      updateArticle(updated).then(() => {
-        useSyncStore.getState().scheduleSyncPush();
-      });
-    } else {
-      set({ selectedArticle: article });
+      markAsReadTimer = setTimeout(() => {
+        markAsReadTimer = null;
+        const updated = { ...article, read: true };
+        updateCachedArticle(updated);
+        set({
+          selectedArticle: updated,
+          articles: get().articles.map((a) =>
+            a.id === article.id ? updated : a,
+          ),
+        });
+        updateArticle(updated).then(() => {
+          useSyncStore.getState().scheduleSyncPush();
+        });
+      }, MARK_AS_READ_DELAY);
     }
   },
 
@@ -78,11 +141,32 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
     if (!article || article.read) return;
 
     const updated = { ...article, read: true };
+    updateCachedArticle(updated);
     await updateArticle(updated);
     set({
       articles: get().articles.map((a) =>
         a.id === articleId ? { ...a, read: true } : a,
       ),
     });
+  },
+
+  markAllAsRead: async () => {
+    const unread = get().articles.filter((a) => !a.read);
+    if (unread.length === 0) return;
+
+    const updated = get().articles.map((a) =>
+      a.read ? a : { ...a, read: true },
+    );
+    // Update cache for current feed
+    const currentFeedId = useFeedStore.getState().selectedFeedId;
+    if (currentFeedId) articleCache.set(currentFeedId, updated);
+    set({ articles: updated });
+
+    for (const article of unread) {
+      const readArticle = { ...article, read: true };
+      updateCachedArticle(readArticle);
+      await updateArticle(readArticle);
+    }
+    useSyncStore.getState().scheduleSyncPush();
   },
 }));

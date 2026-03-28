@@ -37,6 +37,7 @@ FeedZero is a privacy-first RSS reader. React + TypeScript UI with Zustand state
 - **React Router** — URL-based routing with responsive layout (mobile single-panel, desktop 3-panel)
 - **DOMPurify** — HTML sanitization (XSS protection). Do not hand-roll sanitizers.
 - **Dexie.js** — IndexedDB wrapper with query API. Used in `db.ts` for encrypted storage.
+- **feedsmith** — RSS/Atom/JSON Feed parser and OPML handler. Used by `parser.ts` (`parseFeed`) and `opml-service.ts` (`parseOpml`/`generateOpml`).
 - **Defuddle** — Full-text extraction from web pages (browser bundle, zero deps). Pluggable — can be swapped for Readability or other extractors.
 - **marked** — Markdown-to-HTML parsing. Used by site-specific extractors (e.g., GitHub adapter). Output always passed through DOMPurify.
 - **Radix UI + shadcn/ui** — Headless UI primitives (`@radix-ui/react-*`) wrapped as styled components in `src/components/ui/`. Use these wrappers (Button, Dialog, AlertDialog, DropdownMenu, etc.) instead of building from scratch.
@@ -78,8 +79,12 @@ Full-text extraction is user-initiated: in reader panel, click "Extracted" → f
 - **src/core/sync/sync-handler.ts** — Server-side `handleSyncRequest(request, adapter)` — shared `Request → Response` handler. Supports GET (pull), PUT (push), DELETE (vault removal).
 - **src/core/sync/adapters/** — Storage adapter implementations: `memory-adapter.ts`, `filesystem-adapter.ts`, `vercel-blob-adapter.ts`, `resolve-adapter.ts`.
 - **src/core/feeds/feed-service.ts** — `addFeedFlow(url)` orchestrates the full add-feed flow. `refreshFeed(feed)` and `refreshAllFeeds()` handle feed refresh with guid-based dedup.
-- **src/core/parser/parser.ts** — `parse(text, feedUrl)` handles RSS 2.0, Atom 1.0, and JSON Feed 1.1.
+- **src/core/parser/parser.ts** — `parse(text, feedUrl)` delegates to `feedsmith`'s `parseFeed()` for RSS 2.0, Atom 1.0, and JSON Feed 1.1.
 - **src/core/parser/sanitizer.ts** — DOMPurify wrapper with allowlisted tags/attrs.
+- **src/core/opml/opml-service.ts** — OPML import/export via feedsmith's `parseOpml`/`generateOpml`. Returns `Result<T>`.
+- **src/core/opml/url-list-parser.ts** — Parses plain-text URL lists (one URL per line) as an alternative import format.
+- **src/core/feedback/feedback-handler.ts** — Server-side handler for user feedback submissions. Creates GitLab issues via API. Requires `GITLAB_FEEDBACK_TOKEN` and `GITLAB_PROJECT_ID` env vars.
+- **src/core/sync/sync-stats-handler.ts** — Server-side handler returning vault count statistics. No user-identifiable information exposed.
 
 ### Zustand Stores
 
@@ -89,6 +94,7 @@ Full-text extraction is user-initiated: in reader panel, click "Extracted" → f
 - **src/stores/extraction-store.ts** — `cache` (link → extracted HTML), `viewMode`, `fetchExtracted(url)`. Extraction is on-demand and cached.
 - **src/stores/onboarding-store.ts** — Onboarding flow state machine: `welcome` → `storage-choice` → `passphrase-display` → `passphrase-confirm` → `initializing` (or `recovery` for returning users). Storage modes: `local` (client-only, skips passphrase confirmation) vs `sync` (cloud-enabled, requires passphrase confirmation). Generates passphrases via `passphrase-generator.ts`.
 - **src/stores/sync-store.ts** — Cloud sync state and actions. Status: `local-only` | `syncing` | `synced` | `error`. State holds `credentials: SyncCredentials | null` (pre-derived vault ID + CryptoKey, never the raw passphrase). Actions: `enableSync(passphrase)` (derives credentials, stores derived keys, pushes vault), `restoreSync(credentials)` (returning sync users), `push()`, `pull()`, `scheduleSyncPush()` (5s debounce + 0-30s jitter), `disableSync()` (deletes server vault + clears stored keys), `logout()` (clears local data + resets to onboarding, preserves cloud vault).
+- **src/stores/import-store.ts** — OPML/URL-list import progress tracking. State machine: `idle` → `importing` → `complete` | `error`. Tracks per-URL results for progress display.
 
 ### React Components
 
@@ -98,6 +104,9 @@ Full-text extraction is user-initiated: in reader panel, click "Extracted" → f
 - **src/components/articles/** — `article-list.tsx`, `article-item.tsx`
 - **src/components/reader/** — `reader-panel.tsx`, `view-toggle.tsx`, `article-content.tsx`
 - **src/components/onboarding/** — Modal-based onboarding flow. `onboarding-modal.tsx` container with step components in `steps/` (welcome, storage-choice, passphrase-display, passphrase-confirm, recovery).
+- **src/components/explore/** — Explore tab UI for feed catalog and discovery.
+- **src/components/feedback/** — Feedback submission UI.
+- **src/components/settings/** — Settings panel.
 - **src/components/sync/** — `sync-setup-dialog.tsx` (dialog for enabling/disabling cloud sync, data management, vault deletion), `sync-status-chip.tsx` (color-coded status indicator: amber local, green synced, red error).
 - **src/pages/feeds-page.tsx** — Main page component. Desktop: 3-panel CSS grid. Mobile: single panel with back navigation. Syncs URL params to Zustand stores.
 - **src/lib/content-modes.ts** — Pure functions for content view modes (Feed/Extracted visibility, summary subheading detection, similarity/completeness heuristics). Used by `reader-panel.tsx`.
@@ -210,12 +219,12 @@ Three-tier testing strategy. See [Testing Strategy](docs/testing-strategy.md) fo
 All API handlers use the Web standard `Request → Response` pattern via shared handler functions (`proxy-handler.ts`, `sync-handler.ts`). Three entry points consume these handlers:
 
 - **`server.ts`** — Hono standalone server for self-hosting (`npm run serve`). Mounts proxy + sync handlers + static file serving.
-- **`api/*.ts`** — Vercel Serverless Functions. In git, these are thin wrappers (~5-10 lines) that import shared handlers from `src/core/`. During build, `scripts/build-api.js` replaces their content with self-contained esbuild bundles (all deps inlined) because **Vercel's builder compiles each `.ts` individually without bundling cross-directory imports**. See ADR 007.
+- **`api/*.ts`** — Vercel Serverless Functions. Source files are thin wrappers (~5-10 lines) that import shared handlers from `src/core/`. During build, `scripts/build-api.js` replaces their content with self-contained esbuild bundles (all deps inlined) because **Vercel's builder compiles each `.ts` individually without bundling cross-directory imports**. Note: some `api/*.ts` files in git may already contain bundled output from a previous build — the build script overwrites them regardless. See ADR 007.
 - **`vite.config.js`** — Dev proxy using lazy-imported shared handlers with a memory adapter for sync.
 
 **Three-entry-point rule:** Every API endpoint has three consumers (Hono, Vite, Vercel). When changing request format, HTTP method, headers, or URL structure, all three entry points MUST be updated and verified. The Vercel `api/*.ts` wrappers MUST export a named function for every HTTP method the shared handler supports. This is enforced by routing contract tests in `server.test.ts` — if you add a method to the shared handler, the test will fail until the Vercel wrapper exports it too. Never deploy without this verification.
 
-**Endpoints**: `POST /api/feed` with `{"url":"..."}` body (feed proxy), `POST /api/page` with `{"url":"..."}` body (page proxy), `/api/sync` (GET/PUT/DELETE/HEAD encrypted vault).
+**Endpoints**: `POST /api/feed` with `{"url":"..."}` body (feed proxy), `POST /api/page` with `{"url":"..."}` body (page proxy), `/api/sync` (GET/PUT/DELETE/HEAD encrypted vault), `GET /api/icon` (favicon proxy), `POST /api/feedback` (user feedback → GitLab issue, requires `GITLAB_FEEDBACK_TOKEN` + `GITLAB_PROJECT_ID`), `GET /api/stats-sync` (vault count stats).
 
 **SSRF protections** — The proxy blocks requests to internal/private IPs (localhost, 127.0.0.1, ::1, 10.x, 172.16–31.x, 192.168.x, 169.254.169.254) and only allows `http:`/`https:` protocols. Do not weaken these checks.
 

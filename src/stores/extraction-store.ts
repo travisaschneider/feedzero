@@ -19,6 +19,20 @@ interface ExtractionStore {
   getStatus: (url: string | undefined) => ExtractionStatus;
 }
 
+const MAX_CACHE_SIZE = 50;
+
+/** Evict oldest entries if cache exceeds max size. */
+function evictCache(cache: Record<string, string>): Record<string, string> {
+  const keys = Object.keys(cache);
+  if (keys.length <= MAX_CACHE_SIZE) return cache;
+  const evicted = { ...cache };
+  const toRemove = keys.length - MAX_CACHE_SIZE;
+  for (let i = 0; i < toRemove; i++) {
+    delete evicted[keys[i]];
+  }
+  return evicted;
+}
+
 export const useExtractionStore = create<ExtractionStore>((set, get) => ({
   cache: {},
   statusMap: {},
@@ -70,7 +84,7 @@ export const useExtractionStore = create<ExtractionStore>((set, get) => ({
       const result = extract(text, url);
       if (result.ok && result.value.content) {
         set({
-          cache: { ...get().cache, [url]: result.value.content },
+          cache: evictCache({ ...get().cache, [url]: result.value.content }),
           statusMap: { ...get().statusMap, [url]: "available" },
         });
       } else {

@@ -283,31 +283,43 @@ export async function refreshFeed(feed: Feed): Promise<Result<RefreshResult>> {
  * Refresh all feeds concurrently with a concurrency limit.
  * Each feed refresh is independent, so they can safely run in parallel.
  */
+/** Max concurrent feed refreshes to avoid network/CPU spikes. */
+const REFRESH_CONCURRENCY = 5;
+
 export async function refreshAllFeeds(): Promise<Result<RefreshAllResult>> {
   const feedsResult = await getFeeds();
   if (!feedsResult.ok) return err(feedsResult.error);
 
-  const settled = await Promise.allSettled(
-    feedsResult.value.map((feed) =>
-      refreshFeed(feed).then((result) => ({ feed, result })),
-    ),
-  );
+  const feeds = feedsResult.value;
+  const results: RefreshAllResult["results"] = [];
 
-  const results: RefreshAllResult["results"] = settled.map((outcome) => {
-    if (outcome.status === "rejected") {
-      return {
-        feed: { id: "", url: "", title: "Unknown" } as Feed,
-        newCount: 0,
-        updatedCount: 0,
-        error: String(outcome.reason),
-      };
+  // Process feeds in batches to limit concurrency
+  for (let i = 0; i < feeds.length; i += REFRESH_CONCURRENCY) {
+    const batch = feeds.slice(i, i + REFRESH_CONCURRENCY);
+    const settled = await Promise.allSettled(
+      batch.map((feed) =>
+        refreshFeed(feed).then((result) => ({ feed, result })),
+      ),
+    );
+
+    for (const outcome of settled) {
+      if (outcome.status === "rejected") {
+        results.push({
+          feed: { id: "", url: "", title: "Unknown" } as Feed,
+          newCount: 0,
+          updatedCount: 0,
+          error: String(outcome.reason),
+        });
+      } else {
+        const { feed, result } = outcome.value;
+        if (result.ok) {
+          results.push({ feed, ...result.value });
+        } else {
+          results.push({ feed, newCount: 0, updatedCount: 0, error: result.error });
+        }
+      }
     }
-    const { feed, result } = outcome.value;
-    if (result.ok) {
-      return { feed, ...result.value };
-    }
-    return { feed, newCount: 0, updatedCount: 0, error: result.error };
-  });
+  }
 
   return ok({ results });
 }

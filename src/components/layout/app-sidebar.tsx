@@ -9,7 +9,6 @@ import {
   Loader2,
   MessageSquare,
   MoreHorizontal,
-  Plus,
   RefreshCw,
   Settings,
   Sparkles,
@@ -34,11 +33,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog.tsx";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover.tsx";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -65,10 +59,9 @@ import { Switch } from "@/components/ui/switch.tsx";
 import { KeyboardShortcutsDialog } from "@/components/layout/keyboard-shortcuts-dialog.tsx";
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog.tsx";
 import {
-  ChangelogDialog,
+  ChangelogBentoDialog,
   APP_VERSION,
-} from "@/components/layout/changelog-dialog.tsx";
-import { AddFeedForm } from "@/components/feeds/add-feed-form.tsx";
+} from "@/components/layout/changelog-bento.tsx";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import { Kbd } from "@/components/ui/kbd.tsx";
 import type { Feed } from "@/types/index.ts";
@@ -77,32 +70,70 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onFeedSelect?: (feedId: string) => void;
 }
 
+const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.userAgent);
+const settingsShortcutLabel = isMac ? "⌘," : "Ctrl+,";
+
+function SyncBadge({ status }: { status: string }) {
+  if (status === "synced" || status === "syncing") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+        <span className={`rounded-full size-1.5 bg-emerald-500 ${status === "syncing" ? "animate-pulse" : ""}`} />
+        {status === "syncing" ? "Syncing" : "Synced"}
+      </span>
+    );
+  }
+  if (status === "error") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full border border-red-500/30 bg-red-500/10 px-1.5 py-0.5 text-[10px] font-medium text-red-600 dark:text-red-400">
+        <span className="rounded-full size-1.5 bg-red-500" />
+        Error
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+      <span className="rounded-full size-1.5 bg-amber-500" />
+      Local
+    </span>
+  );
+}
+
 function SidebarFooterMenu({ hasFeeds }: { hasFeeds: boolean }) {
   const syncStatus = useSyncStore((s) => s.status);
   const setSyncDialogOpen = useSyncStore((s) => s.setDialogOpen);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const isSyncOn = syncStatus === "synced" || syncStatus === "syncing";
   const isSyncing = syncStatus === "syncing";
   const canSync = hasFeeds;
 
+  // Listen for Cmd/Ctrl+, to open settings dropdown
+  useEffect(() => {
+    const handler = () => setMenuOpen(true);
+    document.addEventListener("feedzero:open-settings", handler);
+    return () =>
+      document.removeEventListener("feedzero:open-settings", handler);
+  }, []);
+
   return (
     <>
-      <DropdownMenu>
+      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
         <DropdownMenuTrigger asChild>
           <SidebarMenuButton
             size="lg"
-            className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+            className="group/settings py-3 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
           >
             <div className="flex items-center justify-center size-8 rounded-lg bg-muted text-muted-foreground">
               <Settings className="size-4" />
             </div>
             <div className="grid flex-1 text-left text-sm leading-tight">
               <span className="truncate font-semibold">Settings</span>
-              <span className="truncate text-xs text-muted-foreground">
-                {isSyncOn ? "Cloud sync on" : "Local only"}
+              <span className="flex items-center gap-1.5 mt-0.5">
+                <SyncBadge status={syncStatus} />
+                <Kbd className="h-4 text-[9px] px-1 opacity-0 group-hover/settings:opacity-100 transition-opacity">{settingsShortcutLabel}</Kbd>
               </span>
             </div>
             <ChevronsUpDown className="ml-auto size-4" />
@@ -167,7 +198,7 @@ function SidebarFooterMenu({ hasFeeds }: { hasFeeds: boolean }) {
         open={shortcutsOpen}
         onOpenChange={setShortcutsOpen}
       />
-      <ChangelogDialog
+      <ChangelogBentoDialog
         open={changelogOpen}
         onOpenChange={setChangelogOpen}
       />
@@ -240,15 +271,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const isExplorePage = pathname === "/explore";
-  const [addFormOpen, setAddFormOpen] = useState(false);
   const [feedToRemove, setFeedToRemove] = useState<Feed | null>(null);
-
-  useEffect(() => {
-    const handleAddFeed = () => setAddFormOpen(true);
-    document.addEventListener("feedzero:add-feed", handleAddFeed);
-    return () =>
-      document.removeEventListener("feedzero:add-feed", handleAddFeed);
-  }, []);
 
   function handleSelect(feedId: string) {
     if (isMobile) setOpenMobile(false);
@@ -292,43 +315,10 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent hidden={isMobile}>
-                      Refresh <Kbd className="ml-1">R</Kbd>
+                      Refresh <Kbd className="ml-1">r</Kbd>
                     </TooltipContent>
                   </Tooltip>
                 )}
-                <Popover open={addFormOpen} onOpenChange={setAddFormOpen}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <PopoverTrigger asChild>
-                        <Button variant="ghost" size="icon" className="size-8">
-                          <Plus className="size-4" />
-                          <span className="sr-only">Add Feed</span>
-                        </Button>
-                      </PopoverTrigger>
-                    </TooltipTrigger>
-                    {!addFormOpen && (
-                      <TooltipContent hidden={isMobile}>
-                        Add Feed <Kbd className="ml-1">N</Kbd>
-                      </TooltipContent>
-                    )}
-                  </Tooltip>
-                  <PopoverContent align="start" variant="form" className="w-80">
-                    <AddFeedForm
-                      onAdded={() => {
-                        setAddFormOpen(false);
-                        // Move focus away from the trigger button so the
-                        // tooltip doesn't activate on popover close.
-                        requestAnimationFrame(() => {
-                          if (document.activeElement instanceof HTMLElement) {
-                            document.activeElement.blur();
-                          }
-                        });
-                      }}
-                      onCancel={() => setAddFormOpen(false)}
-                      onFeedSelect={onFeedSelect}
-                    />
-                  </PopoverContent>
-                </Popover>
               </div>
             </div>
           </div>

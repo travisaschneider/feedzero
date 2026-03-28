@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { ExploreCatalog } from "@/components/explore/explore-catalog.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { feedCatalog } from "@/lib/feed-catalog.ts";
@@ -123,12 +124,114 @@ describe("ExploreCatalog", () => {
     expect(addAllButtons[0]).toBeDisabled();
   });
 
-  it("renders tags for feeds", () => {
+
+  it("shows hint when input looks like a URL", async () => {
+    const user = userEvent.setup();
     render(<ExploreCatalog />);
 
-    const firstFeed = feedCatalog[0].feeds[0];
-    for (const tag of firstFeed.tags) {
-      expect(screen.getAllByText(tag).length).toBeGreaterThan(0);
+    const input = screen.getByPlaceholderText(/search feeds or paste/i);
+    await user.type(input, "example.com/feed");
+
+    expect(
+      screen.getByText(/press enter to add this feed/i),
+    ).toBeInTheDocument();
+  });
+
+  it("does not show hint for regular search text", async () => {
+    const user = userEvent.setup();
+    render(<ExploreCatalog />);
+
+    const input = screen.getByPlaceholderText(/search feeds or paste/i);
+    await user.type(input, "technology");
+
+    expect(
+      screen.queryByText(/press enter to add this feed/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("calls addFeed on Enter when input is a URL", async () => {
+    const user = userEvent.setup();
+    const addFeed = vi.fn().mockResolvedValue({ ok: true, value: undefined });
+    useFeedStore.setState({ addFeed });
+
+    render(<ExploreCatalog />);
+
+    const input = screen.getByPlaceholderText(/search feeds or paste/i);
+    await user.type(input, "https://example.com/feed{Enter}");
+
+    await waitFor(() => {
+      expect(addFeed).toHaveBeenCalledWith("https://example.com/feed");
+    });
+  });
+
+  it("clears input after successful URL add", async () => {
+    const user = userEvent.setup();
+    const addFeed = vi.fn().mockImplementation(async () => {
+      useFeedStore.setState({ selectedFeedId: "new-feed" });
+      return { ok: true, value: undefined };
+    });
+    useFeedStore.setState({ addFeed });
+    const onFeedAdded = vi.fn();
+
+    render(<ExploreCatalog onFeedAdded={onFeedAdded} />);
+
+    const input = screen.getByPlaceholderText(/search feeds or paste/i);
+    await user.type(input, "https://example.com/feed{Enter}");
+
+    await waitFor(() => {
+      expect(input).toHaveValue("");
+    });
+    expect(onFeedAdded).toHaveBeenCalledWith("new-feed");
+  });
+
+  it("renders Import / Export OPML button", () => {
+    render(<ExploreCatalog />);
+
+    expect(
+      screen.getByRole("button", { name: /import.*export/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("feed rows have role option with aria-selected", () => {
+    render(<ExploreCatalog />);
+
+    const options = screen.getAllByRole("option");
+    const totalFeeds = feedCatalog.reduce((sum, c) => sum + c.feeds.length, 0);
+    expect(options.length).toBe(totalFeeds);
+
+    // All should start unselected
+    for (const option of options) {
+      expect(option).toHaveAttribute("aria-selected", "false");
     }
+  });
+
+  it("wraps feed list in a listbox", () => {
+    render(<ExploreCatalog />);
+
+    expect(screen.getByRole("listbox", { name: /feeds/i })).toBeInTheDocument();
+  });
+
+  it("shows search hints when search is focused", async () => {
+    const user = userEvent.setup();
+    render(<ExploreCatalog />);
+
+    const input = screen.getByPlaceholderText(/search feeds or paste/i);
+    await user.click(input);
+
+    expect(screen.getByText(/to browse/)).toBeInTheDocument();
+    expect(screen.getByText(/to clear/)).toBeInTheDocument();
+  });
+
+  it("focuses search input on feedzero:focus-explore-search event", async () => {
+    render(<ExploreCatalog />);
+
+    const input = screen.getByPlaceholderText(/search feeds or paste/i);
+    input.blur();
+
+    document.dispatchEvent(new CustomEvent("feedzero:focus-explore-search"));
+
+    await waitFor(() => {
+      expect(input).toHaveFocus();
+    });
   });
 });

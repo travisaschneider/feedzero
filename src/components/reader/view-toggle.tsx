@@ -52,8 +52,8 @@ export function ViewToggle({
           {extractionStatus === "extracting" ? (
             <Loader2 className="size-3 animate-spin mr-1" />
           ) : null}
-          Extracted
-          <Kbd className="ml-1.5">E</Kbd>
+          Full text
+          <Kbd className="ml-1.5">h</Kbd>
         </ToggleGroupItem>
 
         <ToggleGroupItem
@@ -66,13 +66,13 @@ export function ViewToggle({
             <a href={articleLink} target="_blank" rel="noopener noreferrer">
               <ExternalLink className="size-3" />
               Original
-              <Kbd className="ml-1.5">O</Kbd>
+              <Kbd className="ml-1.5">o</Kbd>
             </a>
           ) : (
             <>
               <ExternalLink className="size-3" />
               Original
-              <Kbd className="ml-1.5">O</Kbd>
+              <Kbd className="ml-1.5">o</Kbd>
             </>
           )}
         </ToggleGroupItem>

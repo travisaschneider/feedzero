@@ -3,7 +3,7 @@ import { render, screen, act } from "@testing-library/react";
 import { MemoryRouter, Routes, Route, useLocation } from "react-router";
 import { FeedsPage } from "@/pages/feeds-page.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
-import { useArticleStore } from "@/stores/article-store.ts";
+import { useArticleStore, clearArticleCache } from "@/stores/article-store.ts";
 import * as db from "@/core/storage/db.ts";
 import type { Article, Feed } from "@/types/index.ts";
 
@@ -132,6 +132,8 @@ function resetStores() {
     selectedArticle: null,
     isLoading: false,
   });
+  clearArticleCache();
+  vi.mocked(db.getArticles).mockResolvedValue({ ok: true, value: [] });
 }
 
 describe("FeedsPage behavior — desktop", () => {
@@ -141,11 +143,11 @@ describe("FeedsPage behavior — desktop", () => {
     resetStores();
   });
 
-  it("shows explore catalog when there are no feeds", () => {
+  it("shows explore catalog when there are no feeds", async () => {
     renderPage("/feeds");
 
     // With no feeds, auto-redirects to /explore which shows the catalog
-    expect(screen.getByRole("heading", { name: "Explore feeds" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Explore feeds" })).toBeInTheDocument();
   });
 
   it("shows panels instead of empty state when feeds exist", () => {
@@ -271,10 +273,10 @@ describe("FeedsPage behavior — mobile", () => {
     expect(screen.getByText("Articles")).toBeInTheDocument();
   });
 
-  it("shows explore catalog when there are no feeds", () => {
+  it("shows explore catalog when there are no feeds", async () => {
     renderPage("/feeds");
 
-    expect(screen.getByRole("heading", { name: "Explore feeds" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Explore feeds" })).toBeInTheDocument();
   });
 
   it("Back button navigates from article to article list and stays there", async () => {
@@ -345,22 +347,22 @@ describe("FeedsPage — explore route", () => {
     resetStores();
   });
 
-  it("shows explore catalog at /explore on desktop", () => {
+  it("shows explore catalog at /explore on desktop", async () => {
     mockIsDesktop = true;
     renderPage("/explore");
 
-    expect(screen.getByRole("heading", { name: "Explore feeds" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Explore feeds" })).toBeInTheDocument();
     expect(screen.queryByText("No feeds yet")).not.toBeInTheDocument();
   });
 
-  it("shows explore catalog at /explore on mobile", () => {
+  it("shows explore catalog at /explore on mobile", async () => {
     mockIsDesktop = false;
     renderPage("/explore");
 
-    expect(screen.getByRole("heading", { name: "Explore feeds" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Explore feeds" })).toBeInTheDocument();
   });
 
-  it("does not show article list or reader at /explore", () => {
+  it("does not show article list or reader at /explore", async () => {
     mockIsDesktop = true;
     useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
 
@@ -369,6 +371,6 @@ describe("FeedsPage — explore route", () => {
     expect(
       container.querySelector("[data-slot='resizable-panel-group']"),
     ).toBeNull();
-    expect(screen.getByRole("heading", { name: "Explore feeds" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Explore feeds" })).toBeInTheDocument();
   });
 });

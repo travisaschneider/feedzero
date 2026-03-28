@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, act } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import userEvent from "@testing-library/user-event";
 import { AppSidebar } from "@/components/layout/app-sidebar.tsx";
@@ -76,22 +76,6 @@ describe("AppSidebar states", () => {
     expect(refreshBtn).toBeDisabled();
   });
 
-  it("add form toggles open and closed", async () => {
-    const user = userEvent.setup();
-    renderSidebar();
-
-    // Initially no input visible
-    expect(screen.queryByLabelText("Feed URL")).not.toBeInTheDocument();
-
-    // Click add button to open
-    await user.click(screen.getByRole("button", { name: /add feed/i }));
-    expect(screen.getByLabelText("Feed URL")).toBeInTheDocument();
-
-    // Click again to close (same button toggles)
-    await user.click(screen.getByRole("button", { name: /add feed/i }));
-    // The collapsible closes; the input should no longer be visible
-    // (Radix Collapsible may still have it in DOM but hidden)
-  });
 
   it("delete triggers confirmation dialog", async () => {
     const user = userEvent.setup();
@@ -191,17 +175,4 @@ describe("AppSidebar states", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("opens add form when feedzero:add-feed event is dispatched", () => {
-    renderSidebar();
-
-    // Initially no input visible
-    expect(screen.queryByLabelText("Feed URL")).not.toBeInTheDocument();
-
-    // Dispatch the custom event
-    act(() => {
-      document.dispatchEvent(new CustomEvent("feedzero:add-feed"));
-    });
-
-    expect(screen.getByLabelText("Feed URL")).toBeInTheDocument();
-  });
 });

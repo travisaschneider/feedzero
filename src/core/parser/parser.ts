@@ -90,8 +90,8 @@ function mapRssFeed(
     // Prefer content:encoded over description for full content
     const contentEncoded = item.content?.encoded;
     const description = item.description;
-    const fullContent = contentEncoded || description || "";
-    const summary = description || "";
+    const fullContent = stripNoneArtifact(contentEncoded || description || "");
+    const summary = stripNoneArtifact(description || "");
 
     // Author: prefer dc:creator, then authors array
     const dcCreator = item.dc?.creator;
@@ -199,6 +199,18 @@ function decodeEntities(str: string): string {
   const el = document.createElement("textarea");
   el.innerHTML = str;
   return el.textContent || "";
+}
+
+/**
+ * Strip the literal string "None" when it's the only text content.
+ * Python-based feed generators (e.g., Django, zeit.web) serialize
+ * Python's `None` as the string "None" when a field is null.
+ */
+function stripNoneArtifact(str: string): string {
+  // Extract text content by stripping HTML tags
+  const textOnly = str.replace(/<[^>]*>/g, "").trim();
+  if (textOnly === "None") return "";
+  return str;
 }
 
 function parseDate(str: string | null | undefined): number | null {

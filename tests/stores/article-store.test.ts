@@ -53,7 +53,7 @@ describe("article-store", () => {
 
       await useArticleStore.getState().loadArticles("f1");
 
-      expect(getArticles).toHaveBeenCalledWith("f1");
+      expect(getArticles).toHaveBeenCalledWith("f1", 25);
       expect(useArticleStore.getState().articles).toEqual(articles);
     });
 
@@ -66,13 +66,11 @@ describe("article-store", () => {
       expect(useArticleStore.getState().articles).toEqual([]);
     });
 
-    it("clears old articles immediately before loading new ones", async () => {
-      // Start with articles from feed A
+    it("clears old articles immediately when switching feeds", async () => {
       const oldArticles = [mockArticle("old-a1"), mockArticle("old-a2")];
       oldArticles.forEach((a) => (a.feedId = "feed-A"));
       useArticleStore.setState({ articles: oldArticles });
 
-      // Set up a delayed response to simulate network latency
       let resolveGetArticles: (value: {
         ok: true;
         value: typeof oldArticles;
@@ -83,36 +81,45 @@ describe("article-store", () => {
         }),
       );
 
-      // Start loading articles for feed B (don't await)
       const loadPromise = useArticleStore.getState().loadArticles("feed-B");
 
-      // IMMEDIATELY after calling loadArticles, articles should be cleared
-      // This prevents showing old feed's articles with new feed's name
+      // Old articles cleared immediately (no stale content from wrong feed)
       expect(useArticleStore.getState().articles).toEqual([]);
+      expect(useArticleStore.getState().selectedArticle).toBeNull();
       expect(useArticleStore.getState().isLoading).toBe(true);
 
-      // Now resolve the fetch
       const newArticles = [mockArticle("new-b1")];
       newArticles[0].feedId = "feed-B";
       resolveGetArticles!({ ok: true, value: newArticles });
       await loadPromise;
 
-      // After load completes, should have new articles
       expect(useArticleStore.getState().articles).toEqual(newArticles);
       expect(useArticleStore.getState().isLoading).toBe(false);
     });
   });
 
   describe("selectArticle", () => {
-    it("sets selected article and marks as read", async () => {
+    it("sets selected article immediately but delays mark-as-read", async () => {
+      vi.useFakeTimers();
       const article = mockArticle("a1", false);
       vi.mocked(updateArticle).mockResolvedValue({ ok: true, value: true });
 
       await useArticleStore.getState().selectArticle(article);
 
-      const state = useArticleStore.getState();
-      expect(state.selectedArticle).toEqual({ ...article, read: true });
+      // Immediately selected but still unread
+      expect(useArticleStore.getState().selectedArticle).toEqual(article);
+      expect(updateArticle).not.toHaveBeenCalled();
+
+      // After 3 seconds, marked as read
+      vi.advanceTimersByTime(1000);
+      await vi.runAllTimersAsync();
+
+      expect(useArticleStore.getState().selectedArticle).toEqual({
+        ...article,
+        read: true,
+      });
       expect(updateArticle).toHaveBeenCalled();
+      vi.useRealTimers();
     });
 
     it("does not update db if already read", async () => {
@@ -122,6 +129,44 @@ describe("article-store", () => {
 
       expect(useArticleStore.getState().selectedArticle).toEqual(article);
       expect(updateArticle).not.toHaveBeenCalled();
+    });
+
+    it("flushes pending mark-as-read when selecting a different article", async () => {
+      vi.useFakeTimers();
+      const article1 = mockArticle("a1", false);
+      const article2 = mockArticle("a2", false);
+      useArticleStore.setState({ articles: [article1, article2] });
+      vi.mocked(updateArticle).mockResolvedValue({ ok: true, value: true });
+
+      // Select first article (starts 1s timer)
+      await useArticleStore.getState().selectArticle(article1);
+      expect(useArticleStore.getState().selectedArticle).toEqual(article1);
+
+      // Switch to second article before timer fires
+      await useArticleStore.getState().selectArticle(article2);
+
+      // First article should be marked read immediately (flushed)
+      const articles = useArticleStore.getState().articles;
+      expect(articles.find((a) => a.id === "a1")?.read).toBe(true);
+      expect(updateArticle).toHaveBeenCalledWith({ ...article1, read: true });
+
+      vi.useRealTimers();
+    });
+
+    it("flushes pending mark-as-read when deselecting with null", async () => {
+      vi.useFakeTimers();
+      const article = mockArticle("a1", false);
+      useArticleStore.setState({ articles: [article] });
+      vi.mocked(updateArticle).mockResolvedValue({ ok: true, value: true });
+
+      await useArticleStore.getState().selectArticle(article);
+      await useArticleStore.getState().selectArticle(null);
+
+      // Article should be marked read (flushed, not cancelled)
+      const articles = useArticleStore.getState().articles;
+      expect(articles.find((a) => a.id === "a1")?.read).toBe(true);
+
+      vi.useRealTimers();
     });
 
     it("sets null to deselect", async () => {
@@ -147,6 +192,34 @@ describe("article-store", () => {
     });
   });
 
+  describe("markAllAsRead", () => {
+    it("marks all unread articles as read", async () => {
+      const articles = [
+        mockArticle("a1", false),
+        mockArticle("a2", false),
+        mockArticle("a3", true),
+      ];
+      useArticleStore.setState({ articles });
+      vi.mocked(updateArticle).mockResolvedValue({ ok: true, value: true });
+
+      await useArticleStore.getState().markAllAsRead();
+
+      const updated = useArticleStore.getState().articles;
+      expect(updated.every((a) => a.read)).toBe(true);
+      // Only unread articles should be persisted
+      expect(updateArticle).toHaveBeenCalledTimes(2);
+    });
+
+    it("does nothing when all articles are read", async () => {
+      const articles = [mockArticle("a1", true), mockArticle("a2", true)];
+      useArticleStore.setState({ articles });
+
+      await useArticleStore.getState().markAllAsRead();
+
+      expect(updateArticle).not.toHaveBeenCalled();
+    });
+  });
+
   describe("sync triggers", () => {
     let scheduleSpy: ReturnType<typeof vi.spyOn>;
 
@@ -155,12 +228,20 @@ describe("article-store", () => {
     });
 
     it("schedules sync push after selectArticle marks as read", async () => {
+      vi.useFakeTimers();
       const article = mockArticle("a1", false);
       vi.mocked(updateArticle).mockResolvedValue({ ok: true, value: true });
 
       await useArticleStore.getState().selectArticle(article);
 
+      // Sync not triggered yet (read is delayed)
+      expect(scheduleSpy).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(1000);
+      await vi.runAllTimersAsync();
+
       expect(scheduleSpy).toHaveBeenCalled();
+      vi.useRealTimers();
     });
 
     it("does not schedule sync push when article is already read", async () => {

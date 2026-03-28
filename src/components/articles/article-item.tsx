@@ -31,7 +31,7 @@ export const ArticleItem = memo(function ArticleItem({
   feedSiteUrl,
 }: ArticleItemProps) {
   function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter" || e.key === " ") {
+    if (e.key === "Enter") {
       e.preventDefault();
       onSelect(article);
     }
@@ -45,20 +45,25 @@ export const ArticleItem = memo(function ArticleItem({
       data-id={article.id}
       onClick={() => onSelect(article)}
       onKeyDown={handleKeyDown}
-      className="px-2 py-2 border-b border-border cursor-pointer hover:bg-accent aria-selected:bg-accent flex gap-4"
+      className="pl-2 pr-3.5 py-2 border-b border-border cursor-pointer hover:bg-accent aria-selected:bg-accent flex gap-4"
     >
-      <div className={`min-w-0 flex-1 ${article.read ? "opacity-60" : ""}`}>
-        <div
-          className={article.read ? "text-muted-foreground" : "text-foreground"}
-        >
-          {decodeEntities(article.title)}
-        </div>
-        <div className="text-xs text-muted-foreground mt-1">
-          {feedTitle && (
-            <span className="font-medium">{feedTitle} &bull; </span>
-          )}
-          {article.author && <>{article.author} &bull; </>}
-          {formatDate(article.publishedAt)}
+      <div className="min-w-0 flex-1 flex gap-2 items-start">
+        <span
+          className={`rounded-full size-1.5 shrink-0 mt-1.5 transition-colors duration-500 ${
+            article.read ? "bg-transparent" : "bg-blue-400 dark:bg-blue-500"
+          }`}
+        />
+        <div className="min-w-0">
+          <div className="text-foreground">
+            {decodeEntities(article.title)}
+          </div>
+          <div className="text-xs text-muted-foreground mt-1">
+            {feedTitle && (
+              <span className="font-medium">{feedTitle} &bull; </span>
+            )}
+            {article.author && <>{article.author} &bull; </>}
+            {formatDate(article.publishedAt)}
+          </div>
         </div>
       </div>
       {feedSiteUrl && (

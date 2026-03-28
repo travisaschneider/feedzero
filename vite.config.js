@@ -41,13 +41,18 @@ function apiProxyPlugin() {
     name: "api-proxy",
     configureServer(server) {
       let proxyHandler = null;
+      let feedCache = null;
       let syncHandler = null;
       let syncAdapter = null;
 
       async function ensureProxyHandler() {
         if (!proxyHandler) {
-          const mod = await import("./src/core/proxy/proxy-handler.ts");
-          proxyHandler = mod.handleProxyRequest;
+          const [proxyMod, cacheMod] = await Promise.all([
+            import("./src/core/proxy/proxy-handler.ts"),
+            import("./src/core/proxy/feed-cache.ts"),
+          ]);
+          proxyHandler = proxyMod.handleProxyRequest;
+          feedCache = cacheMod.createFeedCache();
         }
         return proxyHandler;
       }
@@ -64,24 +69,26 @@ function apiProxyPlugin() {
         return { syncHandler, syncAdapter };
       }
 
+      const cacheOpts = () => ({ cache: feedCache });
+
       server.middlewares.use("/api/feed", async (req, res) => {
         const handler = await ensureProxyHandler();
         const webReq = await toWebRequest(req);
-        const webRes = await handler(webReq, "text/xml");
+        const webRes = await handler(webReq, "text/xml", cacheOpts());
         await sendWebResponse(webRes, res);
       });
 
       server.middlewares.use("/api/page", async (req, res) => {
         const handler = await ensureProxyHandler();
         const webReq = await toWebRequest(req);
-        const webRes = await handler(webReq, "text/html");
+        const webRes = await handler(webReq, "text/html", cacheOpts());
         await sendWebResponse(webRes, res);
       });
 
       server.middlewares.use("/api/icon", async (req, res) => {
         const handler = await ensureProxyHandler();
         const webReq = await toWebRequest(req);
-        const webRes = await handler(webReq, "image/x-icon");
+        const webRes = await handler(webReq, "image/x-icon", cacheOpts());
         await sendWebResponse(webRes, res);
       });
 

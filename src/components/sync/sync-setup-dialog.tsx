@@ -137,8 +137,8 @@ export function SyncSetupDialog() {
     onOpenChange(nextOpen);
   }
 
-  function handleStartSetup() {
-    setPassphrase(generatePassphrase());
+  async function handleStartSetup() {
+    setPassphrase(await generatePassphrase());
     setView("setup");
   }
 

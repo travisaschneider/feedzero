@@ -49,9 +49,13 @@ export async function handleProxyRequest(
   }
 
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15_000);
     const response = await fetch(url, {
       headers: { "User-Agent": "FeedZero/1.0 (RSS Reader)" },
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
     const contentType =
       response.headers.get("content-type") || defaultContentType;
     const body = await response.arrayBuffer();

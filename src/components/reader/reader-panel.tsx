@@ -23,6 +23,7 @@ function formatDate(timestamp: number): string {
 
 export function ReaderPanel() {
   const article = useArticleStore((s) => s.selectedArticle);
+  const isLoading = useArticleStore((s) => s.isLoading);
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
   const cache = useExtractionStore((s) => s.cache);
   const viewMode = useExtractionStore((s) => s.viewMode);
@@ -43,6 +44,9 @@ export function ReaderPanel() {
       extractInBackground(article.link);
     }
   }, [article?.id, article?.link, extractInBackground]);
+
+  // During loading, render nothing to prevent flash of empty state
+  if (isLoading) return null;
 
   // Defensive: don't render article if it doesn't belong to current feed
   if (

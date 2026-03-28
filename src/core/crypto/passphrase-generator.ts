@@ -1,11 +1,12 @@
-import { EFF_WORDLIST } from "./eff-wordlist";
-
 /**
  * Generates a cryptographically random passphrase using the EFF large wordlist.
  * Each word provides ~12.9 bits of entropy (log2(7776)).
  * Uses rejection sampling to eliminate modulo bias.
+ * Wordlist is lazy-loaded to keep it out of the initial bundle.
  */
-export function generatePassphrase(wordCount = 4): string {
+export async function generatePassphrase(wordCount = 4): Promise<string> {
+  const { EFF_WORDLIST } = await import("./eff-wordlist");
+
   const words: string[] = [];
   const maxUnbiased = Math.floor(0x100000000 / EFF_WORDLIST.length) * EFF_WORDLIST.length;
 

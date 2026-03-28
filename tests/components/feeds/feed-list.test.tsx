@@ -83,13 +83,6 @@ describe("AppSidebar", () => {
     expect(onSelect).toHaveBeenCalledWith("a");
   });
 
-  it("has add feed button", () => {
-    renderSidebar();
-    expect(
-      screen.getByRole("button", { name: /add feed/i }),
-    ).toBeInTheDocument();
-  });
-
   it("has refresh all button when feeds exist", () => {
     useFeedStore.setState({
       feeds: [mockFeed("a", "Alpha Feed")],
