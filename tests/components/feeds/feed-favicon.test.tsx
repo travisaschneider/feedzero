@@ -47,12 +47,24 @@ describe("FeedFavicon", () => {
     );
   });
 
-  it("shows RSS fallback after all paths exhausted", () => {
+  it("tries smart favicon endpoint after well-known paths fail", () => {
     const { container } = render(<FeedFavicon siteUrl="https://example.com" />);
     const img = container.querySelector("img")!;
     fireEvent.error(img); // favicon.ico
     fireEvent.error(container.querySelector("img")!); // favicon.png
     fireEvent.error(container.querySelector("img")!); // apple-touch-icon.png
+    const smartImg = container.querySelector("img")!;
+    expect(smartImg.getAttribute("src")).toBe(
+      "/api/favicon?domain=example.com",
+    );
+  });
+
+  it("shows RSS fallback after all strategies exhausted", () => {
+    const { container } = render(<FeedFavicon siteUrl="https://example.com" />);
+    fireEvent.error(container.querySelector("img")!); // favicon.ico
+    fireEvent.error(container.querySelector("img")!); // favicon.png
+    fireEvent.error(container.querySelector("img")!); // apple-touch-icon.png
+    fireEvent.error(container.querySelector("img")!); // smart endpoint
     expect(container.querySelector("img")).toBeNull();
     expect(container.querySelector("svg")).toBeTruthy();
   });

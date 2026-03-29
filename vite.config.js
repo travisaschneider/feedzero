@@ -92,6 +92,15 @@ function apiProxyPlugin() {
         await sendWebResponse(webRes, res);
       });
 
+      server.middlewares.use("/api/favicon", async (req, res) => {
+        const { handleFaviconRequest } = await import(
+          "./src/core/favicon/favicon-handler.ts"
+        );
+        const webReq = await toWebRequest(req);
+        const webRes = await handleFaviconRequest(webReq);
+        await sendWebResponse(webRes, res);
+      });
+
       server.middlewares.use("/api/stats-sync", async (req, res) => {
         const { syncAdapter } = await ensureSyncHandler();
         const { handleSyncStatsRequest } = await import(

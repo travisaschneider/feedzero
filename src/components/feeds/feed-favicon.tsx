@@ -6,11 +6,25 @@ interface FeedFaviconProps {
   className?: string;
 }
 
-/** Well-known favicon paths, tried in order. */
-const FAVICON_PATHS = [
-  "/favicon.ico",
-  "/favicon.png",
-  "/apple-touch-icon.png",
+/**
+ * Favicon URL strategies, tried in order.
+ * "path:" entries append to the origin. "endpoint:" entries are called directly.
+ */
+type FaviconStrategy =
+  | { type: "path"; path: string }
+  | { type: "endpoint"; buildUrl: (origin: string) => string };
+
+const STRATEGIES: FaviconStrategy[] = [
+  { type: "path", path: "/favicon.ico" },
+  { type: "path", path: "/favicon.png" },
+  { type: "path", path: "/apple-touch-icon.png" },
+  {
+    type: "endpoint",
+    buildUrl: (origin) => {
+      const host = new URL(origin).host;
+      return `/api/favicon?domain=${encodeURIComponent(host)}`;
+    },
+  },
 ];
 
 const STORAGE_KEY = "feedzero:favicon-cache";
@@ -95,11 +109,15 @@ export function FeedFavicon({
   const [pathIndex, setPathIndex] = useState(initialIndex);
   const [loaded, setLoaded] = useState(false);
 
-  if (!siteUrl || pathIndex < 0) {
+  if (!siteUrl || pathIndex < 0 || pathIndex >= STRATEGIES.length) {
     return <Rss className={`${className} text-muted-foreground shrink-0`} />;
   }
 
-  const faviconUrl = `/api/icon?url=${encodeURIComponent(origin + FAVICON_PATHS[pathIndex])}`;
+  const strategy = STRATEGIES[pathIndex];
+  const faviconUrl =
+    strategy.type === "path"
+      ? `/api/icon?url=${encodeURIComponent(origin + strategy.path)}`
+      : strategy.buildUrl(origin);
 
   return (
     <>
@@ -117,7 +135,7 @@ export function FeedFavicon({
         }}
         onError={() => {
           const next = pathIndex + 1;
-          if (next < FAVICON_PATHS.length) {
+          if (next < STRATEGIES.length) {
             setPathIndex(next);
             setLoaded(false);
           } else {
