@@ -78,6 +78,18 @@ export function clearFaviconCache() {
   resolvedCache.clear();
 }
 
+/** Remove failed entries so they retry on next render. */
+export function retryFailedFavicons() {
+  let changed = false;
+  for (const [key, entry] of resolvedCache) {
+    if (entry.index < 0) {
+      resolvedCache.delete(key);
+      changed = true;
+    }
+  }
+  if (changed) persistCache();
+}
+
 /** Inject a cache entry directly (used by tests). */
 export function setFaviconCacheEntry(
   origin: string,
