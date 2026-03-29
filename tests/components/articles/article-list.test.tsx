@@ -201,10 +201,10 @@ describe("ArticleList", () => {
       const favicons = container.querySelectorAll("img");
       expect(favicons).toHaveLength(2);
       expect(favicons[0].getAttribute("src")).toBe(
-        "/api/icon?url=https%3A%2F%2Ff1.com%2Ffavicon.ico",
+        "/api/favicon?domain=f1.com",
       );
       expect(favicons[1].getAttribute("src")).toBe(
-        "/api/icon?url=https%3A%2F%2Ff2.com%2Ffavicon.ico",
+        "/api/favicon?domain=f2.com",
       );
     });
 

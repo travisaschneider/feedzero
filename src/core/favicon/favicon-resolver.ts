@@ -44,11 +44,16 @@ async function tryWellKnownPaths(origin: string): Promise<string | null> {
   return null;
 }
 
+/** Minimum favicon size in bytes — smaller icons are likely placeholders. */
+const MIN_ICON_BYTES = 500;
+
 function isImageResponse(res: Response): boolean {
   const ct = res.headers.get("content-type") ?? "";
   const cl = res.headers.get("content-length");
-  // Must be an image type and have non-trivial content
-  return ct.startsWith("image/") && (!cl || parseInt(cl) > 0);
+  if (!ct.startsWith("image/")) return false;
+  // Reject tiny icons (e.g., WordPress 198-byte placeholder favicon.ico)
+  if (cl && parseInt(cl) < MIN_ICON_BYTES) return false;
+  return true;
 }
 
 async function tryHtmlParsing(origin: string): Promise<string | null> {

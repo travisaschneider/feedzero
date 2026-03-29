@@ -4,6 +4,7 @@ import {
   ChevronsUpDown,
   Cloud,
   Compass,
+  ImageOff,
   Keyboard,
   Layers,
   Loader2,
@@ -15,6 +16,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { ALL_FEEDS_ID } from "@/utils/constants.ts";
 import { Button } from "@/components/ui/button.tsx";
@@ -65,6 +67,7 @@ import {
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import { Kbd } from "@/components/ui/kbd.tsx";
 import { useIsOnline } from "@/hooks/use-online.ts";
+import { clearFaviconCache } from "@/components/feeds/feed-favicon.tsx";
 import type { Feed } from "@/types/index.ts";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
@@ -196,6 +199,14 @@ function SidebarFooterMenu({ hasFeeds }: { hasFeeds: boolean }) {
           <DropdownMenuItem onSelect={() => setChangelogOpen(true)}>
             <Sparkles className="size-4" />
             <span>What&apos;s new</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => {
+            clearFaviconCache();
+            try { localStorage.removeItem("feedzero:favicon-cache"); } catch { /* noop */ }
+            toast.success("Favicon cache cleared — reload to refresh icons");
+          }}>
+            <ImageOff className="size-4" />
+            <span>Reload favicons</span>
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setFeedbackOpen(true)}>
             <MessageSquare className="size-4" />

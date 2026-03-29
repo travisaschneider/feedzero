@@ -6,7 +6,7 @@ describe("resolveIconUrl", () => {
     vi.restoreAllMocks();
   });
 
-  it("returns well-known path when HEAD request succeeds", async () => {
+  it("returns well-known path when HEAD request succeeds with good size", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValueOnce({
@@ -21,6 +21,47 @@ describe("resolveIconUrl", () => {
 
     const result = await resolveIconUrl("https://example.com");
     expect(result).toBe("https://example.com/favicon.ico");
+  });
+
+  it("skips tiny placeholder favicons and falls through to HTML parsing", async () => {
+    const fetchMock = vi.fn()
+      // All well-known paths return 198-byte placeholder
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({
+          "content-type": "image/x-icon",
+          "content-length": "198",
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({
+          "content-type": "image/x-icon",
+          "content-length": "198",
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({
+          "content-type": "image/x-icon",
+          "content-length": "198",
+        }),
+      })
+      // HTML has a proper icon
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () =>
+          Promise.resolve(
+            '<html><head><link rel="icon" href="/wp-content/icon.png" sizes="192x192"></head></html>',
+          ),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await resolveIconUrl("https://example.com");
+    expect(result).toBe("https://example.com/wp-content/icon.png");
   });
 
   it("parses HTML link tags when well-known paths fail", async () => {

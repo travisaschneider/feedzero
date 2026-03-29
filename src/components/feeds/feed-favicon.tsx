@@ -15,9 +15,6 @@ type FaviconStrategy =
   | { type: "endpoint"; buildUrl: (origin: string) => string };
 
 const STRATEGIES: FaviconStrategy[] = [
-  { type: "path", path: "/favicon.ico" },
-  { type: "path", path: "/favicon.png" },
-  { type: "path", path: "/apple-touch-icon.png" },
   {
     type: "endpoint",
     buildUrl: (origin) => {
@@ -25,6 +22,9 @@ const STRATEGIES: FaviconStrategy[] = [
       return `/api/favicon?domain=${encodeURIComponent(host)}`;
     },
   },
+  { type: "path", path: "/favicon.ico" },
+  { type: "path", path: "/favicon.png" },
+  { type: "path", path: "/apple-touch-icon.png" },
 ];
 
 const STORAGE_KEY = "feedzero:favicon-cache";

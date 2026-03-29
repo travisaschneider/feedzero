@@ -11,12 +11,12 @@ describe("FeedFavicon", () => {
     clearFaviconCache();
   });
 
-  it("routes favicon requests through the proxy to prevent IP leakage", () => {
+  it("tries smart favicon endpoint first", () => {
     const { container } = render(<FeedFavicon siteUrl="https://example.com" />);
     const img = container.querySelector("img");
     expect(img).toBeTruthy();
     expect(img!.getAttribute("src")).toBe(
-      "/api/icon?url=https%3A%2F%2Fexample.com%2Ffavicon.ico",
+      "/api/favicon?domain=example.com",
     );
   });
 
@@ -26,45 +26,43 @@ describe("FeedFavicon", () => {
     expect(container.querySelector("img")).toBeNull();
   });
 
-  it("tries favicon.png after favicon.ico fails", () => {
+  it("falls back to favicon.ico after smart endpoint fails", () => {
     const { container } = render(<FeedFavicon siteUrl="https://example.com" />);
     const img = container.querySelector("img")!;
-    fireEvent.error(img);
+    fireEvent.error(img); // smart endpoint fails
+    const newImg = container.querySelector("img")!;
+    expect(newImg.getAttribute("src")).toBe(
+      "/api/icon?url=https%3A%2F%2Fexample.com%2Ffavicon.ico",
+    );
+  });
+
+  it("falls back to favicon.png after favicon.ico fails", () => {
+    const { container } = render(<FeedFavicon siteUrl="https://example.com" />);
+    fireEvent.error(container.querySelector("img")!); // smart endpoint
+    fireEvent.error(container.querySelector("img")!); // favicon.ico
     const newImg = container.querySelector("img")!;
     expect(newImg.getAttribute("src")).toBe(
       "/api/icon?url=https%3A%2F%2Fexample.com%2Ffavicon.png",
     );
   });
 
-  it("tries apple-touch-icon.png after favicon.png fails", () => {
+  it("falls back to apple-touch-icon after favicon.png fails", () => {
     const { container } = render(<FeedFavicon siteUrl="https://example.com" />);
-    const img = container.querySelector("img")!;
-    fireEvent.error(img); // favicon.ico fails
-    fireEvent.error(container.querySelector("img")!); // favicon.png fails
+    fireEvent.error(container.querySelector("img")!); // smart endpoint
+    fireEvent.error(container.querySelector("img")!); // favicon.ico
+    fireEvent.error(container.querySelector("img")!); // favicon.png
     const newImg = container.querySelector("img")!;
     expect(newImg.getAttribute("src")).toBe(
       "/api/icon?url=https%3A%2F%2Fexample.com%2Fapple-touch-icon.png",
     );
   });
 
-  it("tries smart favicon endpoint after well-known paths fail", () => {
-    const { container } = render(<FeedFavicon siteUrl="https://example.com" />);
-    const img = container.querySelector("img")!;
-    fireEvent.error(img); // favicon.ico
-    fireEvent.error(container.querySelector("img")!); // favicon.png
-    fireEvent.error(container.querySelector("img")!); // apple-touch-icon.png
-    const smartImg = container.querySelector("img")!;
-    expect(smartImg.getAttribute("src")).toBe(
-      "/api/favicon?domain=example.com",
-    );
-  });
-
   it("shows RSS fallback after all strategies exhausted", () => {
     const { container } = render(<FeedFavicon siteUrl="https://example.com" />);
+    fireEvent.error(container.querySelector("img")!); // smart endpoint
     fireEvent.error(container.querySelector("img")!); // favicon.ico
     fireEvent.error(container.querySelector("img")!); // favicon.png
     fireEvent.error(container.querySelector("img")!); // apple-touch-icon.png
-    fireEvent.error(container.querySelector("img")!); // smart endpoint
     expect(container.querySelector("img")).toBeNull();
     expect(container.querySelector("svg")).toBeTruthy();
   });
@@ -98,13 +96,11 @@ describe("FeedFavicon", () => {
   });
 
   it("retries after cached failure once TTL expires", () => {
-    // Inject a stale failure (timestamp 0 = expired)
     setFaviconCacheEntry("https://stale.example.com", -1, 0);
 
     const { container } = render(
       <FeedFavicon siteUrl="https://stale.example.com" />,
     );
-    // Expired failure should be ignored — component retries (img present)
     expect(container.querySelector("img")).toBeTruthy();
   });
 });
