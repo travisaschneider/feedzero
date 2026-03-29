@@ -44,7 +44,7 @@ export async function handleFaviconRequest(
       status: 200,
       headers: {
         "Content-Type": contentType,
-        "Cache-Control": "public, max-age=86400",
+        "Cache-Control": "no-cache",
       },
     });
   } catch {
