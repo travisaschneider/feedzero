@@ -159,4 +159,45 @@ describe("App sync-aware init", () => {
     expect(useSyncStore.getState().credentials).not.toBeNull();
     expect(useSyncStore.getState().status).toBe("synced");
   });
+
+  it("shows error when new-user initialization fails", async () => {
+    // New user — onboarding not complete
+    useAppStore.setState({ hasCompletedOnboarding: false });
+
+    const { initFresh } = await import("@/core/storage/key-manager");
+    vi.mocked(initFresh).mockResolvedValueOnce({
+      ok: false,
+      error: "Web Crypto unavailable",
+    });
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(useAppStore.getState().error).toBeTruthy();
+    });
+  });
+
+  it("shows error when crypto.subtle is unavailable", async () => {
+    // Simulate missing crypto.subtle (Lockdown Mode)
+    const originalSubtle = globalThis.crypto?.subtle;
+    Object.defineProperty(globalThis.crypto, "subtle", {
+      value: undefined,
+      configurable: true,
+    });
+
+    useAppStore.setState({ hasCompletedOnboarding: false });
+
+    render(<App />);
+
+    await waitFor(() => {
+      const state = useAppStore.getState();
+      expect(state.error).toContain("crypto");
+    });
+
+    // Restore
+    Object.defineProperty(globalThis.crypto, "subtle", {
+      value: originalSubtle,
+      configurable: true,
+    });
+  });
 });

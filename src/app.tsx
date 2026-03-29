@@ -39,10 +39,21 @@ function AppInit({ children }: { children: React.ReactNode }) {
   // New users: auto-initialize with local-only mode (no onboarding modal)
   useEffect(() => {
     if (hasCompletedOnboarding === false && !isDbReady) {
-      generatePassphrase().then((passphrase) =>
-      initialize(passphrase, { sync: false })).then(() => {
-        completeOnboarding();
-      });
+      if (!globalThis.crypto?.subtle) {
+        useAppStore.getState().setError(
+          "Your browser does not support the Web crypto API required for encryption. " +
+          "This can happen in iOS Lockdown Mode or very old browsers.",
+        );
+        return;
+      }
+      generatePassphrase()
+        .then((passphrase) => initialize(passphrase, { sync: false }))
+        .then(() => { completeOnboarding(); })
+        .catch((err) => {
+          useAppStore.getState().setError(
+            err instanceof Error ? err.message : "Initialization failed",
+          );
+        });
     }
   }, [hasCompletedOnboarding, isDbReady, initialize, completeOnboarding]);
 
