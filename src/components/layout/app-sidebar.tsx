@@ -58,9 +58,6 @@ import {
   SidebarMenuItem,
   SidebarRail,
   SidebarMenuBadge,
-  SidebarMenuSub,
-  SidebarMenuSubItem,
-  SidebarMenuSubButton,
   SidebarSeparator,
   useSidebar,
 } from "@/components/ui/sidebar.tsx";
@@ -280,12 +277,10 @@ function DraggableFeedItem({ feed, inFolder, isActive, isRenaming, renameValue, 
   onRefresh: () => void; onReload: () => void; onDelete: () => void;
   onMoveToFolder: (folderId: string | null) => void;
 }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: feed.id });
-  const Wrapper = inFolder ? SidebarMenuSubItem : SidebarMenuItem;
-  const ButtonComp = inFolder ? SidebarMenuSubButton : SidebarMenuButton;
+  const { listeners, setNodeRef, isDragging } = useDraggable({ id: feed.id });
 
   return (
-    <Wrapper ref={setNodeRef} style={{ opacity: isDragging ? 0.4 : 1 }} {...listeners}>
+    <SidebarMenuItem ref={setNodeRef} style={{ opacity: isDragging ? 0.4 : 1 }} {...listeners} className={inFolder ? "pl-4" : ""}>
       {isRenaming ? (
         <form className="flex items-center gap-2 px-2 py-1" onSubmit={(e) => { e.preventDefault(); if (renameValue.trim()) onRename(renameValue.trim()); }}>
           <FeedFavicon siteUrl={feed.siteUrl} />
@@ -294,11 +289,11 @@ function DraggableFeedItem({ feed, inFolder, isActive, isRenaming, renameValue, 
             onBlur={onCancelRename} onKeyDown={(e) => { if (e.key === "Escape") onCancelRename(); }} />
         </form>
       ) : (
-        <ButtonComp isActive={isActive} onClick={onSelect}>
+        <SidebarMenuButton isActive={isActive} onClick={onSelect}>
           <FeedFavicon siteUrl={feed.siteUrl} />
           <span className="truncate">{feed.title}</span>
           {isRefreshing && <RefreshCw className="size-3 animate-spin shrink-0 text-muted-foreground" />}
-        </ButtonComp>
+        </SidebarMenuButton>
       )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -327,7 +322,7 @@ function DraggableFeedItem({ feed, inFolder, isActive, isRenaming, renameValue, 
           {unreadCount > 99 ? "99+" : unreadCount}
         </SidebarMenuBadge>
       )}
-    </Wrapper>
+    </SidebarMenuItem>
   );
 }
 
@@ -575,9 +570,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                               </DropdownMenuContent>
                             </DropdownMenu>
                             <Collapsible.Content>
-                              <SidebarMenuSub>
-                                {folderFeeds.map((feed) => renderFeedItem(feed, true))}
-                              </SidebarMenuSub>
+                              {folderFeeds.map((feed) => renderFeedItem(feed, true))}
                             </Collapsible.Content>
                           </Collapsible.Root>
                         </SidebarMenuItem>
