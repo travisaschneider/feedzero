@@ -11,6 +11,9 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet.tsx";
 
+/** In-memory cache for feed previews — avoids re-fetching on every open. */
+const previewCache = new Map<string, PreviewArticle[]>();
+
 interface PreviewArticle {
   title: string;
   link: string;
@@ -53,32 +56,31 @@ export function FeedPreviewSheet({
   const [articles, setArticles] = useState<PreviewArticle[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [fetched, setFetched] = useState(false);
 
   useEffect(() => {
-    if (open && !fetched) {
-      setLoading(true);
-      setError(null);
-      previewFeed(feedUrl).then((result) => {
-        if (result.ok) {
-          setArticles(result.value.articles);
-        } else {
-          setError(result.error);
-        }
-        setLoading(false);
-        setFetched(true);
-      });
-    }
-  }, [open, fetched, feedUrl]);
+    if (!open) return;
 
-  // Reset when closing
-  useEffect(() => {
-    if (!open) {
-      setFetched(false);
-      setArticles([]);
+    // Check in-memory cache first
+    const cached = previewCache.get(feedUrl);
+    if (cached) {
+      setArticles(cached);
+      setLoading(false);
       setError(null);
+      return;
     }
-  }, [open]);
+
+    setLoading(true);
+    setError(null);
+    previewFeed(feedUrl).then((result) => {
+      if (result.ok) {
+        previewCache.set(feedUrl, result.value.articles);
+        setArticles(result.value.articles);
+      } else {
+        setError(result.error);
+      }
+      setLoading(false);
+    });
+  }, [open, feedUrl]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -167,7 +169,7 @@ export function FeedPreviewSheet({
           </div>
         )}
 
-        {!loading && !error && articles.length === 0 && fetched && (
+        {!loading && !error && articles.length === 0 && previewCache.has(feedUrl) && (
           <div className="py-8 text-center text-muted-foreground text-sm">
             No articles found in this feed.
           </div>
