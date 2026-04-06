@@ -39,10 +39,18 @@ describe("AppSidebar layout structure", () => {
     });
   });
 
-  it("renders SidebarRail", () => {
+  it("renders SidebarRail as a clickable button", () => {
     const { container } = renderSidebar();
     const rail = container.querySelector("[data-sidebar='rail']");
     expect(rail).not.toBeNull();
+    expect(rail!.tagName).toBe("BUTTON");
+    expect(rail!.getAttribute("aria-label")).toBe("Toggle Sidebar");
+  });
+
+  it("SidebarRail shows keyboard shortcut hint", () => {
+    const { container } = renderSidebar();
+    const rail = container.querySelector("[data-sidebar='rail']");
+    expect(rail!.getAttribute("title")).toContain("[");
   });
 
   it("SidebarHeader hides refresh when no feeds exist", () => {
