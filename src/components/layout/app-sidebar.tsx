@@ -4,7 +4,6 @@ import {
   ChevronsUpDown,
   Cloud,
   Compass,
-  ImageOff,
   Keyboard,
   Layers,
   Loader2,
@@ -68,7 +67,6 @@ import {
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import { Kbd } from "@/components/ui/kbd.tsx";
 import { useIsOnline } from "@/hooks/use-online.ts";
-import { clearFaviconCache } from "@/components/feeds/feed-favicon.tsx";
 import type { Feed } from "@/types/index.ts";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
@@ -200,14 +198,6 @@ function SidebarFooterMenu({ hasFeeds }: { hasFeeds: boolean }) {
           <DropdownMenuItem onSelect={() => setChangelogOpen(true)}>
             <Sparkles className="size-4" />
             <span>What&apos;s new</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => {
-            clearFaviconCache();
-            try { localStorage.removeItem("feedzero:favicon-cache"); } catch { /* noop */ }
-            toast.success("Favicon cache cleared — reload to refresh icons");
-          }}>
-            <ImageOff className="size-4" />
-            <span>Reload favicons</span>
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setFeedbackOpen(true)}>
             <MessageSquare className="size-4" />
@@ -395,7 +385,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                           )}
                           {!refreshingFeedIds.has(feed.id) && (unreadCounts[feed.id] ?? 0) > 0 && (
                             <span className="ml-auto shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-primary">
-                              {unreadCounts[feed.id]}
+                              {unreadCounts[feed.id] > 99 ? "99+" : unreadCounts[feed.id]}
                             </span>
                           )}
                         </SidebarMenuButton>

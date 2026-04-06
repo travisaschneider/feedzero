@@ -28,7 +28,8 @@ const STRATEGIES: FaviconStrategy[] = [
 ];
 
 const STORAGE_KEY = "feedzero:favicon-cache";
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days for successful
+const FAILURE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours for failures
 
 interface CacheEntry {
   index: number;
@@ -51,8 +52,9 @@ const resolvedCache: Map<string, CacheEntry> = (() => {
       // Migrate legacy format (plain number) to new format
       const entry: CacheEntry =
         typeof val === "number" ? { index: val, ts: now } : val;
-      // Skip expired failures
-      if (entry.index < 0 && now - entry.ts > CACHE_TTL_MS) continue;
+      // Skip expired entries (failures: 24h, successes: 7d)
+      const ttl = entry.index < 0 ? FAILURE_TTL_MS : CACHE_TTL_MS;
+      if (now - entry.ts > ttl) continue;
       map.set(key, entry);
     }
     return map;
@@ -114,8 +116,7 @@ export function FeedFavicon({
   const cached = resolvedCache.get(origin);
   const isExpired =
     cached !== undefined &&
-    cached.index < 0 &&
-    Date.now() - cached.ts > CACHE_TTL_MS;
+    Date.now() - cached.ts > (cached.index < 0 ? FAILURE_TTL_MS : CACHE_TTL_MS);
   const initialIndex =
     cached !== undefined && !isExpired ? cached.index : 0;
   const [pathIndex, setPathIndex] = useState(initialIndex);
