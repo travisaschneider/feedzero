@@ -8,6 +8,7 @@ import {
   addFeedFlow,
   refreshFeed,
   refreshAllFeeds,
+  reloadFeed,
 } from "../core/feeds/feed-service.ts";
 import { useSyncStore } from "./sync-store.ts";
 import { CHANGELOG_FEED_PATH } from "../utils/constants.ts";
@@ -35,6 +36,7 @@ interface FeedStore {
   loadFeeds: () => Promise<void>;
   addFeed: (url: string, prefetchedContent?: string) => Promise<Result<void>>;
   removeFeed: (feedId: string) => Promise<void>;
+  reloadSingleFeed: (feedId: string) => Promise<void>;
   selectFeed: (feedId: string) => void;
   refreshAll: () => Promise<void>;
   refreshSingleFeed: (feedId: string) => Promise<void>;
@@ -105,6 +107,27 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     } finally {
       set({ isRefreshingAll: false });
     }
+  },
+
+  reloadSingleFeed: async (feedId) => {
+    const ids = new Set(get().refreshingFeedIds);
+    ids.add(feedId);
+    set({ refreshingFeedIds: ids });
+    try {
+      const feedResult = await getFeed(feedId);
+      if (!feedResult.ok) return;
+      await reloadFeed(feedResult.value);
+      // Reload articles into store
+      const { loadArticles, preloadAll } = await import("./article-store.ts").then(m => m.useArticleStore.getState());
+      await preloadAll();
+      const selectedFeedId = get().selectedFeedId;
+      if (selectedFeedId) await loadArticles(selectedFeedId);
+    } finally {
+      const ids = new Set(get().refreshingFeedIds);
+      ids.delete(feedId);
+      set({ refreshingFeedIds: ids });
+    }
+    useSyncStore.getState().scheduleSyncPush();
   },
 
   refreshSingleFeed: async (feedId) => {

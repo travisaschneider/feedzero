@@ -10,6 +10,7 @@ import {
   MessageSquare,
   MoreHorizontal,
   RefreshCw,
+  RotateCcw,
   Settings,
   Sparkles,
   Trash2,
@@ -270,6 +271,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   const unreadCounts = useArticleStore((s) => s.unreadCounts);
   const refreshAll = useFeedStore((s) => s.refreshAll);
   const refreshSingleFeed = useFeedStore((s) => s.refreshSingleFeed);
+  const reloadSingleFeed = useFeedStore((s) => s.reloadSingleFeed);
   const isRefreshingAll = useFeedStore((s) => s.isRefreshingAll);
   const refreshingFeedIds = useFeedStore((s) => s.refreshingFeedIds);
 
@@ -408,6 +410,12 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                             >
                               <RefreshCw className="size-4" />
                               Refresh
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => reloadSingleFeed(feed.id)}
+                            >
+                              <RotateCcw className="size-4" />
+                              Reload from scratch
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
