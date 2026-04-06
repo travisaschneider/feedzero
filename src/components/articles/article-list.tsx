@@ -51,7 +51,7 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
           </div>
         )
       ) : (
-        <ul role="listbox" aria-label="Articles" className="list-none m-0 p-0 pb-12">
+        <ul role="listbox" aria-label="Articles" className="list-none m-0 p-0 pb-6">
           {articles.map((article) => (
             <ArticleItem
               key={article.id}
