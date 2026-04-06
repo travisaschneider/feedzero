@@ -47,10 +47,11 @@ describe("AppSidebar layout structure", () => {
     expect(rail!.getAttribute("aria-label")).toBe("Toggle Sidebar");
   });
 
-  it("SidebarRail shows keyboard shortcut hint", () => {
+  it("SidebarRail is wrapped in a tooltip", () => {
     const { container } = renderSidebar();
     const rail = container.querySelector("[data-sidebar='rail']");
-    expect(rail!.getAttribute("title")).toContain("[");
+    // Rail should be inside a tooltip trigger (span.contents wrapper)
+    expect(rail!.parentElement?.tagName).toBe("SPAN");
   });
 
   it("SidebarHeader hides refresh when no feeds exist", () => {
