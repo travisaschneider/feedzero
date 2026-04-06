@@ -11,7 +11,6 @@ import {
   MoreHorizontal,
   RefreshCw,
   Settings,
-  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -60,10 +59,6 @@ import { useSyncStore } from "@/stores/sync-store.ts";
 import { Switch } from "@/components/ui/switch.tsx";
 import { KeyboardShortcutsDialog } from "@/components/layout/keyboard-shortcuts-dialog.tsx";
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog.tsx";
-import {
-  ChangelogBentoDialog,
-  APP_VERSION,
-} from "@/components/layout/changelog-bento.tsx";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import { Kbd } from "@/components/ui/kbd.tsx";
 import { useIsOnline } from "@/hooks/use-online.ts";
@@ -115,7 +110,6 @@ function SidebarFooterMenu({ hasFeeds }: { hasFeeds: boolean }) {
   const isOnline = useIsOnline();
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const [changelogOpen, setChangelogOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
   const isSyncOn = syncStatus === "synced" || syncStatus === "syncing";
@@ -195,10 +189,6 @@ function SidebarFooterMenu({ hasFeeds }: { hasFeeds: boolean }) {
             <Keyboard className="size-4" />
             <span>Keyboard shortcuts</span>
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setChangelogOpen(true)}>
-            <Sparkles className="size-4" />
-            <span>What&apos;s new</span>
-          </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setFeedbackOpen(true)}>
             <MessageSquare className="size-4" />
             <span>Send feedback</span>
@@ -209,10 +199,6 @@ function SidebarFooterMenu({ hasFeeds }: { hasFeeds: boolean }) {
       <KeyboardShortcutsDialog
         open={shortcutsOpen}
         onOpenChange={setShortcutsOpen}
-      />
-      <ChangelogBentoDialog
-        open={changelogOpen}
-        onOpenChange={setChangelogOpen}
       />
       <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </>
@@ -285,7 +271,6 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   const { pathname } = useLocation();
   const isExplorePage = pathname === "/explore";
   const [feedToRemove, setFeedToRemove] = useState<Feed | null>(null);
-  const [changelogOpen, setChangelogOpen] = useState(false);
 
   function handleSelect(feedId: string) {
     if (isMobile) setOpenMobile(false);
@@ -307,12 +292,6 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
             <div className="flex items-center justify-between">
               <span className="text-lg font-semibold tracking-tight">
                 FeedZero
-                <button
-                  onClick={() => setChangelogOpen(true)}
-                  className="ml-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-amber-700 hover:bg-amber-200 transition-colors cursor-pointer"
-                >
-                  v{APP_VERSION}
-                </button>
               </span>
               <div className="flex items-center gap-1">
                 {feeds.length > 0 && (
@@ -459,10 +438,6 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
         </AlertDialogContent>
       </AlertDialog>
 
-      <ChangelogBentoDialog
-        open={changelogOpen}
-        onOpenChange={setChangelogOpen}
-      />
     </>
   );
 }
