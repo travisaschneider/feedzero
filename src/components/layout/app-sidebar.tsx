@@ -10,7 +10,6 @@ import {
   Loader2,
   MessageSquare,
   MoreHorizontal,
-  PanelLeftClose,
   RefreshCw,
   Settings,
   Sparkles,
@@ -289,7 +288,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   const isRefreshingAll = useFeedStore((s) => s.isRefreshingAll);
   const refreshingFeedIds = useFeedStore((s) => s.refreshingFeedIds);
 
-  const { isMobile, setOpenMobile, toggleSidebar } = useSidebar();
+  const { isMobile, setOpenMobile } = useSidebar();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const isExplorePage = pathname === "/explore";
@@ -342,24 +341,6 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                     </TooltipTrigger>
                     <TooltipContent hidden={isMobile}>
                       Refresh <Kbd className="ml-1">r</Kbd>
-                    </TooltipContent>
-                  </Tooltip>
-                )}
-                {!isMobile && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={toggleSidebar}
-                        className="size-8"
-                      >
-                        <PanelLeftClose className="size-4" />
-                        <span className="sr-only">Collapse sidebar</span>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      Collapse <Kbd className="ml-1">[</Kbd>
                     </TooltipContent>
                   </Tooltip>
                 )}

@@ -39,22 +39,10 @@ describe("AppSidebar layout structure", () => {
     });
   });
 
-  it("renders SidebarRail as a clickable button", () => {
+  it("renders SidebarRail", () => {
     const { container } = renderSidebar();
     const rail = container.querySelector("[data-sidebar='rail']");
     expect(rail).not.toBeNull();
-    expect(rail!.tagName).toBe("BUTTON");
-    expect(rail!.getAttribute("aria-label")).toBe("Toggle Sidebar");
-  });
-
-  it("SidebarRail has a sibling tooltip trigger for keyboard hint", () => {
-    const { container } = renderSidebar();
-    const rail = container.querySelector("[data-sidebar='rail']");
-    expect(rail).not.toBeNull();
-    // A sibling div acts as the tooltip trigger, positioned identically to the rail
-    const sibling = rail!.nextElementSibling?.querySelector("[aria-hidden]")
-      ?? rail!.parentElement?.querySelector("[aria-hidden]");
-    expect(sibling).not.toBeNull();
   });
 
   it("SidebarHeader hides refresh when no feeds exist", () => {

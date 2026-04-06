@@ -108,11 +108,13 @@ describe("FeedsPage layout — desktop", () => {
     expect(inset!.className).toContain("overflow-hidden");
   });
 
-  it("desktop view has no top header bar", () => {
+  it("desktop header is minimal (trigger only, no breadcrumbs)", () => {
     const { container } = renderPage();
     const inset = container.querySelector("[data-slot='sidebar-inset']");
     const header = inset?.querySelector(":scope > header");
-    expect(header).toBeNull();
+    expect(header).not.toBeNull();
+    expect(header!.querySelector("[data-sidebar='trigger']")).not.toBeNull();
+    expect(header!.querySelector("nav")).toBeNull(); // no breadcrumbs
   });
 
   it("ResizablePanelGroup has flex-1 and min-h-0", () => {
