@@ -4,11 +4,11 @@ import {
   DialogClose,
   DialogContent,
 } from "@/components/ui/dialog.tsx";
-import { XIcon, Search, CheckCheck, Zap, Shield, ArrowDownToLine, ArrowUpFromLine, Rss, Moon, BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
+import { XIcon, Search, CheckCheck, Zap, Shield, ShieldOff, Link2, EyeOff, ArrowDownToLine, ArrowUpFromLine, Rss, Moon, BookOpen, ChevronLeft, ChevronRight } from "lucide-react";
 import { Kbd } from "@/components/ui/kbd.tsx";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 
-export const APP_VERSION = "0.2.2";
+export const APP_VERSION = "0.3.0";
 
 const STORAGE_KEY = "feedzero:last-seen-version";
 
@@ -540,6 +540,56 @@ function TileDesc({ children }: { children: React.ReactNode }) {
   );
 }
 
+// --- v0.3.0 tiles ---
+
+function V030Content() {
+  const trackerExamples = [
+    { name: "Tracking pixels", icon: <EyeOff className="size-3.5 text-red-400" />, status: "Stripped" },
+    { name: "UTM parameters", icon: <Link2 className="size-3.5 text-red-400" />, status: "Removed" },
+    { name: "Ad click IDs", icon: <ShieldOff className="size-3.5 text-red-400" />, status: "Blocked" },
+  ];
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:items-stretch">
+      <BentoTile className="sm:col-span-2">
+        <TileLabel isNew>Tracker stripping</TileLabel>
+        <TileDesc>Tracking pixels, UTM parameters, and ad click IDs are automatically stripped from every feed before it reaches your browser.</TileDesc>
+        <div className="mt-3 rounded-md border border-border/30 overflow-hidden">
+          {trackerExamples.map((item, i) => (
+            <div key={item.name} className={`flex items-center gap-2.5 px-2.5 py-1.5 text-xs ${i > 0 ? "border-t border-border/20" : ""}`}>
+              {item.icon}
+              <span className="flex-1">{item.name}</span>
+              <span className="text-[10px] font-medium text-red-400 line-through">{item.status}</span>
+            </div>
+          ))}
+        </div>
+      </BentoTile>
+      <BentoTile>
+        <TileLabel isNew>No fingerprinting</TileLabel>
+        <TileDesc>The server sees which feeds exist, never which ones you read. No accounts, no user IDs, no correlation.</TileDesc>
+        <div className="mt-3 flex items-center justify-center">
+          <div className="flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+            <Shield className="size-3" />
+            Zero correlation
+          </div>
+        </div>
+      </BentoTile>
+      <BentoTile>
+        <TileLabel isNew>Link cleaning</TileLabel>
+        <TileDesc>fbclid, gclid, utm_source and 20+ tracking parameters scrubbed from every link.</TileDesc>
+      </BentoTile>
+      <BentoTile>
+        <TileLabel isNew>Feed catalog</TileLabel>
+        <TileDesc>A global, anonymous index of feeds — powering future recommendations, search, and health monitoring.</TileDesc>
+      </BentoTile>
+      <BentoTile>
+        <TileLabel isNew>Improved changelog</TileLabel>
+        <TileDesc>Navigate between releases with arrow buttons and keyboard shortcuts.</TileDesc>
+      </BentoTile>
+    </div>
+  );
+}
+
 // --- Types ---
 
 type FeatureRelease = {
@@ -564,6 +614,13 @@ export type Release = FeatureRelease | MinorRelease;
 // --- Release data ---
 
 export const releases: Release[] = [
+  {
+    version: "0.3.0",
+    date: "2026-04-06",
+    title: "Cleaner feeds",
+    subtitle: "Tracking pixels, ad click IDs, and UTM parameters stripped automatically. Your feeds, without the surveillance.",
+    type: "feature",
+  },
   {
     version: "0.2.2",
     date: "2026-03-29",
@@ -600,6 +657,7 @@ export const releases: Release[] = [
 ];
 
 const featureContentMap: Record<string, React.FC> = {
+  "0.3.0": V030Content,
   "0.2.1": V021Content,
   "0.2.0": V020Content,
   "0.1.0": V010Content,

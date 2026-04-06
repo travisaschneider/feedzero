@@ -44,17 +44,30 @@ function apiProxyPlugin() {
       let feedCache = null;
       let syncHandler = null;
       let syncAdapter = null;
+      let catalogAdapter = null;
+      let catalogHandler = null;
 
       async function ensureProxyHandler() {
         if (!proxyHandler) {
-          const [proxyMod, cacheMod] = await Promise.all([
+          const [proxyMod, cacheMod, catalogMod] = await Promise.all([
             import("./src/core/proxy/proxy-handler.ts"),
             import("./src/core/proxy/feed-cache.ts"),
+            import("./src/core/catalog/adapters/memory-adapter.ts"),
           ]);
           proxyHandler = proxyMod.handleProxyRequest;
           feedCache = cacheMod.createFeedCache();
+          catalogAdapter = catalogMod.createMemoryCatalogAdapter();
         }
         return proxyHandler;
+      }
+
+      async function ensureCatalogHandler() {
+        if (!catalogHandler) {
+          await ensureProxyHandler(); // ensures catalogAdapter exists
+          const mod = await import("./src/core/catalog/catalog-handler.ts");
+          catalogHandler = mod.handleCatalogRequest;
+        }
+        return { catalogHandler, catalogAdapter };
       }
 
       async function ensureSyncHandler() {
@@ -69,26 +82,26 @@ function apiProxyPlugin() {
         return { syncHandler, syncAdapter };
       }
 
-      const cacheOpts = () => ({ cache: feedCache });
+      const proxyOpts = () => ({ cache: feedCache, catalogAdapter, cleanContent: true });
 
       server.middlewares.use("/api/feed", async (req, res) => {
         const handler = await ensureProxyHandler();
         const webReq = await toWebRequest(req);
-        const webRes = await handler(webReq, "text/xml", cacheOpts());
+        const webRes = await handler(webReq, "text/xml", proxyOpts());
         await sendWebResponse(webRes, res);
       });
 
       server.middlewares.use("/api/page", async (req, res) => {
         const handler = await ensureProxyHandler();
         const webReq = await toWebRequest(req);
-        const webRes = await handler(webReq, "text/html", cacheOpts());
+        const webRes = await handler(webReq, "text/html", proxyOpts());
         await sendWebResponse(webRes, res);
       });
 
       server.middlewares.use("/api/icon", async (req, res) => {
         const handler = await ensureProxyHandler();
         const webReq = await toWebRequest(req);
-        const webRes = await handler(webReq, "image/x-icon", cacheOpts());
+        const webRes = await handler(webReq, "image/x-icon", { cache: feedCache });
         await sendWebResponse(webRes, res);
       });
 
@@ -115,6 +128,13 @@ function apiProxyPlugin() {
         const { syncHandler, syncAdapter } = await ensureSyncHandler();
         const webReq = await toWebRequest(req);
         const webRes = await syncHandler(webReq, syncAdapter);
+        await sendWebResponse(webRes, res);
+      });
+
+      server.middlewares.use("/api/catalog", async (req, res) => {
+        const { catalogHandler, catalogAdapter } = await ensureCatalogHandler();
+        const webReq = await toWebRequest(req);
+        const webRes = await catalogHandler(webReq, catalogAdapter);
         await sendWebResponse(webRes, res);
       });
 
