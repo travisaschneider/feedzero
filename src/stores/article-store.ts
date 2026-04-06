@@ -77,18 +77,20 @@ export const useArticleStore = create<ArticleStore>((set, get) => ({
     if (!result.ok) return;
 
     const all = result.value;
-    // Group by feedId and populate cache
+    // Group by feedId — compute unread from full set, cache sliced for display
     const byFeed = new Map<string, Article[]>();
+    const counts: Record<string, number> = {};
     for (const article of all) {
       const list = byFeed.get(article.feedId);
       if (list) list.push(article);
       else byFeed.set(article.feedId, [article]);
     }
     for (const [feedId, articles] of byFeed) {
+      counts[feedId] = articles.filter((a) => !a.read).length;
       articleCache.set(feedId, articles.slice(0, PAGE_SIZE));
     }
     articleCache.set(ALL_FEEDS_ID, all.slice(0, PAGE_SIZE));
-    set({ unreadCounts: computeUnreadCounts() });
+    set({ unreadCounts: counts });
   },
 
   loadArticles: async (feedId) => {

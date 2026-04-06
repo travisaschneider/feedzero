@@ -395,7 +395,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                           )}
                           {!refreshingFeedIds.has(feed.id) && (unreadCounts[feed.id] ?? 0) > 0 && (
                             <span className="ml-auto shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-primary">
-                              {unreadCounts[feed.id] >= 25 ? "25+" : unreadCounts[feed.id]}
+                              {unreadCounts[feed.id]}
                             </span>
                           )}
                         </SidebarMenuButton>
