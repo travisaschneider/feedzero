@@ -41,26 +41,8 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   }
 
   return (
-    <>
-      {articles.length > 0 && (
-        <div className="flex items-center justify-between px-2 py-1.5 border-b border-border text-xs text-muted-foreground">
-          <div className="flex items-center gap-3">
-            <span className="min-w-16">{unreadCount > 0 ? `${unreadCount} unread` : "All read"}</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 px-2 text-xs"
-              disabled={unreadCount === 0}
-              onClick={markAllAsRead}
-            >
-              <CheckCheck className="size-3 mr-1" />
-              Mark all read
-            </Button>
-          </div>
-        </div>
-      )}
+    <div className="relative h-full">
       {articles.length === 0 ? (
-        // Don't show empty state during loading — prevents flash between feeds
         isLoading ? null : (
           <div className="p-2 text-muted-foreground text-sm">
             No articles found.
@@ -84,6 +66,19 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
           ))}
         </ul>
       )}
-    </>
+      {unreadCount > 0 && (
+        <div className="sticky bottom-3 flex justify-center pointer-events-none">
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-7 rounded-full px-3 text-xs shadow-md pointer-events-auto"
+            onClick={markAllAsRead}
+          >
+            <CheckCheck className="size-3 mr-1.5" />
+            Mark {unreadCount} read
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
