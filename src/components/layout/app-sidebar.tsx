@@ -11,6 +11,7 @@ import {
   MoreHorizontal,
   RefreshCw,
   Settings,
+  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -59,6 +60,7 @@ import { useSyncStore } from "@/stores/sync-store.ts";
 import { Switch } from "@/components/ui/switch.tsx";
 import { KeyboardShortcutsDialog } from "@/components/layout/keyboard-shortcuts-dialog.tsx";
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog.tsx";
+import { CHANGELOG_FEED_PATH } from "@/utils/constants.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import { Kbd } from "@/components/ui/kbd.tsx";
 import { useIsOnline } from "@/hooks/use-online.ts";
@@ -104,13 +106,14 @@ function SyncBadge({ status, isOnline }: { status: string; isOnline: boolean }) 
   );
 }
 
-function SidebarFooterMenu({ hasFeeds }: { hasFeeds: boolean }) {
+function SidebarFooterMenu({ hasFeeds, onWhatsNew }: { hasFeeds: boolean; onWhatsNew: () => void }) {
   const syncStatus = useSyncStore((s) => s.status);
   const setSyncDialogOpen = useSyncStore((s) => s.setDialogOpen);
   const isOnline = useIsOnline();
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const handleWhatsNew = onWhatsNew;
 
   const isSyncOn = syncStatus === "synced" || syncStatus === "syncing";
   const isSyncing = syncStatus === "syncing";
@@ -193,6 +196,10 @@ function SidebarFooterMenu({ hasFeeds }: { hasFeeds: boolean }) {
             <MessageSquare className="size-4" />
             <span>Send feedback</span>
           </DropdownMenuItem>
+          <DropdownMenuItem onSelect={handleWhatsNew}>
+            <Sparkles className="size-4" />
+            <span>What&apos;s new</span>
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -266,6 +273,8 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   const isRefreshingAll = useFeedStore((s) => s.isRefreshingAll);
   const refreshingFeedIds = useFeedStore((s) => s.refreshingFeedIds);
 
+  const addFeed = useFeedStore((s) => s.addFeed);
+
   const { isMobile, setOpenMobile } = useSidebar();
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -275,6 +284,23 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   function handleSelect(feedId: string) {
     if (isMobile) setOpenMobile(false);
     if (onFeedSelect) onFeedSelect(feedId);
+  }
+
+  async function handleWhatsNew() {
+    const changelogUrl = `${window.location.origin}${CHANGELOG_FEED_PATH}`;
+    const existing = feeds.find((f) => f.url.includes(CHANGELOG_FEED_PATH));
+    if (existing) {
+      handleSelect(existing.id);
+      navigate(`/feeds/${existing.id}`);
+    } else {
+      await addFeed(changelogUrl).catch(() => {});
+      const { feeds: updated } = useFeedStore.getState();
+      const added = updated.find((f) => f.url.includes(CHANGELOG_FEED_PATH));
+      if (added) {
+        handleSelect(added.id);
+        navigate(`/feeds/${added.id}`);
+      }
+    }
   }
 
   function handleConfirmRemove() {
@@ -404,7 +430,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
           <LocalStorageWarning />
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarFooterMenu hasFeeds={feeds.length > 0} />
+              <SidebarFooterMenu hasFeeds={feeds.length > 0} onWhatsNew={handleWhatsNew} />
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarFooter>
