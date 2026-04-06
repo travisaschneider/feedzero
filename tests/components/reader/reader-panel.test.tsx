@@ -77,7 +77,11 @@ describe("ReaderPanel", () => {
     expect(heading.className).toContain("tracking-tight");
   });
 
-  it("has gradient bottom border on article header", () => {
+  it("shows feed name below article title", () => {
+    useFeedStore.setState({
+      feeds: [{ id: "f1", url: "https://example.com/feed", title: "Example News", description: "", siteUrl: "https://example.com", createdAt: 0, updatedAt: 0 }],
+      selectedFeedId: "f1",
+    });
     useArticleStore.setState({
       selectedArticle: mockArticle(),
       articles: [],
@@ -85,9 +89,19 @@ describe("ReaderPanel", () => {
     });
 
     render(<ReaderPanel />);
-    const article = document.querySelector("article");
-    const header = article?.querySelector("header");
-    expect(header).toBeInTheDocument();
+    expect(screen.getByText("Example News")).toBeInTheDocument();
+  });
+
+  it("article header has no bottom border separator", () => {
+    useArticleStore.setState({
+      selectedArticle: mockArticle(),
+      articles: [],
+      isLoading: false,
+    });
+
+    render(<ReaderPanel />);
+    const header = document.querySelector("article header");
+    expect(header?.className).not.toContain("border-b");
   });
 
   it("always shows all three buttons", () => {

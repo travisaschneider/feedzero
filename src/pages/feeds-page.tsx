@@ -229,17 +229,6 @@ export function FeedsPage() {
       <SidebarKeyboardToggle />
       <AppSidebar onFeedSelect={handleFeedSelect} />
       <SidebarInset className="overflow-hidden">
-        <header className="flex h-10 shrink-0 items-center border-b px-2 gap-2">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <SidebarTrigger />
-            </TooltipTrigger>
-            <TooltipContent>
-              Toggle Sidebar <Kbd className="ml-1">[</Kbd>
-            </TooltipContent>
-          </Tooltip>
-          <HeaderBreadcrumbs />
-        </header>
         {isExplorePage ? (
           <ScrollArea className="flex-1 min-h-0">
             <Suspense><ExploreCatalog onFeedAdded={handleFeedAdded} /></Suspense>

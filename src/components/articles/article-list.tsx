@@ -4,7 +4,6 @@ import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { ALL_FEEDS_ID } from "@/utils/constants.ts";
 import { Button } from "@/components/ui/button.tsx";
-import { Kbd } from "@/components/ui/kbd.tsx";
 import { ArticleItem } from "./article-item.tsx";
 import type { Article } from "@/types/index.ts";
 
@@ -19,6 +18,8 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   const selectedArticle = useArticleStore((s) => s.selectedArticle);
   const selectArticle = useArticleStore((s) => s.selectArticle);
   const markAllAsRead = useArticleStore((s) => s.markAllAsRead);
+  const loadMore = useArticleStore((s) => s.loadMore);
+  const hasMore = useArticleStore((s) => s.hasMore);
   const isLoading = useArticleStore((s) => s.isLoading);
   const isGlobalView = selectedFeedId === ALL_FEEDS_ID;
   const unreadCount = articles.filter((a) => !a.read).length;
@@ -42,30 +43,8 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   }
 
   return (
-    <>
-      {articles.length > 0 && (
-        <div className="flex items-center justify-between px-2 py-1.5 border-b border-border text-xs text-muted-foreground">
-          <div className="flex items-center gap-3">
-            <span className="min-w-16">{unreadCount > 0 ? `${unreadCount} unread` : "All read"}</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 px-2 text-xs"
-              disabled={unreadCount === 0}
-              onClick={markAllAsRead}
-            >
-              <CheckCheck className="size-3 mr-1" />
-              Mark all read
-            </Button>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Kbd className="h-4 text-[9px] px-1">j</Kbd>
-            <Kbd className="h-4 text-[9px] px-1">k</Kbd>
-          </div>
-        </div>
-      )}
+    <div className="relative h-full">
       {articles.length === 0 ? (
-        // Don't show empty state during loading — prevents flash between feeds
         isLoading ? null : (
           <div className="p-2 text-muted-foreground text-sm">
             No articles found.
@@ -87,8 +66,33 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
               }
             />
           ))}
+          {hasMore && (
+            <li className="p-3 text-center">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-muted-foreground"
+                onClick={loadMore}
+              >
+                Load more articles
+              </Button>
+            </li>
+          )}
         </ul>
       )}
-    </>
+      {unreadCount > 0 && (
+        <div className="sticky bottom-3 flex justify-center pointer-events-none">
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-7 rounded-full px-3 text-xs shadow-md pointer-events-auto"
+            onClick={markAllAsRead}
+          >
+            <CheckCheck className="size-3 mr-1.5" />
+            Mark {unreadCount} read
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }

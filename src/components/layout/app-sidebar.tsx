@@ -4,7 +4,6 @@ import {
   ChevronsUpDown,
   Cloud,
   Compass,
-  ImageOff,
   Keyboard,
   Layers,
   Loader2,
@@ -16,7 +15,6 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { toast } from "sonner";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { ALL_FEEDS_ID } from "@/utils/constants.ts";
 import { Button } from "@/components/ui/button.tsx";
@@ -53,9 +51,11 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  SidebarMenuBadge,
   SidebarSeparator,
   useSidebar,
 } from "@/components/ui/sidebar.tsx";
+import { useArticleStore } from "@/stores/article-store.ts";
 import { useSyncStore } from "@/stores/sync-store.ts";
 import { Switch } from "@/components/ui/switch.tsx";
 import { KeyboardShortcutsDialog } from "@/components/layout/keyboard-shortcuts-dialog.tsx";
@@ -67,7 +67,6 @@ import {
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import { Kbd } from "@/components/ui/kbd.tsx";
 import { useIsOnline } from "@/hooks/use-online.ts";
-import { clearFaviconCache } from "@/components/feeds/feed-favicon.tsx";
 import type { Feed } from "@/types/index.ts";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
@@ -200,14 +199,6 @@ function SidebarFooterMenu({ hasFeeds }: { hasFeeds: boolean }) {
             <Sparkles className="size-4" />
             <span>What&apos;s new</span>
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => {
-            clearFaviconCache();
-            try { localStorage.removeItem("feedzero:favicon-cache"); } catch { /* noop */ }
-            toast.success("Favicon cache cleared — reload to refresh icons");
-          }}>
-            <ImageOff className="size-4" />
-            <span>Reload favicons</span>
-          </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => setFeedbackOpen(true)}>
             <MessageSquare className="size-4" />
             <span>Send feedback</span>
@@ -283,6 +274,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   const feeds = useFeedStore((s) => s.feeds);
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
   const removeFeed = useFeedStore((s) => s.removeFeed);
+  const unreadCounts = useArticleStore((s) => s.unreadCounts);
   const refreshAll = useFeedStore((s) => s.refreshAll);
   const refreshSingleFeed = useFeedStore((s) => s.refreshSingleFeed);
   const isRefreshingAll = useFeedStore((s) => s.isRefreshingAll);
@@ -394,7 +386,7 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                         </SidebarMenuButton>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <SidebarMenuAction showOnHover>
+                            <SidebarMenuAction showOnHover className="focus-visible:ring-0">
                               <MoreHorizontal />
                               <span className="sr-only">More</span>
                             </SidebarMenuAction>
@@ -415,6 +407,11 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
+                        {!refreshingFeedIds.has(feed.id) && (unreadCounts[feed.id] ?? 0) > 0 && (
+                          <SidebarMenuBadge className="group-hover/menu-item:md:opacity-0 group-focus-within/menu-item:md:opacity-0 group-has-[[data-state=open]]/menu-item:md:opacity-0 transition-opacity">
+                            {unreadCounts[feed.id] > 99 ? "99+" : unreadCounts[feed.id]}
+                          </SidebarMenuBadge>
+                        )}
                       </SidebarMenuItem>
                     ))}
                   </>
