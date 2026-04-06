@@ -3,6 +3,7 @@ import {
   handleProxyRequest,
   SUPPORTED_METHODS,
 } from "@/core/proxy/proxy-handler";
+import { createMemoryCatalogAdapter } from "@/core/catalog/adapters/memory-adapter.ts";
 
 const fetchSpy = vi.spyOn(globalThis, "fetch");
 
@@ -109,6 +110,100 @@ describe("handleProxyRequest", () => {
     );
     const res = await handleProxyRequest(req, "text/xml");
     expect(res.headers.get("Content-Type")).toBe("application/atom+xml");
+  });
+});
+
+describe("content cleaning", () => {
+  it("strips tracking pixels from feed responses when cleanContent is true", async () => {
+    const feedXml = `<rss><channel><item><description><![CDATA[<p>Hello</p><img src="https://pixel.quantserve.com/p.gif" width="1" height="1">]]></description></item></channel></rss>`;
+    fetchSpy.mockResolvedValue(
+      new Response(feedXml, { status: 200, headers: { "Content-Type": "text/xml" } }),
+    );
+
+    const req = new Request("http://localhost/api/feed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: "https://example.com/feed.xml" }),
+    });
+    const res = await handleProxyRequest(req, "text/xml", { cleanContent: true });
+    const body = await res.text();
+
+    expect(body).toContain("Hello");
+    expect(body).not.toContain("quantserve");
+  });
+
+  it("strips UTM params from feed responses when cleanContent is true", async () => {
+    const feedXml = `<rss><channel><item><description><![CDATA[<a href="https://example.com/post?utm_source=rss&id=5">Link</a>]]></description></item></channel></rss>`;
+    fetchSpy.mockResolvedValue(
+      new Response(feedXml, { status: 200, headers: { "Content-Type": "text/xml" } }),
+    );
+
+    const req = new Request("http://localhost/api/feed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: "https://example.com/feed.xml" }),
+    });
+    const res = await handleProxyRequest(req, "text/xml", { cleanContent: true });
+    const body = await res.text();
+
+    expect(body).toContain("id=5");
+    expect(body).not.toContain("utm_source");
+  });
+
+  it("does not clean content when cleanContent is not set", async () => {
+    const feedXml = `<rss><item><description><![CDATA[<img src="https://pixel.quantserve.com/p.gif" width="1" height="1">]]></description></item></rss>`;
+    fetchSpy.mockResolvedValue(new Response(feedXml, { status: 200 }));
+
+    const req = new Request("http://localhost/api/feed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: "https://example.com/feed.xml" }),
+    });
+    const res = await handleProxyRequest(req, "text/xml");
+    const body = await res.text();
+
+    expect(body).toContain("quantserve");
+  });
+});
+
+describe("catalog integration", () => {
+  it("upserts feed URL into catalog when catalogAdapter is provided", async () => {
+    fetchSpy.mockResolvedValue(new Response("<rss/>", { status: 200 }));
+    const catalog = createMemoryCatalogAdapter();
+
+    const req = new Request("http://localhost/api/feed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: "https://example.com/feed.xml" }),
+    });
+    await handleProxyRequest(req, "text/xml", { catalogAdapter: catalog });
+
+    // Wait for async upsert
+    await new Promise((r) => setTimeout(r, 10));
+
+    const entry = await catalog.get("https://example.com/feed.xml");
+    expect(entry.ok).toBe(true);
+    if (!entry.ok) return;
+    expect(entry.value).not.toBeNull();
+    expect(entry.value!.requestCount).toBe(1);
+  });
+
+  it("does not upsert on proxy error", async () => {
+    fetchSpy.mockRejectedValue(new Error("fail"));
+    const catalog = createMemoryCatalogAdapter();
+
+    const req = new Request("http://localhost/api/feed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: "https://example.com/feed.xml" }),
+    });
+    await handleProxyRequest(req, "text/xml", { catalogAdapter: catalog });
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    const entry = await catalog.get("https://example.com/feed.xml");
+    if (!entry.ok) return;
+    expect(entry.value).toBeNull();
   });
 });
 

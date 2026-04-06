@@ -2,9 +2,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createApp } from "../server";
 import { SUPPORTED_METHODS } from "../src/core/sync/sync-handler";
 import { SUPPORTED_METHODS as PROXY_SUPPORTED_METHODS } from "../src/core/proxy/proxy-handler";
+import { SUPPORTED_METHODS as CATALOG_SUPPORTED_METHODS } from "../src/core/catalog/catalog-handler";
 import * as vercelSyncExports from "../api/sync";
 import * as vercelFeedExports from "../api/feed";
 import * as vercelPageExports from "../api/page";
+import * as vercelCatalogExports from "../api/catalog";
 
 // Mock fetch globally for proxy handler tests
 const mockFetch = vi.fn();
@@ -426,6 +428,33 @@ describe("server", () => {
           `Hono server returned 405 for ${method} /api/feed`,
         ).not.toBe(405);
       }
+    });
+  });
+
+  describe("catalog routing contract", () => {
+    it("CATALOG_SUPPORTED_METHODS lists GET", () => {
+      expect(CATALOG_SUPPORTED_METHODS).toContain("GET");
+    });
+
+    it("Vercel api/catalog.ts exports a handler for every supported method", () => {
+      for (const method of CATALOG_SUPPORTED_METHODS) {
+        expect(
+          vercelCatalogExports,
+          `api/catalog.ts is missing export for ${method}`,
+        ).toHaveProperty(method);
+        expect(
+          typeof (vercelCatalogExports as Record<string, unknown>)[method],
+        ).toBe("function");
+      }
+    });
+
+    it("Hono server accepts GET /api/catalog", async () => {
+      const app = createApp();
+      const res = await app.request("/api/catalog?action=count");
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.ok).toBe(true);
+      expect(body.count).toBe(0);
     });
   });
 });

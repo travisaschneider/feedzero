@@ -1,5 +1,7 @@
 import { validateProxyUrl } from "./validate-url.ts";
 import type { FeedCache } from "./feed-cache.ts";
+import type { CatalogStorageAdapter } from "../catalog/catalog-types.ts";
+import { cleanFeedContent } from "../cleaner/cleaner.ts";
 
 /**
  * HTTP methods the proxy handler accepts.
@@ -11,6 +13,10 @@ export const SUPPORTED_METHODS: readonly string[] = ["GET", "POST"];
 export interface ProxyOptions {
   /** Optional feed cache for deduplication across users. */
   cache?: FeedCache;
+  /** Optional catalog adapter — records anonymous feed request counts. */
+  catalogAdapter?: CatalogStorageAdapter;
+  /** Strip trackers and tracking params from feed content before returning. */
+  cleanContent?: boolean;
 }
 
 /**
@@ -63,6 +69,22 @@ export async function handleProxyRequest(
     // Cache successful feed/page responses
     if (cache && response.status >= 200 && response.status < 400) {
       cache.set(url, body, contentType, response.status);
+    }
+
+    // Record anonymous feed request in catalog (fire-and-forget)
+    if (options?.catalogAdapter && response.status >= 200 && response.status < 400) {
+      options.catalogAdapter.upsert(url).catch(() => {});
+    }
+
+    // Clean text-based feed content (XML, HTML) if enabled
+    const isTextContent = /xml|html|text/i.test(contentType);
+    if (options?.cleanContent && isTextContent && response.status >= 200 && response.status < 400) {
+      const text = new TextDecoder().decode(body);
+      const cleaned = cleanFeedContent(text);
+      return new Response(cleaned, {
+        status: response.status,
+        headers: { "Content-Type": contentType },
+      });
     }
 
     return new Response(body, {

@@ -4,10 +4,13 @@ import { handleFeedbackRequest } from "./src/core/feedback/feedback-handler";
 import { handleSyncRequest } from "./src/core/sync/sync-handler";
 import { handleSyncStatsRequest } from "./src/core/sync/sync-stats-handler";
 import { handleFaviconRequest } from "./src/core/favicon/favicon-handler";
+import { handleCatalogRequest } from "./src/core/catalog/catalog-handler";
 import { createMemoryAdapter } from "./src/core/sync/adapters/memory-adapter";
+import { createMemoryCatalogAdapter } from "./src/core/catalog/adapters/memory-adapter";
 import { resolveAdapter } from "./src/core/sync/adapters/resolve-adapter";
 import { createFeedCache } from "./src/core/proxy/feed-cache";
 import type { SyncStorageAdapter } from "./src/core/sync/types";
+import type { CatalogStorageAdapter } from "./src/core/catalog/catalog-types";
 import type { FeedCache } from "./src/core/proxy/feed-cache";
 
 /**
@@ -40,8 +43,10 @@ function createRateLimiter(maxRequests = 100, windowMs = 60_000) {
 export function createApp(
   adapter?: SyncStorageAdapter,
   feedCache?: FeedCache,
+  catalogAdapter?: CatalogStorageAdapter,
 ): Hono {
   const syncAdapter = adapter ?? createMemoryAdapter();
+  const catalog = catalogAdapter ?? createMemoryCatalogAdapter();
   const app = new Hono();
   const isAllowed = createRateLimiter();
 
@@ -100,21 +105,26 @@ export function createApp(
     return c.json({ feeds: feedCache.getStats() });
   });
 
-  const cacheOpts = feedCache ? { cache: feedCache } : undefined;
+  const proxyOpts = {
+    ...(feedCache ? { cache: feedCache } : {}),
+    catalogAdapter: catalog,
+    cleanContent: true,
+  };
 
   app.on(["GET", "POST"], "/api/feed", (c) =>
-    handleProxyRequest(c.req.raw, "text/xml", cacheOpts),
+    handleProxyRequest(c.req.raw, "text/xml", proxyOpts),
   );
   app.on(["GET", "POST"], "/api/page", (c) =>
-    handleProxyRequest(c.req.raw, "text/html", cacheOpts),
+    handleProxyRequest(c.req.raw, "text/html", proxyOpts),
   );
   app.get("/api/icon", (c) =>
-    handleProxyRequest(c.req.raw, "image/x-icon", cacheOpts),
+    handleProxyRequest(c.req.raw, "image/x-icon", { cache: feedCache }),
   );
   app.get("/api/favicon", (c) => handleFaviconRequest(c.req.raw));
   app.all("/api/sync", (c) => handleSyncRequest(c.req.raw, syncAdapter));
   app.get("/api/stats-sync", (c) => handleSyncStatsRequest(c.req.raw, syncAdapter));
   app.post("/api/feedback", (c) => handleFeedbackRequest(c.req.raw));
+  app.get("/api/catalog", (c) => handleCatalogRequest(c.req.raw, catalog));
 
   return app;
 }
@@ -126,7 +136,8 @@ async function startServer(): Promise<void> {
 
   const adapter = resolveAdapter();
   const cache = createFeedCache();
-  const app = createApp(adapter, cache);
+  const catalog = createMemoryCatalogAdapter();
+  const app = createApp(adapter, cache, catalog);
 
   app.use("/*", serveStatic({ root: "./dist" }));
   app.get("/*", serveStatic({ path: "./dist/index.html" }));

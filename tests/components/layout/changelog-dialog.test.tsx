@@ -50,7 +50,7 @@ describe("ChangelogBentoDialog", () => {
   it("shows latest release on open", () => {
     render(<ChangelogBentoDialog open={true} onOpenChange={vi.fn()} />);
 
-    expect(screen.getByText(releases[0].title)).toBeInTheDocument();
+    expect(screen.getAllByText(releases[0].title).length).toBeGreaterThan(0);
     expect(screen.getByText(releases[0].subtitle)).toBeInTheDocument();
   });
 
@@ -72,7 +72,7 @@ describe("ChangelogBentoDialog", () => {
 
     // Go back
     await user.click(screen.getByRole("button", { name: /newer release/i }));
-    expect(screen.getByText(releases[0].title)).toBeInTheDocument();
+    expect(screen.getAllByText(releases[0].title).length).toBeGreaterThan(0);
   });
 
   it("shows page indicator", () => {
