@@ -229,9 +229,6 @@ export function FeedsPage() {
       <SidebarKeyboardToggle />
       <AppSidebar onFeedSelect={handleFeedSelect} />
       <SidebarInset className="overflow-hidden">
-        <header className="flex h-8 shrink-0 items-center px-2">
-          <SidebarTrigger />
-        </header>
         {isExplorePage ? (
           <ScrollArea className="flex-1 min-h-0">
             <Suspense><ExploreCatalog onFeedAdded={handleFeedAdded} /></Suspense>
