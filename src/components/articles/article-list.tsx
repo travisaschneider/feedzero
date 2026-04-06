@@ -4,7 +4,6 @@ import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { ALL_FEEDS_ID } from "@/utils/constants.ts";
 import { Button } from "@/components/ui/button.tsx";
-import { Kbd } from "@/components/ui/kbd.tsx";
 import { ArticleItem } from "./article-item.tsx";
 import type { Article } from "@/types/index.ts";
 
@@ -57,10 +56,6 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
               <CheckCheck className="size-3 mr-1" />
               Mark all read
             </Button>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Kbd className="h-4 text-[9px] px-1">j</Kbd>
-            <Kbd className="h-4 text-[9px] px-1">k</Kbd>
           </div>
         </div>
       )}
