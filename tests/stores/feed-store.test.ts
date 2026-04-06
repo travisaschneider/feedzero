@@ -25,7 +25,7 @@ vi.mock("../../src/core/sync/sync-service", () => ({
   importVault: vi.fn(),
 }));
 
-import { getFeeds, getFeed, removeFeed, updateFeed } from "../../src/core/storage/db.ts";
+import { getFeeds, getFeed, removeFeed, updateFeed, getFolders, addFolder, updateFolder, removeFolder } from "../../src/core/storage/db.ts";
 import {
   addFeedFlow,
   refreshFeed,
@@ -46,6 +46,7 @@ describe("feed-store", () => {
   beforeEach(() => {
     useFeedStore.setState({
       feeds: [],
+      folders: [],
       selectedFeedId: null,
       isLoading: false,
       error: null,
@@ -341,6 +342,93 @@ describe("feed-store", () => {
       await useFeedStore.getState().refreshAll();
 
       expect(scheduleSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe("createFolder", () => {
+    it("creates a folder and reloads folder list", async () => {
+      const folder = { id: "folder-1", name: "Tech", createdAt: Date.now() };
+      vi.mocked(addFolder).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(getFolders).mockResolvedValue({ ok: true, value: [folder] });
+
+      await useFeedStore.getState().createFolder("Tech");
+
+      expect(addFolder).toHaveBeenCalledWith(expect.objectContaining({ name: "Tech" }));
+      expect(useFeedStore.getState().folders).toHaveLength(1);
+      expect(useFeedStore.getState().folders[0].name).toBe("Tech");
+    });
+  });
+
+  describe("renameFolder", () => {
+    it("renames a folder and reloads", async () => {
+      const folder = { id: "folder-1", name: "Tech", createdAt: Date.now() };
+      useFeedStore.setState({ folders: [folder] });
+      vi.mocked(updateFolder).mockResolvedValue({ ok: true, value: true });
+      const renamed = { ...folder, name: "Technology" };
+      vi.mocked(getFolders).mockResolvedValue({ ok: true, value: [renamed] });
+
+      await useFeedStore.getState().renameFolder("folder-1", "Technology");
+
+      expect(updateFolder).toHaveBeenCalledWith(expect.objectContaining({ name: "Technology" }));
+      expect(useFeedStore.getState().folders[0].name).toBe("Technology");
+    });
+  });
+
+  describe("deleteFolder", () => {
+    it("unfiles feeds and removes folder", async () => {
+      const folder = { id: "folder-1", name: "Tech", createdAt: Date.now() };
+      const feed = { ...mockFeed("f1", "Feed"), folderId: "folder-1" };
+      useFeedStore.setState({ feeds: [feed], folders: [folder] });
+      vi.mocked(updateFeed).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(removeFolder).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [{ ...feed, folderId: undefined }] });
+      vi.mocked(getFolders).mockResolvedValue({ ok: true, value: [] });
+
+      await useFeedStore.getState().deleteFolder("folder-1");
+
+      expect(updateFeed).toHaveBeenCalledWith(expect.objectContaining({ folderId: undefined }));
+      expect(removeFolder).toHaveBeenCalledWith("folder-1");
+      expect(useFeedStore.getState().folders).toHaveLength(0);
+    });
+  });
+
+  describe("moveFeedToFolder", () => {
+    it("moves a feed into a folder", async () => {
+      const feed = mockFeed("f1", "Feed");
+      vi.mocked(getFeed).mockResolvedValue({ ok: true, value: feed });
+      vi.mocked(updateFeed).mockResolvedValue({ ok: true, value: true });
+      const moved = { ...feed, folderId: "folder-1" };
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [moved] });
+
+      await useFeedStore.getState().moveFeedToFolder("f1", "folder-1");
+
+      expect(updateFeed).toHaveBeenCalledWith(expect.objectContaining({ folderId: "folder-1" }));
+    });
+
+    it("moves a feed out of a folder (unfiled)", async () => {
+      const feed = { ...mockFeed("f1", "Feed"), folderId: "folder-1" };
+      vi.mocked(getFeed).mockResolvedValue({ ok: true, value: feed });
+      vi.mocked(updateFeed).mockResolvedValue({ ok: true, value: true });
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [{ ...feed, folderId: undefined }] });
+
+      await useFeedStore.getState().moveFeedToFolder("f1", null);
+
+      expect(updateFeed).toHaveBeenCalledWith(expect.objectContaining({ folderId: undefined }));
+    });
+  });
+
+  describe("loadFeeds loads folders too", () => {
+    it("loads feeds and folders in parallel", async () => {
+      const feed = mockFeed("f1", "Feed");
+      const folder = { id: "folder-1", name: "Tech", createdAt: Date.now() };
+      vi.mocked(getFeeds).mockResolvedValue({ ok: true, value: [feed] });
+      vi.mocked(getFolders).mockResolvedValue({ ok: true, value: [folder] });
+
+      await useFeedStore.getState().loadFeeds();
+
+      expect(useFeedStore.getState().feeds).toHaveLength(1);
+      expect(useFeedStore.getState().folders).toHaveLength(1);
+      expect(useFeedStore.getState().folders[0].name).toBe("Tech");
     });
   });
 

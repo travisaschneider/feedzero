@@ -17,6 +17,11 @@ import {
   getArticleByGuid,
   exportAll,
   importAll,
+  addFolder,
+  getFolders,
+  updateFolder,
+  removeFolder,
+  updateFeed,
 } from "../../../src/core/storage/db.ts";
 import { createFeed, createArticle } from "../../../src/core/storage/schema.ts";
 import { isOk, isErr, unwrap } from "../../../src/utils/result.ts";
@@ -644,6 +649,72 @@ describe("Database", () => {
       const feeds = unwrap(await getFeeds());
       expect(feeds).toHaveLength(1);
       expect(feeds[0].title).toBe("Key Test");
+    });
+  });
+
+  describe("folder operations", () => {
+    it("should add and retrieve folders", async () => {
+      const folder = { id: "folder-1", name: "Tech", createdAt: Date.now() };
+      const addResult = await addFolder(folder);
+      expect(isOk(addResult)).toBe(true);
+
+      const foldersResult = await getFolders();
+      expect(isOk(foldersResult)).toBe(true);
+      const folders = unwrap(foldersResult);
+      expect(folders).toHaveLength(1);
+      expect(folders[0].name).toBe("Tech");
+    });
+
+    it("should update a folder", async () => {
+      const folder = { id: "folder-2", name: "Old Name", createdAt: Date.now() };
+      await addFolder(folder);
+
+      const updated = { ...folder, name: "New Name" };
+      await updateFolder(updated);
+
+      const folders = unwrap(await getFolders());
+      const found = folders.find((f) => f.id === "folder-2");
+      expect(found.name).toBe("New Name");
+    });
+
+    it("should remove a folder", async () => {
+      const folder = { id: "folder-3", name: "ToDelete", createdAt: Date.now() };
+      await addFolder(folder);
+
+      await removeFolder("folder-3");
+
+      const folders = unwrap(await getFolders());
+      expect(folders.find((f) => f.id === "folder-3")).toBeUndefined();
+    });
+  });
+
+  describe("updateFeed", () => {
+    it("should update feed title", async () => {
+      const feedResult = createFeed({
+        url: "https://update-test.com/feed",
+        title: "Original",
+      });
+      const feed = unwrap(feedResult);
+      await addFeed(feed);
+
+      await updateFeed({ ...feed, title: "Renamed" });
+
+      const retrieved = unwrap(await getFeed(feed.id));
+      expect(retrieved.title).toBe("Renamed");
+    });
+
+    it("should update feed folderId", async () => {
+      const feedResult = createFeed({
+        url: "https://folder-test.com/feed",
+        title: "Test",
+      });
+      const feed = unwrap(feedResult);
+      await addFeed(feed);
+
+      await updateFeed({ ...feed, folderId: "folder-1" });
+
+      const retrieved = unwrap(await getFeed(feed.id));
+      expect(retrieved.folderId).toBe("folder-1");
     });
   });
 });
