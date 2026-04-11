@@ -36,14 +36,12 @@ const ExploreCatalog = lazy(() =>
 
 /**
  * Returns the default feed ID to show when no feed is selected.
- * - If one feed exists, return that feed's ID.
- * - If multiple feeds exist, return the global "all" feed.
- * - If no feeds exist, return null.
+ * Whenever any feeds exist, the All items aggregated view is the landing
+ * destination — users should always see their full stream first, regardless
+ * of how many feeds they subscribe to.
  */
 function getDefaultFeedId(feeds: { id: string }[]): string | null {
-  if (feeds.length === 0) return null;
-  if (feeds.length === 1) return feeds[0].id;
-  return ALL_FEEDS_ID;
+  return feeds.length === 0 ? null : ALL_FEEDS_ID;
 }
 
 /**

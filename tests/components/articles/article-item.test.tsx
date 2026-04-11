@@ -136,7 +136,25 @@ describe("ArticleItem", () => {
         />,
       );
       const li = container.querySelector("li");
-      expect(li?.className).toContain("aria-selected:border-l-2");
+      // The bar uses a color change on selection, not a width change.
+      expect(li?.className).toContain("aria-selected:border-l-primary");
+    });
+
+    it("reserves space for the accent bar so selection does not shift text", () => {
+      // If border-l-2 is only added on selection, the 2px border pushes
+      // the text inward by 2px when the user clicks an article — a visible
+      // horizontal jiggle. Reserve the space always (transparent border)
+      // and only swap the color on selection.
+      const { container } = render(
+        <ArticleItem
+          article={mockArticle()}
+          isSelected={false}
+          onSelect={() => {}}
+        />,
+      );
+      const li = container.querySelector("li");
+      expect(li?.className).toContain("border-l-2");
+      expect(li?.className).toContain("border-l-transparent");
     });
 
     it("dims read article titles", () => {

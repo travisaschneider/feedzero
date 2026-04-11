@@ -7,6 +7,7 @@ import { useArticleStore } from "@/stores/article-store.ts";
 
 vi.mock("@/core/storage/db.ts", () => ({
   getArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+  getAllArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
   updateArticle: vi.fn().mockResolvedValue({ ok: true, value: true }),
   getFeeds: vi.fn().mockResolvedValue({ ok: true, value: [] }),
   getFeed: vi.fn(),

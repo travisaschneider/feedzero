@@ -45,7 +45,7 @@ export const ArticleItem = memo(function ArticleItem({
       data-id={article.id}
       onClick={() => onSelect(article)}
       onKeyDown={handleKeyDown}
-      className="pl-2 pr-3.5 py-2 border-b border-border cursor-pointer hover:bg-accent aria-selected:bg-accent aria-selected:border-l-2 aria-selected:border-l-primary flex gap-4 transition-colors duration-150"
+      className="pl-2 pr-3.5 py-2 border-b border-border border-l-2 border-l-transparent cursor-pointer hover:bg-accent aria-selected:bg-accent aria-selected:border-l-primary flex gap-4 transition-colors duration-150"
     >
       <div className="min-w-0 flex-1 flex gap-2 items-start">
         <span

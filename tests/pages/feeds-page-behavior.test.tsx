@@ -5,10 +5,12 @@ import { FeedsPage } from "@/pages/feeds-page.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore, clearArticleCache } from "@/stores/article-store.ts";
 import * as db from "@/core/storage/db.ts";
+import { ALL_FEEDS_ID } from "@/utils/constants.ts";
 import type { Article, Feed } from "@/types/index.ts";
 
 vi.mock("@/core/storage/db.ts", () => ({
   getArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+  getAllArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
   updateArticle: vi.fn().mockResolvedValue({ ok: true, value: true }),
   getFeeds: vi.fn().mockResolvedValue({ ok: true, value: [] }),
   getFeed: vi.fn(),
@@ -170,14 +172,27 @@ describe("FeedsPage behavior — desktop", () => {
     expect(useFeedStore.getState().selectedFeedId).toBe("feed-1");
   });
 
-  it("auto-navigates to single feed when no feedId in URL", async () => {
+  it("auto-navigates to All items feed when feeds exist and no feedId in URL", async () => {
     useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
 
     renderPage("/feeds");
 
-    // With one feed, auto-navigates to that feed
+    // Whenever feeds exist, default destination is the All items feed —
+    // even for a single feed — so users always land on the aggregated view.
     await vi.waitFor(() => {
-      expect(currentUrl).toBe("/feeds/feed-1");
+      expect(currentUrl).toBe(`/feeds/${ALL_FEEDS_ID}`);
+    });
+  });
+
+  it("auto-navigates to All items feed when multiple feeds exist", async () => {
+    useFeedStore.setState({
+      feeds: [makeFeed("feed-1"), makeFeed("feed-2")],
+    });
+
+    renderPage("/feeds");
+
+    await vi.waitFor(() => {
+      expect(currentUrl).toBe(`/feeds/${ALL_FEEDS_ID}`);
     });
   });
 
