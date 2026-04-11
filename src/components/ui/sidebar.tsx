@@ -568,8 +568,17 @@ function SidebarMenuAction({
         "peer-data-[size=default]/menu-button:top-1.5",
         "peer-data-[size=lg]/menu-button:top-2.5",
         "group-data-[collapsible=icon]:hidden",
+        // `showOnHover` hides the action on desktop (opacity-0) and reveals
+        // it on mouse hover, dropdown-open, or keyboard focus-visible.
+        // Note: this deliberately uses `group-has-[:focus-visible]` rather
+        // than `group-focus-within`. The latter matches ANY focus, including
+        // the click-focus that browsers give a button when the user clicks
+        // it — which caused the action dots to stay visible alongside the
+        // unread badge after clicking a feed. `:focus-visible` only matches
+        // keyboard focus (Tab), preserving accessibility without leaking
+        // the action-dot reveal into mouse interactions.
         showOnHover &&
-          "peer-data-[active=true]/menu-button:text-sidebar-accent-foreground group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 md:opacity-0",
+          "peer-data-[active=true]/menu-button:text-sidebar-accent-foreground group-has-[:focus-visible]/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 md:opacity-0",
         className,
       )}
       {...props}

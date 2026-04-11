@@ -171,4 +171,31 @@ describe("FeedItem", () => {
     await user.click(screen.getByText("Example Feed"));
     expect(onSelect).toHaveBeenCalled();
   });
+
+  it("action dots do not appear on click-focus, only on hover or keyboard focus-visible", () => {
+    // Bug: clicking a feed puts the button into :focus state (click focus).
+    // The shadcn SidebarMenuAction's showOnHover variant used
+    // `group-focus-within/menu-item:opacity-100`, which matches ANY focus —
+    // including click focus — so after clicking the action dots became
+    // visible alongside the unread badge, overlapping it.
+    //
+    // The fix is to use `group-has-[:focus-visible]` instead, which only
+    // matches when the focused element has :focus-visible (keyboard focus,
+    // not mouse click). This test enforces the class substitution at the
+    // source, so a regression in the shadcn wrapper is caught immediately.
+    useArticleStore.setState({
+      articlesByFeedId: {
+        f1: Array.from({ length: 5 }, (_, i) => articleFixture(`a${i}`, false)),
+      },
+    });
+    const { container } = renderFeedItem({ isSelected: true });
+    const action = container.querySelector("[data-sidebar='menu-action']");
+    expect(action).not.toBeNull();
+    // Negative: must not reveal the action on any focus (including click).
+    expect(action!.className).not.toContain(
+      "group-focus-within/menu-item:opacity-100",
+    );
+    // Positive: hover-based reveal must still work.
+    expect(action!.className).toContain("group-hover/menu-item:opacity-100");
+  });
 });
