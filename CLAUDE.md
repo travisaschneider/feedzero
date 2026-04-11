@@ -301,6 +301,19 @@ Write detailed commit messages. Use conventional commit prefixes (`feat:`, `fix:
 3. **Fix** — How it was fixed (what changed)
 4. **Prevention** — What preventive measures were added (tests, docs, lint rules)
 
+## Multi-agent hygiene
+
+Two or more agents may be in flight in parallel working trees. Uncommitted work is fragile — a `git reset --hard` from a co-located agent will wipe it silently. Follow these rules to avoid losing work.
+
+- **Commit after every successful GREEN step.** Small, conventional-commit messages, never batch unrelated RGR cycles into one commit. A committed change is in the reflog for ~90 days and survives `reset --hard`; an uncommitted change survives nothing. Do not wait until "the task is done" to commit.
+- **Before any destructive git operation** (`reset --hard`, `clean -fd`, `checkout .`, `stash drop`, force-push, branch deletion), run `git status` first and describe what you see. If the working tree contains modifications you did not author, stop and ask — do not assume they are stale. The default should be to preserve, not to clear.
+- **For tasks expected to run in parallel with other agents**, use a git worktree instead of sharing a single working tree:
+  - Delegated subagents: use the `Agent` tool with `isolation: "worktree"`.
+  - Whole sessions: create a worktree manually at `~/builder/kindle/feedzero-wt-<feature>/` via `git worktree add ../feedzero-wt-<feature> -b feat/<feature>`. The `landing/` sister repo stays shared (runtime coupling only — the app fetches its feed over HTTP from the deployed URL, not from the filesystem).
+- **Landing/feedzero contract changes are serialized.** When a change spans both the landing repo (which serves `https://feedzero.app/releases.xml`) and the feedzero repo (which consumes it), land and deploy the landing-side change first, then do the feedzero-side consumer work. The first-launch auto-subscribe is wrapped in try/catch so a stale URL is non-fatal, but new users will silently miss the release feed until the next refresh.
+- **Do not touch code you did not author without understanding its scope.** If `git status` shows files modified by another agent (or pre-existing WIP from the user), do not stage them, do not revert them, do not include them in your commits. Leave them for their owner.
+- **When splitting one uncommitted working tree across multiple commits**, prefer `git add -p` over hand-edited patches. Always create a safety stash (`git stash push -u && git stash apply`) before starting a surgical split so you have a guaranteed rollback point.
+
 ## Principles
 
 FeedZero exists to protect its users. It is used by journalists, activists, and people living under surveillance. Every decision — architecture, testing, deployment — must be made as if a user's safety depends on it, because it does.
