@@ -5,7 +5,7 @@ import { FeedsPage } from "@/pages/feeds-page.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore, clearArticleCache } from "@/stores/article-store.ts";
 import * as db from "@/core/storage/db.ts";
-import { ALL_FEEDS_ID } from "@/utils/constants.ts";
+import { ALL_FEEDS_ID, toFolderFeedId } from "@/utils/constants.ts";
 import type { Article, Feed } from "@/types/index.ts";
 
 vi.mock("@/core/storage/db.ts", () => ({
@@ -170,6 +170,21 @@ describe("FeedsPage behavior — desktop", () => {
 
     // Observable: feed is selected in store state
     expect(useFeedStore.getState().selectedFeedId).toBe("feed-1");
+  });
+
+  it("selects a folder-aggregated feed from the URL on mount", () => {
+    const folderFeedId = toFolderFeedId("tech");
+    useFeedStore.setState({
+      feeds: [
+        { ...makeFeed("feed-1"), folderId: "tech" },
+        { ...makeFeed("feed-2"), folderId: "tech" },
+      ],
+    });
+
+    renderPage(`/feeds/${folderFeedId}`);
+
+    // Observable: folder feed is selected in store state
+    expect(useFeedStore.getState().selectedFeedId).toBe(folderFeedId);
   });
 
   it("auto-navigates to All items feed when feeds exist and no feedId in URL", async () => {

@@ -5,7 +5,7 @@ import { ReaderPanel } from "@/components/reader/reader-panel.tsx";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
-import { ALL_FEEDS_ID } from "@/utils/constants.ts";
+import { ALL_FEEDS_ID, toFolderFeedId } from "@/utils/constants.ts";
 
 vi.mock("@/core/storage/db.ts", () => ({
   getArticles: vi.fn(),
@@ -210,6 +210,26 @@ describe("ReaderPanel", () => {
       useFeedStore.setState({ selectedFeedId: ALL_FEEDS_ID });
       useArticleStore.setState({
         selectedArticle: mockArticle({ feedId: "some-other-feed" }),
+        articles: [],
+        isLoading: false,
+      });
+
+      render(<ReaderPanel />);
+
+      expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
+        "Test Article",
+      );
+    });
+  });
+
+  describe("folder-aggregated view", () => {
+    it("renders article from any feed when selectedFeedId is a folder feed", () => {
+      // Folder feed is an aggregated view: the selected article may come
+      // from any feed in the folder. The defensive mismatch check must not
+      // reject it the way it rejects wrong-feed articles in single-feed views.
+      useFeedStore.setState({ selectedFeedId: toFolderFeedId("tech") });
+      useArticleStore.setState({
+        selectedArticle: mockArticle({ feedId: "some-feed-in-folder" }),
         articles: [],
         isLoading: false,
       });

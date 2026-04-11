@@ -3,7 +3,7 @@ import { decodeEntities } from "@/lib/decode-entities.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useExtractionStore } from "@/stores/extraction-store.ts";
-import { ALL_FEEDS_ID } from "@/utils/constants.ts";
+import { isAggregatedFeedId } from "@/utils/constants.ts";
 import { hasSummarySubheading } from "@/lib/content-modes.ts";
 import { needsExtraction } from "@/core/extractor/extractor.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
@@ -50,11 +50,13 @@ export function ReaderPanel() {
   // During loading, render nothing to prevent flash of empty state
   if (isLoading) return null;
 
-  // Defensive: don't render article if it doesn't belong to current feed
+  // Defensive: don't render article if it doesn't belong to current feed.
+  // Aggregated views (global all-items, folder feeds) intentionally show
+  // articles from many feeds — skip the mismatch check for them.
   if (
     article &&
     selectedFeedId &&
-    selectedFeedId !== ALL_FEEDS_ID &&
+    !isAggregatedFeedId(selectedFeedId) &&
     article.feedId !== selectedFeedId
   ) {
     return (

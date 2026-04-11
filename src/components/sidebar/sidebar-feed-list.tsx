@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { useDroppable } from "@dnd-kit/core";
 import { useFeedStore } from "@/stores/feed-store.ts";
+import { toFolderFeedId } from "@/utils/constants.ts";
 import { SidebarSeparator } from "@/components/ui/sidebar.tsx";
 import { FeedItem } from "./feed-item.tsx";
 import { FolderItem } from "./folder-item.tsx";
@@ -79,7 +80,13 @@ export function SidebarFeedList({ onFeedSelect }: SidebarFeedListProps) {
         {folders.map((folder) => {
           const folderFeeds = feedsByFolder.get(folder.id) ?? [];
           return (
-            <FolderItem key={folder.id} folder={folder} onDelete={() => setFolderToDelete(folder)}>
+            <FolderItem
+              key={folder.id}
+              folder={folder}
+              isSelected={selectedFeedId === toFolderFeedId(folder.id)}
+              onSelect={() => onFeedSelect(toFolderFeedId(folder.id))}
+              onDelete={() => setFolderToDelete(folder)}
+            >
               {folderFeeds.map((feed) => (
                 <FeedItem
                   key={feed.id}

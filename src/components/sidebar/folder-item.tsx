@@ -4,9 +4,9 @@ import * as Collapsible from "@radix-ui/react-collapsible";
 import { useDroppable } from "@dnd-kit/core";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import {
+  SidebarMenu,
   SidebarMenuAction,
   SidebarMenuButton,
-  SidebarMenuItem,
 } from "@/components/ui/sidebar.tsx";
 import {
   DropdownMenu,
@@ -20,9 +20,13 @@ interface FolderItemProps {
   folder: Folder;
   children: React.ReactNode;
   onDelete: () => void;
+  /** Whether this folder's aggregated feed is the currently selected feed. */
+  isSelected: boolean;
+  /** Called when the user wants to view the folder's aggregated feed. */
+  onSelect: () => void;
 }
 
-export function FolderItem({ folder, children, onDelete }: FolderItemProps) {
+export function FolderItem({ folder, children, onDelete, isSelected, onSelect }: FolderItemProps) {
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const renameFolder = useFeedStore((s) => s.renameFolder);
@@ -39,10 +43,21 @@ export function FolderItem({ folder, children, onDelete }: FolderItemProps) {
     setIsRenaming(false);
   }
 
+  // The outer <li> carries no `group/menu-item` class of its own, so hovering
+  // a child feed (which lives inside an inner <ul>) does NOT trigger hover
+  // state on the folder header's group. The folder header is a nested <div>
+  // that owns its own `group/menu-item` scope for the action-dots swap,
+  // scoped only to the header row — not to child feeds.
   return (
-    <div ref={setNodeRef} className={isOver ? "bg-accent/50 rounded-md transition-colors" : "transition-colors"}>
-      <SidebarMenuItem>
-        <Collapsible.Root className="group/folder" defaultOpen>
+    <li
+      ref={setNodeRef}
+      className={isOver ? "bg-accent/50 rounded-md transition-colors" : "transition-colors"}
+    >
+      <Collapsible.Root className="group/folder" defaultOpen>
+        <div
+          data-sidebar="menu-item"
+          className="group/menu-item relative"
+        >
           {isRenaming ? (
             <form className="flex items-center gap-2 px-2 py-1" onSubmit={handleSubmitRename}>
               <ChevronRight className="size-3.5" />
@@ -56,12 +71,30 @@ export function FolderItem({ folder, children, onDelete }: FolderItemProps) {
               />
             </form>
           ) : (
-            <Collapsible.Trigger asChild>
-              <SidebarMenuButton className="font-medium">
-                <ChevronRight className="size-3.5 transition-transform group-data-[state=open]/folder:rotate-90" />
+            <>
+              {/*
+                Split interaction: the main SidebarMenuButton navigates to
+                the folder's aggregated feed; a small absolutely-positioned
+                Collapsible.Trigger on its left toggles collapse. Button
+                padding leaves room for the chevron so the two don't overlap.
+              */}
+              <SidebarMenuButton
+                isActive={isSelected}
+                onClick={onSelect}
+                className="font-medium pl-7"
+              >
                 <span className="truncate">{folder.name}</span>
               </SidebarMenuButton>
-            </Collapsible.Trigger>
+              <Collapsible.Trigger asChild>
+                <button
+                  type="button"
+                  aria-label="Toggle folder"
+                  className="absolute left-1 top-1 size-6 flex items-center justify-center rounded-sm hover:bg-sidebar-accent z-10"
+                >
+                  <ChevronRight className="size-3.5 transition-transform group-data-[state=open]/folder:rotate-90" />
+                </button>
+              </Collapsible.Trigger>
+            </>
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -79,11 +112,13 @@ export function FolderItem({ folder, children, onDelete }: FolderItemProps) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Collapsible.Content>
+        </div>
+        <Collapsible.Content>
+          <SidebarMenu>
             {children}
-          </Collapsible.Content>
-        </Collapsible.Root>
-      </SidebarMenuItem>
-    </div>
+          </SidebarMenu>
+        </Collapsible.Content>
+      </Collapsible.Root>
+    </li>
   );
 }
