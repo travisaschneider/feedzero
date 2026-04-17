@@ -201,14 +201,12 @@ describe("FeedsPage layout — mobile", () => {
     expect(main).not.toBeNull();
   });
 
-  it("main has flex-1, flex, flex-col, and min-h-0", () => {
+  it("main has flex-1 and overflow-y-auto for scrollable content", () => {
     const { container } = renderPage();
     const main = container.querySelector("[role='main']");
     expect(main).not.toBeNull();
     expect(main!.className).toContain("flex-1");
-    expect(main!.className).toContain("flex");
-    expect(main!.className).toContain("flex-col");
-    expect(main!.className).toContain("min-h-0");
+    expect(main!.className).toContain("overflow-y-auto");
   });
 
   it("does not show Back button on article list or feeds root", () => {

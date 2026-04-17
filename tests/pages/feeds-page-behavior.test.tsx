@@ -309,65 +309,39 @@ describe("FeedsPage behavior — mobile", () => {
     expect(await screen.findByRole("heading", { name: "Explore" })).toBeInTheDocument();
   });
 
-  it("Back button navigates from article to article list and stays there", async () => {
-    const articles = [makeArticle("art-1"), makeArticle("art-2")];
-
-    // Mock getArticles to return articles (simulates real DB with data)
-    vi.mocked(db.getArticles).mockResolvedValue({ ok: true, value: articles });
-
+  it("floating back pill is present when viewing an article", () => {
     useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
-    useArticleStore.setState({ articles });
-    const { container } = renderPage("/feeds/feed-1/articles/art-2");
+    useArticleStore.setState({ articles: [makeArticle("art-1")] });
+    const { container } = renderPage("/feeds/feed-1/articles/art-1");
 
-    const backBtn = Array.from(container.querySelectorAll("button")).find((b) =>
-      b.textContent?.includes("←"),
-    );
-    expect(backBtn).toBeDefined();
-
-    await act(async () => {
-      backBtn!.click();
-    });
-
-    // Observable: URL changes to article list and STAYS there
-    // User should see the article list to pick a different article
-    await vi.waitFor(() => {
-      expect(currentUrl).toBe("/feeds/feed-1");
-    });
-
-    // Wait a tick to ensure no auto-redirect happens
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 50));
-    });
-
-    // Still at article list, not redirected back to an article
-    expect(currentUrl).toBe("/feeds/feed-1");
+    const pill = container.querySelector("[data-testid='back-pill']");
+    expect(pill).not.toBeNull();
+    expect(pill!.textContent).toContain("Back");
   });
 
-  it("Back button is not shown on article list (only on article reader)", () => {
+  it("back pill is not present on article list (no articleId in URL)", () => {
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
     const { container } = renderPage("/feeds/feed-1");
 
-    const backBtn = Array.from(container.querySelectorAll("button")).find((b) =>
-      b.textContent?.includes("←"),
-    );
-    expect(backBtn).toBeUndefined();
+    const pill = container.querySelector("[data-testid='back-pill']");
+    expect(pill).toBeNull();
   });
 
-  it("Back button is not shown at /feeds root", () => {
+  it("back pill is not present at /feeds root", () => {
     const { container } = renderPage("/feeds");
 
-    const backBtn = Array.from(container.querySelectorAll("button")).find((b) =>
-      b.textContent?.includes("←"),
-    );
-    expect(backBtn).toBeUndefined();
+    const pill = container.querySelector("[data-testid='back-pill']");
+    expect(pill).toBeNull();
   });
 
-  it("mobile header has sticky positioning", () => {
+  it("mobile header is present with sidebar trigger", () => {
     const { container } = renderPage("/feeds");
 
     const header = container.querySelector("header");
     expect(header).not.toBeNull();
-    expect(header!.className).toMatch(/\bsticky\b/);
-    expect(header!.className).toMatch(/\btop-0\b/);
+    // Header contains the sidebar trigger
+    const trigger = header!.querySelector("[data-sidebar='trigger']");
+    expect(trigger).not.toBeNull();
   });
 });
 

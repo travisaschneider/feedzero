@@ -1,5 +1,6 @@
-import { useEffect, useRef, lazy, Suspense } from "react";
+import { useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { useParams, useNavigate, useLocation } from "react-router";
+import { ChevronLeft } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useIsDesktop } from "@/hooks/use-media-query.ts";
@@ -172,14 +173,71 @@ export function FeedsPage() {
     navigate(`/feeds/${feedId}/articles/${article.id}`);
   }
 
-  // Mobile: sidebar is offcanvas, show one content panel at a time
+  // Scroll-snap: programmatically scroll to the reader panel when an
+  // article is selected, and back to the list when the back pill is tapped.
+  const snapContainerRef = useRef<HTMLDivElement>(null);
+  const programmaticScrollRef = useRef(false);
+
+  /** Scroll the snap container to the reader (panel 2). */
+  const scrollToReader = useCallback(() => {
+    const el = snapContainerRef.current;
+    if (!el) return;
+    programmaticScrollRef.current = true;
+    el.scrollTo({ left: el.clientWidth, behavior: "smooth" });
+  }, []);
+
+  /** Scroll the snap container back to the article list (panel 1). */
+  const scrollToList = useCallback(() => {
+    const el = snapContainerRef.current;
+    if (!el) return;
+    programmaticScrollRef.current = true;
+    skipAutoSelectRef.current = true;
+    el.scrollTo({ left: 0, behavior: "smooth" });
+  }, []);
+
+  // When the URL gains an articleId, scroll to the reader panel.
+  useEffect(() => {
+    if (!isDesktop && articleId && feedId) {
+      // Small delay so the reader content renders before we scroll.
+      requestAnimationFrame(() => scrollToReader());
+    }
+  }, [isDesktop, articleId, feedId, scrollToReader]);
+
+  // Detect user-initiated swipe-back via scrollend. When the user swipes
+  // from the reader panel back to the list, drop the articleId from the URL
+  // so the back navigation is reflected in history.
+  useEffect(() => {
+    const el = snapContainerRef.current;
+    if (!el || isDesktop) return;
+
+    function handleScrollEnd() {
+      // Ignore scrolls we triggered programmatically.
+      if (programmaticScrollRef.current) {
+        programmaticScrollRef.current = false;
+        return;
+      }
+      // If scrolled back to the list panel and URL still has articleId, navigate.
+      if (el!.scrollLeft < el!.clientWidth / 2 && articleId && feedId) {
+        skipAutoSelectRef.current = true;
+        navigate(`/feeds/${feedId}`, { replace: true });
+      }
+    }
+
+    el.addEventListener("scrollend", handleScrollEnd);
+    return () => el.removeEventListener("scrollend", handleScrollEnd);
+  }, [isDesktop, articleId, feedId, navigate]);
+
+  // Mobile: sidebar is offcanvas, two-panel scroll-snap for list ↔ reader
   if (!isDesktop) {
+    // Explore page: no scroll-snap, single panel
+    const showExplore = isExplorePage || (!feedId && feeds.length === 0);
+
     return (
       <SidebarProvider defaultOpen={false}>
         <SidebarKeyboardToggle />
         <AppSidebar onFeedSelect={handleFeedSelect} />
-        <SidebarInset>
-          <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3 sticky top-0 z-10 bg-background">
+        <SidebarInset className="flex flex-col h-dvh overflow-hidden">
+          <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3 z-10 bg-background">
             <Tooltip>
               <TooltipTrigger asChild>
                 <SidebarTrigger />
@@ -190,32 +248,44 @@ export function FeedsPage() {
             </Tooltip>
             <HeaderBreadcrumbs fallback={feedId ? "Articles" : "Feeds"} />
           </header>
-          <main role="main" className="flex-1 flex flex-col min-h-0">
-            {articleId && feedId && (
-              <Button
-                variant="link"
-                size="sm"
-                onClick={() => {
-                  skipAutoSelectRef.current = true;
-                  navigate(`/feeds/${feedId}`);
-                }}
-                className="justify-start"
-              >
-                ← Back
-              </Button>
-            )}
-            <div className="flex-1 overflow-y-auto">
-              {isExplorePage ? (
-                <Suspense><ExploreCatalog onFeedAdded={handleFeedAdded} /></Suspense>
-              ) : articleId ? (
-                <ReaderPanel />
-              ) : feedId ? (
+
+          {showExplore ? (
+            <main role="main" className="flex-1 overflow-y-auto">
+              <Suspense><ExploreCatalog onFeedAdded={handleFeedAdded} /></Suspense>
+            </main>
+          ) : (
+            <div
+              ref={snapContainerRef}
+              className="flex flex-1 min-h-0 overflow-x-auto snap-x snap-mandatory"
+              style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}
+            >
+              {/* Panel 1: Article list */}
+              <main role="main" className="shrink-0 w-full snap-start overflow-y-auto">
                 <ArticleList onArticleSelect={handleArticleSelect} />
-              ) : (
-                <Suspense><ExploreCatalog onFeedAdded={handleFeedAdded} /></Suspense>
-              )}
+              </main>
+
+              {/* Panel 2: Reader */}
+              <div className="shrink-0 w-full snap-start overflow-y-auto relative">
+                <ReaderPanel />
+                {/* Floating back pill */}
+                {articleId && (
+                  <Button
+                    data-testid="back-pill"
+                    variant="secondary"
+                    size="sm"
+                    className="fixed bottom-6 left-4 z-20 rounded-full shadow-md px-3 h-8"
+                    onClick={() => {
+                      scrollToList();
+                      navigate(`/feeds/${feedId}`);
+                    }}
+                  >
+                    <ChevronLeft className="size-4 mr-1" />
+                    Back
+                  </Button>
+                )}
+              </div>
             </div>
-          </main>
+          )}
         </SidebarInset>
       </SidebarProvider>
     );
