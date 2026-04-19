@@ -3,12 +3,47 @@
   <title>FeedZero Release Notes</title>
   <subtitle>What changed in FeedZero.</subtitle>
   <id>feedzero:changelog</id>
-  <updated>2026-04-06T18:00:00Z</updated>
+  <updated>2026-04-19T12:00:00Z</updated>
   <link rel="self" href="https://feedzero.app/releases.xml" />
   <link rel="alternate" type="text/html" href="https://feedzero.app/#releases" />
   <author>
     <name>FeedZero</name>
   </author>
+  <entry>
+    <id>feedzero:release:0.5.0</id>
+    <title>v0.5.0 — Feed folders and mobile navigation</title>
+    <link rel="alternate" href="https://feedzero.app/#releases" />
+    <published>2026-04-19T12:00:00Z</published>
+    <updated>2026-04-19T12:00:00Z</updated>
+    <summary>Organize feeds into collapsible folders, read all items in a folder at once, and swipe between articles on mobile.</summary>
+    <content type="html"><![CDATA[<p>Organize feeds into collapsible folders, read all items in a folder at once, and swipe between articles on mobile.</p>
+<h3>Added</h3>
+<ul>
+  <li>Added feed folders. Create folders from the sidebar, drag feeds between them, rename or delete folders from the context menu.</li>
+  <li>Added folder aggregated feeds. Clicking a folder header shows all articles from every feed in that folder, with per-feed title and favicon on each row.</li>
+  <li>Added swipe navigation on mobile. The article list and reader are side-by-side scroll-snap panels. Swipe left to read, swipe right to go back.</li>
+  <li>Added a floating back pill on the mobile reader view. Tapping it scrolls back to the article list.</li>
+  <li>Added safe-area inset support for iPhone Dynamic Island and notch. Content no longer renders under the notch in any orientation.</li>
+  <li>Added inline feed rename from the three-dot context menu.</li>
+  <li>Added Vercel Speed Insights for Core Web Vitals monitoring.</li>
+</ul>
+<h3>Changed</h3>
+<ul>
+  <li>The app now defaults to the All Items view when feeds exist, instead of auto-selecting the first feed.</li>
+  <li>Unread counts are derived from a single source of truth (<code>articlesByFeedId</code>) instead of a separately stored counter. Badges update immediately after adding a feed from the Explore tab.</li>
+  <li>All articles in a feed render at once. Removed the 25-article display cap and the Load More button.</li>
+  <li>Sidebar action dots appear only on hover, not after clicking a feed. The fix uses <code>:focus-visible</code> so keyboard users still see the dots when tabbing.</li>
+  <li>Article selection no longer shifts text. The left accent bar reserves its 2px space at all times.</li>
+  <li>The sidebar was decomposed from a single 728-line component into focused sub-components (FeedItem, FolderItem, SidebarFeedList, confirmation dialogs).</li>
+</ul>
+<h3>Fixed</h3>
+<ul>
+  <li>Fixed unread badge not updating after adding a feed from the Explore tab.</li>
+  <li>Fixed sidebar action dots and unread badge overlapping after clicking a feed.</li>
+  <li>Fixed article text shifting 2px when selected.</li>
+</ul>]]></content>
+    <author><name>FeedZero</name></author>
+  </entry>
   <entry>
     <id>feedzero:release:0.4.0</id>
     <title>v0.4.0 — Release notes feed</title>
