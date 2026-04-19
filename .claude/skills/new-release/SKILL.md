@@ -100,29 +100,48 @@ npx vitest run tests/core/parser/release-feed-fixture.test.ts
 
 This test parses the vendored fixture through the app's parser and asserts the fields the app consumes (title, siteUrl, articles with title/link/content/publishedAt/guid). If the landing-side generator changed its format in a way that breaks the parser, this test catches it.
 
-### 6. (Optional) Create a bento box page
+### 6. Take a fresh screenshot of the app
 
-If the user wants a social media visual, create a bento page:
+```bash
+cd ../feedzero-landing
+node take-screenshot.mjs
+```
+
+This launches the Vite dev server from the feedzero repo, captures the Explore tab at 1440x900, and saves `screenshot.png`. The `<img class="shot">` on the landing page renders it with rounded corners (`border-radius: 12px`) and a subtle shadow (`box-shadow`).
+
+If the dev server is already running, use `--url`:
+```bash
+node take-screenshot.mjs --url http://localhost:3000
+```
+
+For a feeds view with articles loaded:
+```bash
+node take-screenshot.mjs --scene feeds
+```
+
+### 7. (Optional) Create a bento box page
+
+If the user wants a social media visual for LinkedIn/Twitter, create a bento page:
 
 ```bash
 mkdir -p ../feedzero-landing/releases/<VERSION>/
 ```
 
-Create `../feedzero-landing/releases/<VERSION>/index.html` with a dark-mode bento grid layout. See `../feedzero-landing/releases/0.5.0/index.html` as a reference. The page should:
-- Have a hero card with the version number and tagline
-- Feature cards for the biggest highlights (use accent gradients)
-- Stats row (tests count, feeds in catalog, etc.)
-- Links to the app, landing page, and Atom feed
-- Be designed for 1200px-wide screenshots (LinkedIn post images)
+Create `../feedzero-landing/releases/<VERSION>/index.html`. Use `../feedzero-landing/releases/0.5.0/index.html` as a reference. The page must:
+- Be a fixed 1200x630 landscape card (LinkedIn image dimensions), no scrolling required.
+- Use the **same visual language as the landing page**: white background, 1px `#e5e7eb` borders, `#f8fafc` panel headers, slate text (`#0f172a`), gray descriptions (`#64748b`), eyebrow labels, `.tag` elements, `kbd` elements, `.word` passphrase pills, `.tile` illustration boxes. See `index.html`'s CSS for the exact values.
+- Follow the writing style: plain, factual, verb-led. Each cell title is one short sentence ending with a period. No marketing verbs, no emojis, no exclamation marks.
+- Include mini illustration tiles in each cell (sidebar mock-ups, tag pipelines, code snippets) — not just text. These fill the space and give visual texture.
+- Have a stats footer row with key numbers (tests, feeds in catalog, encryption, etc.).
 
-### 7. Commit and push — LANDING FIRST
+### 8. Commit and push — LANDING FIRST
 
 **Deployment order matters.** The feedzero app fetches `https://feedzero.app/releases.xml` on first launch. If feedzero deploys before the landing site, new users see a 404 on auto-subscribe (swallowed by try/catch, non-fatal, but they won't see the release feed until next refresh).
 
 ```bash
 # Landing repo — commit and push FIRST
 cd ../feedzero-landing
-git add releases.mjs releases.xml index.html
+git add releases.mjs releases.xml index.html screenshot.png
 # Also add releases/<VERSION>/index.html if a bento page was created
 git commit -m "release: v<VERSION> — <short title>"
 git push origin main
@@ -142,7 +161,7 @@ git commit -m "release: bump version to <VERSION>, update release feed fixture"
 git push origin main
 ```
 
-### 8. Verify the live feed
+### 9. Verify the live feed
 
 ```bash
 curl -sSL "https://feedzero.app/releases.xml" | grep "<id>feedzero:release:<VERSION>"
@@ -150,7 +169,7 @@ curl -sSL "https://feedzero.app/releases.xml" | grep "<id>feedzero:release:<VERS
 
 If this returns the entry ID, the release is live. Existing users who refresh their release feed will see the new entry. New users auto-subscribing on first launch will get the full feed.
 
-### 9. (Optional) Draft a LinkedIn post
+### 10. (Optional) Draft a LinkedIn post
 
 If the user wants a social post, draft it in builder/maker tone:
 - First-person, "here's what I shipped" energy
