@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ArticleList } from "@/components/articles/article-list.tsx";
@@ -6,6 +6,10 @@ import { ArticleItem } from "@/components/articles/article-item.tsx";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import type { Article } from "@/types/index.ts";
+import {
+  installVirtualizerShims,
+  restoreVirtualizerShims,
+} from "../../helpers/virtualizer-shims.ts";
 
 vi.mock("@/core/storage/db.ts", () => ({
   getArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
@@ -37,6 +41,7 @@ const mockArticle = (id: string, title: string, read = false): Article => ({
 
 describe("ArticleList accessibility", () => {
   beforeEach(() => {
+    installVirtualizerShims();
     useFeedStore.setState({
       feeds: [],
       selectedFeedId: "f1",
@@ -48,6 +53,10 @@ describe("ArticleList accessibility", () => {
       selectedArticle: null,
       isLoading: false,
     });
+  });
+
+  afterEach(() => {
+    restoreVirtualizerShims();
   });
 
   it("renders ul with role listbox", () => {

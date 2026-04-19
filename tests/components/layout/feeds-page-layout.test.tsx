@@ -145,14 +145,22 @@ describe("FeedsPage layout — desktop", () => {
     }
   });
 
-  it("each panel wraps a ScrollArea with h-full", () => {
+  it("each panel has its own scrollable region", () => {
+    // The reader panel uses a Radix ScrollArea. The article list panel owns
+    // its own overflow-y-auto scroll container (needed so the virtualizer in
+    // ArticleList has a single, measurable scroll element — nesting a Radix
+    // ScrollArea around it would hide the real scroller behind a viewport
+    // div, breaking virtualization).
     const { container } = renderPage();
     const panels = container.querySelectorAll("[data-panel]");
     for (const panel of panels) {
       const scrollArea = panel.querySelector(
         "[data-radix-scroll-area-viewport]",
       );
-      expect(scrollArea).not.toBeNull();
+      const nativeScroller =
+        panel.querySelector(".overflow-y-auto") ??
+        panel.querySelector(".overflow-auto");
+      expect(scrollArea ?? nativeScroller).not.toBeNull();
     }
   });
 

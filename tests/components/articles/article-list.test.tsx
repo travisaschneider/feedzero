@@ -1,10 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ArticleList } from "@/components/articles/article-list.tsx";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { ALL_FEEDS_ID, toFolderFeedId } from "@/utils/constants.ts";
+import {
+  installVirtualizerShims,
+  restoreVirtualizerShims,
+} from "../../helpers/virtualizer-shims.ts";
 
 vi.mock("@/core/storage/db.ts", () => ({
   getArticles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
@@ -51,6 +55,7 @@ const mockFeed = (id: string, title: string) => ({
 
 describe("ArticleList", () => {
   beforeEach(() => {
+    installVirtualizerShims();
     useFeedStore.setState({
       feeds: [],
       selectedFeedId: null,
@@ -62,6 +67,10 @@ describe("ArticleList", () => {
       selectedArticle: null,
       isLoading: false,
     });
+  });
+
+  afterEach(() => {
+    restoreVirtualizerShims();
   });
 
   it("shows empty state when no feed selected", () => {
@@ -248,6 +257,34 @@ describe("ArticleList", () => {
       const { container } = render(<ArticleList />);
 
       expect(container.querySelector("img")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("virtualization (large lists)", () => {
+    it("does not render every article to the DOM for long lists", () => {
+      useFeedStore.setState({
+        feeds: [],
+        selectedFeedId: "f1",
+        isLoading: false,
+        error: null,
+      });
+      const articles = Array.from({ length: 500 }, (_, i) =>
+        mockArticle(`a${i}`, `Article ${i}`),
+      );
+      useArticleStore.setState({
+        articles,
+        selectedArticle: null,
+        isLoading: false,
+      });
+
+      const { container } = render(<ArticleList />);
+
+      const rendered = container.querySelectorAll('li[role="option"]');
+      // Exact count depends on estimated item size, but must be bounded by the
+      // viewport — nowhere near the full 500. A generous cap still catches the
+      // regression of rendering all items.
+      expect(rendered.length).toBeLessThan(100);
+      expect(rendered.length).toBeGreaterThan(0);
     });
   });
 

@@ -259,8 +259,8 @@ export function FeedsPage() {
               className="flex flex-1 min-h-0 overflow-x-auto snap-x snap-mandatory"
               style={{ scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}
             >
-              {/* Panel 1: Article list */}
-              <main role="main" className="shrink-0 w-full snap-start overflow-y-auto">
+              {/* Panel 1: Article list — owns its own scroll for virtualization */}
+              <main role="main" className="shrink-0 w-full snap-start">
                 <ArticleList onArticleSelect={handleArticleSelect} />
               </main>
 
@@ -315,9 +315,9 @@ export function FeedsPage() {
               minSize="300px"
               className="overflow-hidden"
             >
-              <ScrollArea className="h-full">
-                <ArticleList onArticleSelect={handleArticleSelect} />
-              </ScrollArea>
+              {/* ArticleList owns its own scroll container so the virtualizer
+                  can measure and observe a single scroll element. */}
+              <ArticleList onArticleSelect={handleArticleSelect} />
             </ResizablePanel>
             <ResizableHandle />
             <ResizablePanel
