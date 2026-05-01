@@ -1,0 +1,47 @@
+import { describe, it, expect } from "vitest";
+import { findNextArticle } from "@/lib/next-article";
+import type { Article } from "@/types";
+
+function makeArticle(id: string): Article {
+  return {
+    id,
+    feedId: "f1",
+    guid: id,
+    title: `Article ${id}`,
+    link: `https://example.com/${id}`,
+    content: "",
+    summary: "",
+    author: "",
+    publishedAt: 0,
+    read: false,
+    createdAt: 0,
+  };
+}
+
+describe("findNextArticle", () => {
+  const a = makeArticle("a");
+  const b = makeArticle("b");
+  const c = makeArticle("c");
+
+  it("returns the article after the current one in the list", () => {
+    expect(findNextArticle([a, b, c], a)).toEqual(b);
+    expect(findNextArticle([a, b, c], b)).toEqual(c);
+  });
+
+  it("returns null when the current article is the last", () => {
+    expect(findNextArticle([a, b, c], c)).toBeNull();
+  });
+
+  it("returns null when there is no current article", () => {
+    expect(findNextArticle([a, b, c], null)).toBeNull();
+  });
+
+  it("returns null when the list is empty", () => {
+    expect(findNextArticle([], a)).toBeNull();
+  });
+
+  it("returns null when the current article is not in the list", () => {
+    const orphan = makeArticle("orphan");
+    expect(findNextArticle([a, b, c], orphan)).toBeNull();
+  });
+});

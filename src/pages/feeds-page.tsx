@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { useParams, useNavigate, useLocation } from "react-router";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useIsDesktop } from "@/hooks/use-media-query.ts";
@@ -9,6 +9,8 @@ import { useSidebar } from "@/components/ui/sidebar.tsx";
 import { Button } from "@/components/ui/button.tsx";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
 import { ALL_FEEDS_ID } from "@/utils/constants.ts";
+import { findNextArticle } from "@/lib/next-article.ts";
+import { decodeEntities } from "@/lib/decode-entities.ts";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -67,6 +69,7 @@ export function FeedsPage() {
   const loadArticles = useArticleStore((s) => s.loadArticles);
   const articles = useArticleStore((s) => s.articles);
   const selectArticle = useArticleStore((s) => s.selectArticle);
+  const selectedArticle = useArticleStore((s) => s.selectedArticle);
 
   // Navigate to /explore and focus search when N key or Plus button is used
   useEffect(() => {
@@ -181,6 +184,10 @@ export function FeedsPage() {
     if (el) el.scrollTop = 0;
   }, [articleId]);
 
+  // The article that follows the currently-selected one — drives the
+  // floating Next pill on mobile (mirror of the Back pill).
+  const nextArticle = findNextArticle(articles, selectedArticle);
+
   /** Scroll the snap container to the reader (panel 2). */
   const scrollToReader = useCallback(() => {
     const el = snapContainerRef.current;
@@ -275,7 +282,10 @@ export function FeedsPage() {
                 data-testid="reader-scroll-mobile"
                 className="shrink-0 w-full snap-start overflow-y-auto relative pb-20"
               >
-                <ReaderPanel onArticleSelect={handleArticleSelect} />
+                <ReaderPanel
+                  onArticleSelect={handleArticleSelect}
+                  hideInlineNextPill
+                />
                 {/* Floating back pill */}
                 {articleId && (
                   <Button
@@ -290,6 +300,27 @@ export function FeedsPage() {
                   >
                     <ChevronLeft className="size-4 mr-1" />
                     Back
+                  </Button>
+                )}
+                {/* Floating next pill — mirrors the back pill on the right.
+                    Fades in via tailwindcss-animate so it doesn't jump in
+                    abruptly each time the user enters a new article. */}
+                {articleId && nextArticle && (
+                  <Button
+                    key={nextArticle.id}
+                    data-testid="next-pill-floating"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleArticleSelect(nextArticle)}
+                    className="fixed bottom-6 right-4 z-20 rounded-full shadow-md pl-3 pr-2 h-8 max-w-[55%] animate-in fade-in slide-in-from-right-2 duration-300"
+                  >
+                    <span className="text-muted-foreground mr-1.5 shrink-0">
+                      Next:
+                    </span>
+                    <span className="truncate font-medium">
+                      {decodeEntities(nextArticle.title)}
+                    </span>
+                    <ChevronRight className="size-4 shrink-0 ml-1" />
                   </Button>
                 )}
               </div>

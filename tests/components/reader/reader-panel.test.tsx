@@ -290,6 +290,22 @@ describe("ReaderPanel", () => {
       );
     });
 
+    it("does NOT render the inline Next pill when hideInlineNextPill is true", () => {
+      const current = mockArticle({ id: "a1" });
+      const next = makeArticle({ id: "a2", title: "Next" });
+      useArticleStore.setState({
+        articles: [current, next],
+        selectedArticle: current,
+        isLoading: false,
+      });
+
+      render(<ReaderPanel hideInlineNextPill />);
+
+      // Mobile uses a floating pill rendered by FeedsPage, so the inline
+      // pill must be suppressed when this prop is set.
+      expect(screen.queryByTestId("next-pill")).toBeNull();
+    });
+
     it("truncates long titles with the truncate class", () => {
       const current = mockArticle({ id: "a1" });
       const next = makeArticle({

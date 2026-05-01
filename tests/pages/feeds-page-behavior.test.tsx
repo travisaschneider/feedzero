@@ -368,6 +368,72 @@ describe("FeedsPage behavior — mobile", () => {
     expect(currentUrl).toBe("/feeds/feed-1");
   });
 
+  it("floating Next pill appears next to Back pill when there is a next article (mobile)", () => {
+    const articles = [makeArticle("art-1"), makeArticle("art-2")];
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+    useArticleStore.setState({
+      articlesByFeedId: { "feed-1": articles },
+      articles,
+      selectedArticle: articles[0],
+      loadArticles: async () => {},
+    });
+    vi.mocked(db.getArticles).mockResolvedValue({ ok: true, value: articles });
+
+    const { container } = renderPage("/feeds/feed-1/articles/art-1");
+
+    const nextPill = container.querySelector(
+      "[data-testid='next-pill-floating']",
+    );
+    expect(nextPill).not.toBeNull();
+    // Sits at the right edge to mirror the Back pill on the left.
+    expect(nextPill!.className).toMatch(/\bright-4\b/);
+    // Fades in on mount via tailwindcss-animate utilities.
+    expect(nextPill!.className).toMatch(/animate-in/);
+    expect(nextPill!.className).toMatch(/fade-in/);
+  });
+
+  it("floating Next pill is hidden when current article is the last (mobile)", () => {
+    const articles = [makeArticle("art-1")];
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+    useArticleStore.setState({
+      articlesByFeedId: { "feed-1": articles },
+      articles,
+      selectedArticle: articles[0],
+      loadArticles: async () => {},
+    });
+    vi.mocked(db.getArticles).mockResolvedValue({ ok: true, value: articles });
+
+    const { container } = renderPage("/feeds/feed-1/articles/art-1");
+
+    expect(
+      container.querySelector("[data-testid='next-pill-floating']"),
+    ).toBeNull();
+  });
+
+  it("clicking the floating Next pill navigates to the next article (mobile)", async () => {
+    const user = userEvent.setup();
+    const articles = [makeArticle("art-1"), makeArticle("art-2")];
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+    useArticleStore.setState({
+      articlesByFeedId: { "feed-1": articles },
+      articles,
+      selectedArticle: articles[0],
+      loadArticles: async () => {},
+    });
+    vi.mocked(db.getArticles).mockResolvedValue({ ok: true, value: articles });
+
+    const { container } = renderPage("/feeds/feed-1/articles/art-1");
+
+    const pill = container.querySelector(
+      "[data-testid='next-pill-floating']",
+    ) as HTMLElement;
+    await user.click(pill);
+
+    await vi.waitFor(() => {
+      expect(currentUrl).toBe("/feeds/feed-1/articles/art-2");
+    });
+  });
+
   it("floating back pill is present when viewing an article", () => {
     useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
     useArticleStore.setState({ articles: [makeArticle("art-1")] });

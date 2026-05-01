@@ -9,6 +9,7 @@ import { hasSummarySubheading } from "@/lib/content-modes.ts";
 import { needsExtraction } from "@/core/extractor/extractor.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
 import { Button } from "@/components/ui/button.tsx";
+import { findNextArticle } from "@/lib/next-article.ts";
 import type { Article } from "@/types/index.ts";
 import { ArticleContent } from "./article-content.tsx";
 import { ViewToggle, type ViewMode } from "./view-toggle.tsx";
@@ -16,6 +17,12 @@ import { ViewToggle, type ViewMode } from "./view-toggle.tsx";
 interface ReaderPanelProps {
   /** Called when the user picks the next article via the bottom pill. */
   onArticleSelect?: (article: Article) => void;
+  /**
+   * Suppress the inline Next-article pill at the bottom of the article.
+   * Mobile sets this true because FeedsPage renders a floating pill next
+   * to the Back pill instead.
+   */
+  hideInlineNextPill?: boolean;
 }
 
 function formatDate(timestamp: number): string {
@@ -30,7 +37,10 @@ function formatDate(timestamp: number): string {
   });
 }
 
-export function ReaderPanel({ onArticleSelect }: ReaderPanelProps = {}) {
+export function ReaderPanel({
+  onArticleSelect,
+  hideInlineNextPill = false,
+}: ReaderPanelProps = {}) {
   const article = useArticleStore((s) => s.selectedArticle);
   const articles = useArticleStore((s) => s.articles);
   const isLoading = useArticleStore((s) => s.isLoading);
@@ -121,11 +131,7 @@ export function ReaderPanel({ onArticleSelect }: ReaderPanelProps = {}) {
   // The next article in the loaded list, if any. The article store keeps
   // articles ordered the same way the article list panel renders them, so
   // "next" here matches the j-key keyboard shortcut and the visual order.
-  const currentIndex = articles.findIndex((a) => a.id === article.id);
-  const nextArticle =
-    currentIndex >= 0 && currentIndex < articles.length - 1
-      ? articles[currentIndex + 1]
-      : null;
+  const nextArticle = findNextArticle(articles, article);
 
   return (
     <article className="p-4 px-6">
@@ -161,7 +167,7 @@ export function ReaderPanel({ onArticleSelect }: ReaderPanelProps = {}) {
         <ArticleContent html={getContent()} />
       )}
 
-      {nextArticle && (
+      {nextArticle && !hideInlineNextPill && (
         <div className="mt-8 max-w-180">
           <Button
             data-testid="next-pill"
