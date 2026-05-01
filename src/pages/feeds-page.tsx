@@ -388,13 +388,15 @@ export function FeedsPage() {
               minSize="200px"
               className="overflow-hidden"
             >
-              <ScrollArea className="h-full">
+              {/* Plain overflow-y-auto — Radix ScrollArea's display:table wrapper
+                  prevents text from wrapping at panel width, causing clipping. */}
+              <div className="h-full overflow-y-auto overflow-x-hidden">
                 <ReaderPanel
                   nextArticle={nextArticle}
                   prevArticle={prevArticle}
                   onNavigate={handleArticleSelect}
                 />
-              </ScrollArea>
+              </div>
             </ResizablePanel>
           </>
         )}

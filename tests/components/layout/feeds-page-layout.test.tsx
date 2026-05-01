@@ -147,11 +147,10 @@ describe("FeedsPage layout — desktop", () => {
   });
 
   it("each panel has its own scrollable region", () => {
-    // The reader panel uses a Radix ScrollArea. The article list panel owns
-    // its own overflow-y-auto scroll container (needed so the virtualizer in
-    // ArticleList has a single, measurable scroll element — nesting a Radix
-    // ScrollArea around it would hide the real scroller behind a viewport
-    // div, breaking virtualization).
+    // Both panels use native overflow-y-auto scroll containers.
+    // ArticleList needs a native scroller for the virtualizer to measure.
+    // The reader panel also uses native overflow to avoid Radix ScrollArea's
+    // display:table wrapper, which prevents text from wrapping at panel width.
     const { container } = renderPage();
     const panels = container.querySelectorAll("[data-panel]");
     for (const panel of panels) {
@@ -163,6 +162,19 @@ describe("FeedsPage layout — desktop", () => {
         panel.querySelector(".overflow-auto");
       expect(scrollArea ?? nativeScroller).not.toBeNull();
     }
+  });
+
+  it("reader panel uses native overflow scroll (not Radix ScrollArea)", () => {
+    // Radix ScrollArea wraps content in display:table which prevents text from
+    // wrapping to the panel width — text clips at the panel edge instead.
+    // The reader panel must use a plain overflow-y-auto div.
+    const { container } = renderPage();
+    const panels = container.querySelectorAll("[data-panel]");
+    const readerPanel = panels[2]; // sidebar=0, article-list=1, reader=2
+    expect(readerPanel.querySelector("[data-radix-scroll-area-viewport]")).toBeNull();
+    const nativeScroller = readerPanel.querySelector(".overflow-y-auto") ??
+      readerPanel.querySelector(".overflow-auto");
+    expect(nativeScroller).not.toBeNull();
   });
 
   it("renders ResizableHandle between panels", () => {
