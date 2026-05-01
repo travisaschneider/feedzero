@@ -369,7 +369,11 @@ export function FeedsPage() {
               className="overflow-hidden"
             >
               <ScrollArea className="h-full">
-                <ReaderPanel />
+                <ReaderPanel
+                  nextArticle={nextArticle}
+                  prevArticle={prevArticle}
+                  onNavigate={handleArticleSelect}
+                />
               </ScrollArea>
             </ResizablePanel>
           </ResizablePanelGroup>

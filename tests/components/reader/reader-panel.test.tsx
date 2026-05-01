@@ -241,4 +241,75 @@ describe("ReaderPanel", () => {
       );
     });
   });
+
+  describe("desktop navigation pills", () => {
+    const nextArt = { ...mockArticle(), id: "a2", title: "Next Article" };
+    const prevArt = { ...mockArticle(), id: "a0", title: "Prev Article" };
+
+    beforeEach(() => {
+      useArticleStore.setState({
+        selectedArticle: mockArticle(),
+        articles: [],
+        isLoading: false,
+      });
+    });
+
+    it("shows next pill when nextArticle prop provided", () => {
+      render(<ReaderPanel nextArticle={nextArt} onNavigate={vi.fn()} />);
+      expect(screen.getByTestId("next-pill")).toBeInTheDocument();
+    });
+
+    it("shows prev pill when prevArticle prop provided", () => {
+      render(<ReaderPanel prevArticle={prevArt} onNavigate={vi.fn()} />);
+      expect(screen.getByTestId("prev-pill")).toBeInTheDocument();
+    });
+
+    it("shows both pills when both provided", () => {
+      render(<ReaderPanel nextArticle={nextArt} prevArticle={prevArt} onNavigate={vi.fn()} />);
+      expect(screen.getByTestId("next-pill")).toBeInTheDocument();
+      expect(screen.getByTestId("prev-pill")).toBeInTheDocument();
+    });
+
+    it("does not show pills when neither provided", () => {
+      render(<ReaderPanel />);
+      expect(screen.queryByTestId("next-pill")).toBeNull();
+      expect(screen.queryByTestId("prev-pill")).toBeNull();
+    });
+
+    it("next pill shows j kbd hint", () => {
+      render(<ReaderPanel nextArticle={nextArt} onNavigate={vi.fn()} />);
+      const pill = screen.getByTestId("next-pill");
+      expect(pill.querySelector("kbd")).toBeTruthy();
+      expect(pill.querySelector("kbd")!.textContent).toBe("j");
+    });
+
+    it("prev pill shows k kbd hint", () => {
+      render(<ReaderPanel prevArticle={prevArt} onNavigate={vi.fn()} />);
+      const pill = screen.getByTestId("prev-pill");
+      expect(pill.querySelector("kbd")).toBeTruthy();
+      expect(pill.querySelector("kbd")!.textContent).toBe("k");
+    });
+
+    it("clicking next pill calls onNavigate with nextArticle", async () => {
+      const user = userEvent.setup();
+      const onNavigate = vi.fn();
+      render(<ReaderPanel nextArticle={nextArt} onNavigate={onNavigate} />);
+      await user.click(screen.getByTestId("next-pill"));
+      expect(onNavigate).toHaveBeenCalledWith(nextArt);
+    });
+
+    it("clicking prev pill calls onNavigate with prevArticle", async () => {
+      const user = userEvent.setup();
+      const onNavigate = vi.fn();
+      render(<ReaderPanel prevArticle={prevArt} onNavigate={onNavigate} />);
+      await user.click(screen.getByTestId("prev-pill"));
+      expect(onNavigate).toHaveBeenCalledWith(prevArt);
+    });
+
+    it("pills do not render when onNavigate is not provided", () => {
+      render(<ReaderPanel nextArticle={nextArt} prevArticle={prevArt} />);
+      expect(screen.queryByTestId("next-pill")).toBeNull();
+      expect(screen.queryByTestId("prev-pill")).toBeNull();
+    });
+  });
 });

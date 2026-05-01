@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { decodeEntities } from "@/lib/decode-entities.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
@@ -7,6 +8,9 @@ import { isAggregatedFeedId } from "@/utils/constants.ts";
 import { hasSummarySubheading } from "@/lib/content-modes.ts";
 import { needsExtraction } from "@/core/extractor/extractor.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
+import type { Article } from "@/types/index.ts";
+import { Kbd } from "@/components/ui/kbd.tsx";
+import { Button } from "@/components/ui/button.tsx";
 import { ArticleContent } from "./article-content.tsx";
 import { ViewToggle, type ViewMode } from "./view-toggle.tsx";
 
@@ -22,7 +26,13 @@ function formatDate(timestamp: number): string {
   });
 }
 
-export function ReaderPanel() {
+interface ReaderPanelProps {
+  nextArticle?: Article | null;
+  prevArticle?: Article | null;
+  onNavigate?: (article: Article) => void;
+}
+
+export function ReaderPanel({ nextArticle, prevArticle, onNavigate }: ReaderPanelProps = {}) {
   const article = useArticleStore((s) => s.selectedArticle);
   const isLoading = useArticleStore((s) => s.isLoading);
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
@@ -141,6 +151,37 @@ export function ReaderPanel() {
         </p>
       ) : (
         <ArticleContent html={getContent()} />
+      )}
+
+      {onNavigate && (prevArticle || nextArticle) && (
+        <div className="flex justify-between gap-2 mt-8 pt-4 border-t border-border">
+          {prevArticle ? (
+            <Button
+              data-testid="prev-pill"
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-1.5 max-w-[45%]"
+              onClick={() => onNavigate(prevArticle)}
+            >
+              <ChevronLeft className="size-3.5 shrink-0" />
+              <Kbd>k</Kbd>
+              <span className="truncate">{decodeEntities(prevArticle.title)}</span>
+            </Button>
+          ) : <div />}
+          {nextArticle ? (
+            <Button
+              data-testid="next-pill"
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-1.5 max-w-[45%] ml-auto"
+              onClick={() => onNavigate(nextArticle)}
+            >
+              <span className="truncate">{decodeEntities(nextArticle.title)}</span>
+              <Kbd>j</Kbd>
+              <ChevronRight className="size-3.5 shrink-0" />
+            </Button>
+          ) : <div />}
+        </div>
       )}
     </article>
   );
