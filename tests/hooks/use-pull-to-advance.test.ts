@@ -129,6 +129,44 @@ describe("usePullToAdvance — bottom (next article)", () => {
 
     expect(onNext).not.toHaveBeenCalled();
   });
+
+  it("calls onNext after 150ms timer even when scrollend does not fire (iOS < 16.4 compat)", () => {
+    vi.useFakeTimers();
+    const { el, setScrollTop } = makeScrollEl(600, 1200);
+    const scrollRef = { current: el };
+
+    renderHook(() =>
+      usePullToAdvance({ scrollRef, hasNext: true, hasPrev: false, onNext, onPrev }),
+    );
+
+    // Scroll fully into pull zone — no scrollend dispatched
+    setScrollTop(1200 - 600);
+    act(() => { el.dispatchEvent(new Event("scroll")); });
+    expect(onNext).not.toHaveBeenCalled(); // timer not yet fired
+
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(onNext).toHaveBeenCalledOnce();
+
+    vi.useRealTimers();
+  });
+
+  it("does not call onNext twice when both scrollend and timer fire", () => {
+    vi.useFakeTimers();
+    const { el, setScrollTop } = makeScrollEl(600, 1200);
+    const scrollRef = { current: el };
+
+    renderHook(() =>
+      usePullToAdvance({ scrollRef, hasNext: true, hasPrev: false, onNext, onPrev }),
+    );
+
+    setScrollTop(1200 - 600);
+    act(() => { scrollAndEnd(el); }); // fires both scroll + scrollend
+    act(() => { vi.advanceTimersByTime(200); }); // timer fires after scrollend
+
+    expect(onNext).toHaveBeenCalledOnce(); // only once, not twice
+
+    vi.useRealTimers();
+  });
 });
 
 describe("usePullToAdvance — top (previous article)", () => {

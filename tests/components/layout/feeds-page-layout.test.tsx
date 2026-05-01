@@ -260,4 +260,26 @@ describe("FeedsPage layout — mobile", () => {
       expect(backBtn).toBeUndefined();
     }
   });
+
+  it("mobile reader scroll div has overscroll-none to prevent browser pull-to-refresh", () => {
+    // overscroll-behavior:none stops Android Chrome's native pull-to-refresh from
+    // firing when the user pulls down on the reader. Without it, the browser gesture
+    // fires instead of our pull-to-prev indicator.
+    useFeedStore.setState({ feeds: [defaultFeed], selectedFeedId: "f1" });
+    const { container } = renderPage("/feeds/f1");
+    const reader = container.querySelector('[data-testid="reader-scroll-mobile"]');
+    expect(reader).not.toBeNull();
+    expect((reader as HTMLElement).className).toContain("overscroll-none");
+  });
+
+  it("mobile reader scroll div has touch-pan-y to prevent horizontal snap from vertical scroll", () => {
+    // touch-action:pan-y restricts gesture handling to vertical only. Without it,
+    // a vertical scroll with a slight horizontal component can trigger the horizontal
+    // snap container to jump back to the article list panel.
+    useFeedStore.setState({ feeds: [defaultFeed], selectedFeedId: "f1" });
+    const { container } = renderPage("/feeds/f1");
+    const reader = container.querySelector('[data-testid="reader-scroll-mobile"]');
+    expect(reader).not.toBeNull();
+    expect((reader as HTMLElement).className).toContain("touch-pan-y");
+  });
 });

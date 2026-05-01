@@ -48,38 +48,46 @@ export function usePullToAdvance({
   const touchStartYRef = useRef(0);
   const isPullingTopRef = useRef(false);
 
-  // Bottom: scroll events
+  // Bottom: scroll events with timer fallback for browsers without scrollend (iOS < 16.4).
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || !hasNext) return;
 
-    function handleScroll() {
-      const el = scrollRef.current;
-      if (!el) return;
-      const overscroll = el.scrollTop + el.clientHeight - (el.scrollHeight - PULL_ZONE_HEIGHT);
-      const progress = Math.min(1, Math.max(0, overscroll / PULL_ZONE_HEIGHT));
-      bottomProgressRef.current = progress;
-      setBottomProgress(progress);
-    }
+    let timer: ReturnType<typeof setTimeout> | null = null;
 
-    function handleScrollEnd() {
-      const el = scrollRef.current;
-      if (!el) return;
+    function commitScrollEnd() {
+      if (timer) { clearTimeout(timer); timer = null; }
+      const target = scrollRef.current;
+      if (!target) return;
       if (bottomProgressRef.current >= 1) {
         onNext();
       } else if (bottomProgressRef.current > 0) {
-        // Rubber-band: snap back to just before the pull zone
-        el.scrollTo({ top: el.scrollHeight - el.clientHeight - PULL_ZONE_HEIGHT, behavior: "smooth" });
+        target.scrollTo({ top: target.scrollHeight - target.clientHeight - PULL_ZONE_HEIGHT, behavior: "smooth" });
       }
       bottomProgressRef.current = 0;
       setBottomProgress(0);
     }
 
+    function handleScroll() {
+      const target = scrollRef.current;
+      if (!target) return;
+      const overscroll = target.scrollTop + target.clientHeight - (target.scrollHeight - PULL_ZONE_HEIGHT);
+      const progress = Math.min(1, Math.max(0, overscroll / PULL_ZONE_HEIGHT));
+      bottomProgressRef.current = progress;
+      setBottomProgress(progress);
+
+      // Timer fires if scrollend doesn't (iOS < 16.4 doesn't support scrollend).
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(commitScrollEnd, 150);
+    }
+
     el.addEventListener("scroll", handleScroll, { passive: true });
-    el.addEventListener("scrollend", handleScrollEnd, { passive: true });
+    // scrollend fires immediately on supported browsers and cancels the timer.
+    el.addEventListener("scrollend", commitScrollEnd, { passive: true });
     return () => {
       el.removeEventListener("scroll", handleScroll);
-      el.removeEventListener("scrollend", handleScrollEnd);
+      el.removeEventListener("scrollend", commitScrollEnd);
+      if (timer) clearTimeout(timer);
     };
   }, [scrollRef, hasNext, onNext]);
 

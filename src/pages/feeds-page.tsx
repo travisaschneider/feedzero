@@ -297,7 +297,7 @@ export function FeedsPage() {
               <div
                 ref={readerScrollRef}
                 data-testid="reader-scroll-mobile"
-                className="shrink-0 w-full snap-start overflow-y-auto relative pb-20"
+                className="shrink-0 w-full snap-start overflow-y-auto relative pb-20 overscroll-none touch-pan-y"
               >
                 {/* Top pull-to-prev indicator — fades in as user pulls down from top */}
                 {topPullPx > 0 && (
