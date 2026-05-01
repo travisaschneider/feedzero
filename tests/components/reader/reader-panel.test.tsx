@@ -424,11 +424,17 @@ describe("ReaderPanel", () => {
       expect(pill.className).toContain("justify-end");
     });
 
-    it("nav bar is sticky at the bottom of the reader", () => {
+    it("nav bar is pinned to bottom via flex layout, not sticky", () => {
+      // sticky bottom-0 only shows pills when the user scrolls to the end.
+      // Desktop nav must be always visible: a flex child below the scroll container.
       render(<ReaderPanel nextArticle={nextArt} onNavigate={vi.fn()} />);
       const bar = screen.getByTestId("nav-pills-bar");
-      expect(bar.className).toContain("sticky");
-      expect(bar.className).toContain("bottom-0");
+      expect(bar.className).not.toContain("sticky");
+      // The component owns its scroll container when nav props are provided
+      const scrollContainer = document.querySelector(".overflow-y-auto");
+      expect(scrollContainer).not.toBeNull();
+      // Nav bar is a flex sibling below the scroll container, not inside it
+      expect(scrollContainer!.contains(bar)).toBe(false);
     });
 
     it("pills have backdrop blur and bg for floaty contrast", () => {
