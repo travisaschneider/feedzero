@@ -280,6 +280,32 @@ describe("FeedsPage behavior — desktop", () => {
     });
   });
 
+  it("clicking the Next pill in the reader navigates to the next article", async () => {
+    const user = userEvent.setup();
+    const articles = [makeArticle("art-1"), makeArticle("art-2")];
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+    // Seed both buckets and stub loadArticles so the in-flight reload
+    // doesn't blow away the test list before the pill is clicked.
+    useArticleStore.setState({
+      articlesByFeedId: { "feed-1": articles },
+      articles,
+      selectedArticle: articles[0],
+      loadArticles: async () => {},
+    });
+    vi.mocked(db.getArticles).mockResolvedValue({ ok: true, value: articles });
+
+    renderPage("/feeds/feed-1/articles/art-1");
+
+    const pill = await screen.findByTestId("next-pill");
+    await user.click(pill);
+
+    // The pill must produce a URL change to the next article. Without the
+    // FeedsPage wiring, clicking is inert and the URL stays put.
+    await vi.waitFor(() => {
+      expect(currentUrl).toBe("/feeds/feed-1/articles/art-2");
+    });
+  });
+
   it("does not auto-navigate when articleId is already in URL", () => {
     useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
     useArticleStore.setState({

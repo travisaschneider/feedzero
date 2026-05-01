@@ -275,7 +275,7 @@ export function FeedsPage() {
                 data-testid="reader-scroll-mobile"
                 className="shrink-0 w-full snap-start overflow-y-auto relative pb-20"
               >
-                <ReaderPanel />
+                <ReaderPanel onArticleSelect={handleArticleSelect} />
                 {/* Floating back pill */}
                 {articleId && (
                   <Button
@@ -335,7 +335,7 @@ export function FeedsPage() {
               className="overflow-hidden"
             >
               <ScrollArea className="h-full">
-                <ReaderPanel />
+                <ReaderPanel onArticleSelect={handleArticleSelect} />
               </ScrollArea>
             </ResizablePanel>
           </ResizablePanelGroup>
