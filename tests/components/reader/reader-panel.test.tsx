@@ -17,6 +17,11 @@ vi.mock("@/core/extractor/extractor.ts", () => ({
   needsExtraction: vi.fn().mockReturnValue(false),
 }));
 
+let mockIsDesktop = true;
+vi.mock("@/hooks/use-media-query.ts", () => ({
+  useIsDesktop: () => mockIsDesktop,
+}));
+
 const mockArticle = (overrides = {}) => ({
   id: "a1",
   feedId: "f1",
@@ -335,6 +340,7 @@ describe("ReaderPanel", () => {
     const prevArt = { ...mockArticle(), id: "a0", title: "Prev Article" };
 
     beforeEach(() => {
+      mockIsDesktop = true;
       useArticleStore.setState({
         selectedArticle: mockArticle(),
         articles: [],
@@ -453,6 +459,38 @@ describe("ReaderPanel", () => {
       render(<ReaderPanel nextArticle={nextArt} onNavigate={vi.fn()} />);
       const pill = screen.getByTestId("next-pill");
       expect(pill.className).toMatch(/backdrop-blur/);
+    });
+  });
+
+  describe("mobile navigation pills", () => {
+    const nextArt = { ...mockArticle(), id: "a2", title: "Next Article" };
+    const prevArt = { ...mockArticle(), id: "a0", title: "Prev Article" };
+
+    beforeEach(() => {
+      mockIsDesktop = false;
+      useArticleStore.setState({
+        selectedArticle: mockArticle(),
+        articles: [],
+        isLoading: false,
+      });
+    });
+
+    it("back pill shows only an arrow icon — no Back label on mobile", () => {
+      render(<ReaderPanel nextArticle={nextArt} onNavigate={vi.fn()} onBack={vi.fn()} />);
+      const pill = screen.getByTestId("back-pill");
+      expect(pill.textContent).not.toContain("Back");
+    });
+
+    it("prev and next pills do not show kbd hints on mobile", () => {
+      render(<ReaderPanel nextArticle={nextArt} prevArticle={prevArt} onNavigate={vi.fn()} />);
+      expect(screen.getByTestId("prev-pill").querySelector("kbd")).toBeNull();
+      expect(screen.getByTestId("next-pill").querySelector("kbd")).toBeNull();
+    });
+
+    it("prev and next pills fill available width on mobile (flex-1)", () => {
+      render(<ReaderPanel nextArticle={nextArt} prevArticle={prevArt} onNavigate={vi.fn()} />);
+      expect(screen.getByTestId("prev-pill").className).toContain("flex-1");
+      expect(screen.getByTestId("next-pill").className).toContain("flex-1");
     });
   });
 });

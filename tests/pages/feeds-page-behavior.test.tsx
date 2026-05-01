@@ -352,7 +352,8 @@ describe("FeedsPage behavior — mobile", () => {
 
     const pill = container.querySelector("[data-testid='back-pill']");
     expect(pill).not.toBeNull();
-    expect(pill!.textContent).toContain("Back");
+    // Mobile back pill is icon-only — no "Back" label
+    expect(pill!.textContent).not.toContain("Back");
   });
 
   it("pull-to-advance pull zone is not present in mobile reader (replaced by nav pills)", () => {

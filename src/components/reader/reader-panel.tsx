@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import { useIsDesktop } from "@/hooks/use-media-query.ts";
 import { ChevronLeft, ChevronRight, ExternalLink, Loader2 } from "lucide-react";
 import { decodeEntities } from "@/lib/decode-entities.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
@@ -41,6 +42,7 @@ interface ReaderPanelProps {
 }
 
 export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: ReaderPanelProps = {}) {
+  const isDesktop = useIsDesktop();
   const article = useArticleStore((s) => s.selectedArticle);
   const isLoading = useArticleStore((s) => s.isLoading);
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
@@ -90,7 +92,7 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
           onClick={onBack}
         >
           <ChevronLeft className="size-3.5 shrink-0" />
-          Back
+          {isDesktop && "Back"}
         </Button>
       )}
       {prevArticle && (
@@ -98,25 +100,31 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
           data-testid="prev-pill"
           variant="outline"
           size="sm"
-          className="min-w-0 max-w-[35%] flex items-center gap-1 justify-start rounded-full shadow-md bg-background/95 backdrop-blur-sm"
+          className={cn(
+            "min-w-0 flex items-center gap-1 justify-start rounded-full shadow-md bg-background/95 backdrop-blur-sm",
+            isDesktop ? "max-w-[35%]" : "flex-1",
+          )}
           onClick={() => onNavigate(prevArticle)}
         >
           <ChevronLeft className="size-3.5 shrink-0" />
-          <Kbd className="shrink-0">k</Kbd>
+          {isDesktop && <Kbd className="shrink-0">k</Kbd>}
           <span className="truncate">{decodeEntities(prevArticle.title)}</span>
         </Button>
       )}
-      <div className="flex-1" />
+      {isDesktop && <div className="flex-1" />}
       {nextArticle && (
         <Button
           data-testid="next-pill"
           variant="outline"
           size="sm"
-          className="min-w-0 max-w-[35%] flex items-center gap-1 justify-end rounded-full shadow-md bg-background/95 backdrop-blur-sm"
+          className={cn(
+            "min-w-0 flex items-center gap-1 justify-end rounded-full shadow-md bg-background/95 backdrop-blur-sm",
+            isDesktop ? "max-w-[35%]" : "flex-1",
+          )}
           onClick={() => onNavigate(nextArticle)}
         >
           <span className="truncate">{decodeEntities(nextArticle.title)}</span>
-          <Kbd className="shrink-0">j</Kbd>
+          {isDesktop && <Kbd className="shrink-0">j</Kbd>}
           <ChevronRight className="size-3.5 shrink-0" />
         </Button>
       )}
