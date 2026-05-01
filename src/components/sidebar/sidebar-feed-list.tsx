@@ -243,10 +243,7 @@ export function SidebarFeedList({ onFeedSelect }: SidebarFeedListProps) {
       </DndContext>
 
       <SidebarSeparator className="mx-0 my-1" />
-      <NewFolderInput />
-
-      {/* Auto-organize pill at the bottom — only visible when relevant */}
-      <AutoOrganizePill />
+      <NewFolderInput trailing={<AutoOrganizePill />} />
 
       <FeedRemoveDialog
         feedTitle={feedToRemove?.title ?? ""}

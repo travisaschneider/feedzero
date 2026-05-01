@@ -1,9 +1,13 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { FolderPlus } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar.tsx";
 
-export function NewFolderInput() {
+interface NewFolderInputProps {
+  trailing?: ReactNode;
+}
+
+export function NewFolderInput({ trailing }: NewFolderInputProps = {}) {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const createFolder = useFeedStore((s) => s.createFolder);
@@ -36,11 +40,12 @@ export function NewFolderInput() {
   }
 
   return (
-    <SidebarMenuItem>
-      <SidebarMenuButton className="text-muted-foreground" onClick={() => setCreating(true)}>
+    <SidebarMenuItem className="flex items-center">
+      <SidebarMenuButton className="text-muted-foreground flex-1" onClick={() => setCreating(true)}>
         <FolderPlus className="size-4" />
         <span>New folder</span>
       </SidebarMenuButton>
+      {trailing && <div className="shrink-0 pr-1">{trailing}</div>}
     </SidebarMenuItem>
   );
 }

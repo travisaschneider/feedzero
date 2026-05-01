@@ -137,7 +137,7 @@ describe("SidebarFeedList", () => {
     expect(folderButton?.getAttribute("data-active")).toBe("true");
   });
 
-  it("renders the auto-organize pill when there are many unfiled feeds", () => {
+  it("renders the auto-organize wand trigger when there are many unfiled feeds", () => {
     const feeds = Array.from({ length: 12 }, (_, i) =>
       mockFeed(`f${i}`, `Feed ${i}`),
     );
@@ -145,28 +145,24 @@ describe("SidebarFeedList", () => {
 
     renderList();
 
-    expect(screen.getByTestId("auto-organize-pill")).toBeInTheDocument();
+    expect(screen.getByTestId("auto-organize-trigger")).toBeInTheDocument();
   });
 
-  it("auto-organize pill appears after folder items (at the bottom)", () => {
+  it("auto-organize wand trigger appears inline with the New folder row", () => {
     const feeds = Array.from({ length: 12 }, (_, i) =>
       mockFeed(`f${i}`, `Feed ${i}`),
     );
     useFeedStore.setState({ feeds, folders: [], selectedFeedId: null });
 
-    const { container } = renderList();
+    renderList();
 
-    // The pill must come AFTER all feed items in the DOM
-    const allItems = container.querySelectorAll("[data-sidebar='menu-item']");
-    const pill = screen.getByTestId("auto-organize-pill");
-    const lastItem = allItems[allItems.length - 1];
-    // pill should follow the last menu-item in document order
-    expect(
-      lastItem.compareDocumentPosition(pill) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    const trigger = screen.getByTestId("auto-organize-trigger");
+    const newFolderBtn = screen.getByText("New folder").closest("[data-sidebar='menu-item']");
+    // wand trigger must be a descendant of the same menu-item as "New folder"
+    expect(newFolderBtn?.contains(trigger)).toBe(true);
   });
 
-  it("does NOT render the auto-organize pill with few feeds", () => {
+  it("does NOT render the auto-organize wand trigger with few feeds", () => {
     useFeedStore.setState({
       feeds: [mockFeed("f1", "Only Feed")],
       folders: [],
@@ -175,7 +171,7 @@ describe("SidebarFeedList", () => {
 
     renderList();
 
-    expect(screen.queryByTestId("auto-organize-pill")).toBeNull();
+    expect(screen.queryByTestId("auto-organize-trigger")).toBeNull();
   });
 
   describe("hover / badge invariants", () => {
