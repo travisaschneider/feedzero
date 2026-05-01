@@ -38,41 +38,28 @@ test.describe("Viewport resize", () => {
     await expect(sidebar).toBeVisible({ timeout: 5000 });
   });
 
-  test("sidebar works when resizing through the 768-1024px gap zone", async ({
+  test("three-panel desktop layout renders at 900px (no gap zone)", async ({
     page,
   }) => {
-    // FeedsPage switches at 1024px (useIsDesktop), SidebarProvider at
-    // 768px (useIsMobile). Between 768-1024px the mobile layout renders
-    // but SidebarProvider thinks it's desktop. The sidebar trigger should
-    // still open the sidebar at any width below 1024px.
+    // useIsDesktop and useIsMobile both use 768px as their threshold, so
+    // there is no gap zone. At 900px the full desktop 3-panel layout should
+    // render with the persistent sidebar — no offcanvas trigger needed.
     await skipOnboarding(page);
     await mockFeedEndpoint(page, SAMPLE_RSS);
 
-    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.setViewportSize({ width: 900, height: 720 });
     await page.goto("/feeds");
     await page.waitForFunction(
       () => !document.body.textContent?.includes("Loading"),
       { timeout: 10000 },
     );
 
-    // Resize to the gap zone: 900px (below 1024 = mobile layout, above 768 = SidebarProvider thinks desktop)
-    await page.setViewportSize({ width: 900, height: 720 });
-    await page.waitForTimeout(500);
+    // Desktop layout: resizable panel group should be present
+    const panels = page.locator('[data-slot="resizable-panel-group"]');
+    await expect(panels).toBeVisible({ timeout: 5000 });
 
-    // The sidebar trigger should exist in the mobile layout
-    const trigger = page.locator('[data-sidebar="trigger"]');
-    await expect(trigger).toBeVisible({ timeout: 5000 });
-
-    // Clicking the trigger should open the sidebar
-    await trigger.click();
+    // Persistent sidebar should be visible (no trigger needed to open it)
     const sidebar = page.locator('[data-sidebar="sidebar"]');
-    await expect(sidebar).toBeVisible({ timeout: 5000 });
-
-    // Close sidebar and resize back to desktop
-    await page.setViewportSize({ width: 1280, height: 720 });
-    await page.waitForTimeout(500);
-
-    // Sidebar should reappear as the persistent desktop sidebar
     await expect(sidebar).toBeVisible({ timeout: 5000 });
   });
 });

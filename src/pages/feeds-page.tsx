@@ -354,8 +354,8 @@ export function FeedsPage() {
             className="flex-1 min-h-0"
           >
             <ResizablePanel
-              defaultSize="40%"
-              minSize="300px"
+              defaultSize="35%"
+              minSize="180px"
               className="overflow-hidden"
             >
               {/* ArticleList owns its own scroll container so the virtualizer
@@ -364,8 +364,8 @@ export function FeedsPage() {
             </ResizablePanel>
             <ResizableHandle />
             <ResizablePanel
-              defaultSize="60%"
-              minSize="300px"
+              defaultSize="65%"
+              minSize="280px"
               className="overflow-hidden"
             >
               <ScrollArea className="h-full">
