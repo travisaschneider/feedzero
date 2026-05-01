@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Routes, Route, useLocation, useNavigate } from "react-router";
 import { FeedsPage } from "@/pages/feeds-page.tsx";
@@ -342,36 +342,7 @@ describe("FeedsPage behavior — mobile", () => {
     expect(currentUrl).toBe("/feeds/feed-1");
   });
 
-  it("floating back pill is present when viewing an article", () => {
-    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
-    useArticleStore.setState({ articles: [makeArticle("art-1")] });
-    const { container } = renderPage("/feeds/feed-1/articles/art-1");
-
-    const pill = container.querySelector("[data-testid='back-pill']");
-    expect(pill).not.toBeNull();
-    expect(pill!.textContent).toContain("Back");
-  });
-
-  it("pull zone is present at the bottom of the mobile reader", () => {
-    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
-    useArticleStore.setState({ articles: [makeArticle("art-1")] });
-    const { container } = renderPage("/feeds/feed-1/articles/art-1");
-
-    const pullZone = container.querySelector("[data-testid='pull-zone-bottom']");
-    expect(pullZone).not.toBeNull();
-  });
-
-  it("no floating next-pill in mobile reader (replaced by pull-to-advance)", () => {
-    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
-    const a1 = makeArticle("art-1");
-    const a2 = makeArticle("art-2");
-    useArticleStore.setState({ articles: [a1, a2], selectedArticle: a1 });
-    const { container } = renderPage("/feeds/feed-1/articles/art-1");
-
-    expect(container.querySelector("[data-testid='next-pill-floating']")).toBeNull();
-  });
-
-  it("reader scroll container reserves bottom space so the back pill does not cover content", () => {
+  it("back button is present in nav bar when viewing an article", () => {
     useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
     useArticleStore.setState({
       articles: [makeArticle("art-1")],
@@ -379,13 +350,43 @@ describe("FeedsPage behavior — mobile", () => {
     });
     const { container } = renderPage("/feeds/feed-1/articles/art-1");
 
-    // The reader's mobile scroll panel must reserve bottom padding for the
-    // fixed back pill so the last paragraph isn't hidden behind it.
-    const readerScroll = container.querySelector(
-      "[data-testid='reader-scroll-mobile']",
-    );
-    expect(readerScroll).not.toBeNull();
-    expect(readerScroll!.className).toMatch(/\bpb-(20|24|28|32)\b/);
+    const pill = container.querySelector("[data-testid='back-pill']");
+    expect(pill).not.toBeNull();
+    expect(pill!.textContent).toContain("Back");
+  });
+
+  it("pull-to-advance pull zone is not present in mobile reader (replaced by nav pills)", () => {
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+    useArticleStore.setState({ articles: [makeArticle("art-1")] });
+    const { container } = renderPage("/feeds/feed-1/articles/art-1");
+
+    expect(container.querySelector("[data-testid='pull-zone-bottom']")).toBeNull();
+  });
+
+  it("nav pills are present in mobile reader when there is a next article", async () => {
+    const a1 = makeArticle("art-1");
+    const a2 = makeArticle("art-2");
+    vi.mocked(db.getArticles).mockResolvedValueOnce({ ok: true, value: [a1, a2] });
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+    useArticleStore.setState({ articles: [a1, a2], selectedArticle: a1 });
+    const { container } = renderPage("/feeds/feed-1/articles/art-1");
+
+    await waitFor(() => {
+      expect(container.querySelector("[data-testid='next-pill']")).not.toBeNull();
+    });
+  });
+
+  it("reader-scroll-mobile outer wrapper has no bottom padding (nav bar is in-flow, not floating)", () => {
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+    useArticleStore.setState({
+      articles: [makeArticle("art-1")],
+      selectedArticle: makeArticle("art-1"),
+    });
+    const { container } = renderPage("/feeds/feed-1/articles/art-1");
+
+    const wrapper = container.querySelector("[data-testid='reader-scroll-mobile']");
+    expect(wrapper).not.toBeNull();
+    expect(wrapper!.className).not.toMatch(/\bpb-(20|24|28|32)\b/);
   });
 
   it("back pill is not present on article list (no articleId in URL)", () => {
@@ -403,11 +404,12 @@ describe("FeedsPage behavior — mobile", () => {
     expect(pill).toBeNull();
   });
 
-  it("resets reader scroll position to top when articleId changes (mobile)", async () => {
+  it("resets reader scroll position to top when article changes (mobile)", async () => {
     const user = userEvent.setup();
-    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
     const a1 = makeArticle("art-1");
     const a2 = makeArticle("art-2");
+    vi.mocked(db.getArticles).mockResolvedValue({ ok: true, value: [a1, a2] });
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
     useArticleStore.setState({
       articles: [a1, a2],
       selectedArticle: a1,
@@ -430,22 +432,23 @@ describe("FeedsPage behavior — mobile", () => {
       </MemoryRouter>,
     );
 
-    const readerScroll = container.querySelector(
-      "[data-testid='reader-scroll-mobile']",
-    ) as HTMLElement;
-    expect(readerScroll).not.toBeNull();
+    // ReaderPanel owns the scroll container; wait for effects to settle first.
+    let readerScroll!: HTMLElement;
+    await waitFor(() => {
+      readerScroll = container.querySelector(
+        "[data-testid='reader-scroll-container']",
+      ) as HTMLElement;
+      expect(readerScroll).not.toBeNull();
+    });
 
-    // Simulate the user having scrolled down inside the reader.
     readerScroll.scrollTop = 500;
     expect(readerScroll.scrollTop).toBe(500);
 
-    // Trigger a real route change — same as a swipe-driven URL update.
     await user.click(screen.getByTestId("nav-to-next"));
 
-    // After the article changes, the reader scroll panel must be back at the top.
     await vi.waitFor(() => {
       const after = container.querySelector(
-        "[data-testid='reader-scroll-mobile']",
+        "[data-testid='reader-scroll-container']",
       ) as HTMLElement;
       expect(after.scrollTop).toBe(0);
     });

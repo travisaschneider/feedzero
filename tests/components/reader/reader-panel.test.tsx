@@ -400,16 +400,28 @@ describe("ReaderPanel", () => {
       expect(screen.queryByTestId("prev-pill")).toBeNull();
     });
 
-    it("prev pill is full width (flex-1)", () => {
-      render(<ReaderPanel prevArticle={prevArt} onNavigate={vi.fn()} />);
-      const pill = screen.getByTestId("prev-pill");
-      expect(pill.className).toContain("flex-1");
+    it("pills are content-sized — no flex-1 so short titles produce short pills", () => {
+      render(<ReaderPanel nextArticle={nextArt} prevArticle={prevArt} onNavigate={vi.fn()} />);
+      expect(screen.getByTestId("prev-pill").className).not.toContain("flex-1");
+      expect(screen.getByTestId("next-pill").className).not.toContain("flex-1");
     });
 
-    it("next pill is full width (flex-1)", () => {
+    it("back button appears in nav bar when onBack is provided", () => {
+      render(<ReaderPanel nextArticle={nextArt} onNavigate={vi.fn()} onBack={vi.fn()} />);
+      expect(screen.getByTestId("back-pill")).toBeInTheDocument();
+    });
+
+    it("clicking back button calls onBack", async () => {
+      const user = userEvent.setup();
+      const onBack = vi.fn();
+      render(<ReaderPanel nextArticle={nextArt} onNavigate={vi.fn()} onBack={onBack} />);
+      await user.click(screen.getByTestId("back-pill"));
+      expect(onBack).toHaveBeenCalledOnce();
+    });
+
+    it("back button does not appear when onBack is not provided", () => {
       render(<ReaderPanel nextArticle={nextArt} onNavigate={vi.fn()} />);
-      const pill = screen.getByTestId("next-pill");
-      expect(pill.className).toContain("flex-1");
+      expect(screen.queryByTestId("back-pill")).toBeNull();
     });
 
     it("prev pill text is left-aligned (justify-start)", () => {

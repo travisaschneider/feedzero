@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight, ExternalLink, Loader2 } from "lucide-react";
 import { decodeEntities } from "@/lib/decode-entities.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
@@ -37,9 +37,10 @@ interface ReaderPanelProps {
   nextArticle?: Article | null;
   prevArticle?: Article | null;
   onNavigate?: (article: Article) => void;
+  onBack?: () => void;
 }
 
-export function ReaderPanel({ nextArticle, prevArticle, onNavigate }: ReaderPanelProps = {}) {
+export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: ReaderPanelProps = {}) {
   const article = useArticleStore((s) => s.selectedArticle);
   const isLoading = useArticleStore((s) => s.isLoading);
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
@@ -52,9 +53,12 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate }: ReaderPane
   const resetForArticle = useExtractionStore((s) => s.resetForArticle);
   const statusMap = useExtractionStore((s) => s.statusMap);
 
-  // Reset view mode when article changes
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Reset scroll and view mode when article changes
   useEffect(() => {
     resetForArticle();
+    if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
   }, [article?.id, resetForArticle]);
 
   // Auto-extract teaser articles in background
@@ -70,15 +74,65 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate }: ReaderPane
     </div>
   );
 
-  // Desktop layout wraps everything (including empty/loading state) in the
-  // flex column so the scroll container is always present for layout stability.
+  // navPills depends only on props — safe to compute before early returns so
+  // the back button is always visible (even while the article is loading).
+  const navPills = onNavigate && (prevArticle || nextArticle || onBack) ? (
+    <div
+      data-testid="nav-pills-bar"
+      className="flex items-center gap-2 px-4 pb-4 pt-2 shrink-0"
+    >
+      {onBack && (
+        <Button
+          data-testid="back-pill"
+          variant="outline"
+          size="sm"
+          className="shrink-0 rounded-full h-8 px-3 gap-1 bg-background/95 backdrop-blur-sm shadow-md"
+          onClick={onBack}
+        >
+          <ChevronLeft className="size-3.5 shrink-0" />
+          Back
+        </Button>
+      )}
+      {prevArticle && (
+        <Button
+          data-testid="prev-pill"
+          variant="outline"
+          size="sm"
+          className="min-w-0 max-w-[35%] flex items-center gap-1 justify-start rounded-full shadow-md bg-background/95 backdrop-blur-sm"
+          onClick={() => onNavigate(prevArticle)}
+        >
+          <ChevronLeft className="size-3.5 shrink-0" />
+          <Kbd className="shrink-0">k</Kbd>
+          <span className="truncate">{decodeEntities(prevArticle.title)}</span>
+        </Button>
+      )}
+      <div className="flex-1" />
+      {nextArticle && (
+        <Button
+          data-testid="next-pill"
+          variant="outline"
+          size="sm"
+          className="min-w-0 max-w-[35%] flex items-center gap-1 justify-end rounded-full shadow-md bg-background/95 backdrop-blur-sm"
+          onClick={() => onNavigate(nextArticle)}
+        >
+          <span className="truncate">{decodeEntities(nextArticle.title)}</span>
+          <Kbd className="shrink-0">j</Kbd>
+          <ChevronRight className="size-3.5 shrink-0" />
+        </Button>
+      )}
+    </div>
+  ) : null;
+
+  // Wraps empty/loading states in the flex column so layout is stable and the
+  // nav bar (including back button) is always visible when onNavigate is provided.
   function wrap(content: ReactNode) {
     if (onNavigate) {
       return (
         <div className="h-full flex flex-col">
-          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+          <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-none">
             {content}
           </div>
+          {navPills}
         </div>
       );
     }
@@ -244,46 +298,10 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate }: ReaderPane
     </div>
   );
 
-  const navPills = onNavigate && (prevArticle || nextArticle) ? (
-    <div
-      data-testid="nav-pills-bar"
-      className="flex gap-3 px-6 pb-4 pt-2"
-    >
-      {prevArticle ? (
-        <Button
-          data-testid="prev-pill"
-          variant="outline"
-          size="sm"
-          className="flex-1 flex items-center gap-1 min-w-0 justify-start rounded-full shadow-md bg-background/95 backdrop-blur-sm"
-          onClick={() => onNavigate(prevArticle)}
-        >
-          <ChevronLeft className="size-3.5 shrink-0" />
-          <Kbd className="shrink-0">k</Kbd>
-          <span className="truncate">{decodeEntities(prevArticle.title)}</span>
-        </Button>
-      ) : <div className="flex-1" />}
-      {nextArticle ? (
-        <Button
-          data-testid="next-pill"
-          variant="outline"
-          size="sm"
-          className="flex-1 flex items-center gap-1 min-w-0 justify-end rounded-full shadow-md bg-background/95 backdrop-blur-sm"
-          onClick={() => onNavigate(nextArticle)}
-        >
-          <span className="truncate">{decodeEntities(nextArticle.title)}</span>
-          <Kbd className="shrink-0">j</Kbd>
-          <ChevronRight className="size-3.5 shrink-0" />
-        </Button>
-      ) : <div className="flex-1" />}
-    </div>
-  ) : null;
-
-  // Desktop: flex column with scroll container + always-visible nav pills.
-  // Mobile: fragment, outer component owns the scroll container.
   if (onNavigate) {
     return (
       <div className="h-full flex flex-col">
-        <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+        <div ref={scrollContainerRef} data-testid="reader-scroll-container" className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-y-none">
           {articleBody}
         </div>
         {navPills}

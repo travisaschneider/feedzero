@@ -1,16 +1,13 @@
 import { useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { useParams, useNavigate, useLocation } from "react-router";
-import { ChevronLeft, ChevronDown, ChevronUp } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
 import { useIsDesktop } from "@/hooks/use-media-query.ts";
 import { useKeyboardNav } from "@/hooks/use-keyboard-nav.ts";
 import { useSidebar } from "@/components/ui/sidebar.tsx";
-import { Button } from "@/components/ui/button.tsx";
 import { ScrollArea } from "@/components/ui/scroll-area.tsx";
 import { ALL_FEEDS_ID } from "@/utils/constants.ts";
 import { findNextArticle, findPrevArticle } from "@/lib/next-article.ts";
-import { usePullToAdvance, PULL_ZONE_HEIGHT } from "@/hooks/use-pull-to-advance.ts";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -171,29 +168,10 @@ export function FeedsPage() {
   // Scroll-snap: programmatically scroll to the reader panel when an
   // article is selected, and back to the list when the back pill is tapped.
   const snapContainerRef = useRef<HTMLDivElement>(null);
-  const readerScrollRef = useRef<HTMLDivElement>(null);
   const programmaticScrollRef = useRef(false);
-
-  // Reset the reader's vertical scroll to the top whenever the article
-  // changes. Without this, swiping to a new (unread) article would show its
-  // middle/bottom because the scroll position from the previous article
-  // persists on the same DOM element.
-  useEffect(() => {
-    if (!articleId) return;
-    const el = readerScrollRef.current;
-    if (el) el.scrollTop = 0;
-  }, [articleId]);
 
   const nextArticle = findNextArticle(articles, selectedArticle);
   const prevArticle = findPrevArticle(articles, selectedArticle);
-
-  const { bottomProgress, topPullPx } = usePullToAdvance({
-    scrollRef: readerScrollRef,
-    hasNext: !!nextArticle,
-    hasPrev: !!prevArticle,
-    onNext: () => { if (nextArticle) handleArticleSelect(nextArticle); },
-    onPrev: () => { if (prevArticle) handleArticleSelect(prevArticle); },
-  });
 
   /** Scroll the snap container to the reader (panel 2). */
   const scrollToReader = useCallback(() => {
@@ -291,51 +269,20 @@ export function FeedsPage() {
                 <ArticleList onArticleSelect={handleArticleSelect} />
               </main>
 
-              {/* Panel 2: Reader. pb-20 reserves space below the article so
-                  the fixed back pill (bottom-6 + h-8) does not cover the
-                  last lines of the pull zone. */}
+              {/* Panel 2: Reader — ReaderPanel owns its own scroll and nav bar */}
               <div
-                ref={readerScrollRef}
                 data-testid="reader-scroll-mobile"
-                className="shrink-0 w-full snap-start overflow-y-auto relative pb-20 overscroll-none touch-pan-y"
+                className="shrink-0 w-full snap-start h-full"
               >
-                {/* Top pull-to-prev indicator — fades in as user pulls down from top */}
-                {topPullPx > 0 && (
-                  <div
-                    data-testid="pull-indicator-top"
-                    className="flex items-center justify-center gap-1.5 py-3 text-xs text-muted-foreground"
-                    style={{ opacity: Math.min(1, topPullPx / 80) }}
-                  >
-                    <ChevronUp className="size-3.5" />
-                    {topPullPx >= 80 ? "Release to go back" : "Pull to go back"}
-                  </div>
-                )}
-                <ReaderPanel />
-                {/* Bottom pull zone — fills as user scrolls past article end */}
-                <div
-                  data-testid="pull-zone-bottom"
-                  className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground"
-                  style={{ height: PULL_ZONE_HEIGHT, opacity: bottomProgress }}
-                >
-                  <ChevronDown className="size-3.5" />
-                  {bottomProgress >= 1 ? "Release to advance" : "Pull to advance"}
-                </div>
-                {/* Floating back pill */}
-                {articleId && (
-                  <Button
-                    data-testid="back-pill"
-                    variant="secondary"
-                    size="sm"
-                    className="fixed bottom-6 left-4 z-20 rounded-full shadow-md px-3 h-8"
-                    onClick={() => {
-                      scrollToList();
-                      navigate(`/feeds/${feedId}`);
-                    }}
-                  >
-                    <ChevronLeft className="size-4 mr-1" />
-                    Back
-                  </Button>
-                )}
+                <ReaderPanel
+                  nextArticle={nextArticle}
+                  prevArticle={prevArticle}
+                  onNavigate={handleArticleSelect}
+                  onBack={articleId ? () => {
+                    scrollToList();
+                    navigate(`/feeds/${feedId}`);
+                  } : undefined}
+                />
               </div>
             </div>
           )}
