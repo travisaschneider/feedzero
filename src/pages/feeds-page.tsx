@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, lazy, Suspense } from "react";
+import { useEffect, useRef, useCallback, useState, lazy, Suspense } from "react";
 import { useParams, useNavigate, useLocation } from "react-router";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore } from "@/stores/article-store.ts";
@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/sidebar.tsx";
 import { AppSidebar } from "@/components/layout/app-sidebar.tsx";
 import { HeaderBreadcrumbs } from "@/components/layout/header-breadcrumbs.tsx";
+import { FeedSwitcherSheet } from "@/components/layout/feed-switcher-sheet.tsx";
 import { Kbd } from "@/components/ui/kbd.tsx";
 import {
   Tooltip,
@@ -60,6 +61,7 @@ export function FeedsPage() {
   const { pathname } = useLocation();
   const isExplorePage = pathname === "/explore";
   const isDesktop = useIsDesktop();
+  const [feedSheetOpen, setFeedSheetOpen] = useState(false);
   useKeyboardNav();
   const feeds = useFeedStore((s) => s.feeds);
   const selectFeed = useFeedStore((s) => s.selectFeed);
@@ -254,8 +256,16 @@ export function FeedsPage() {
                 Toggle Sidebar <Kbd className="ml-1">[</Kbd>
               </TooltipContent>
             </Tooltip>
-            <HeaderBreadcrumbs fallback={feedId ? "Articles" : "Feeds"} />
+            <HeaderBreadcrumbs
+              fallback={feedId ? "Articles" : "Feeds"}
+              onTriggerClick={() => setFeedSheetOpen(true)}
+            />
           </header>
+          <FeedSwitcherSheet
+            open={feedSheetOpen}
+            onOpenChange={setFeedSheetOpen}
+            onFeedSelect={handleFeedSelect}
+          />
 
           {showExplore ? (
             <main role="main" className="flex-1 overflow-y-auto">

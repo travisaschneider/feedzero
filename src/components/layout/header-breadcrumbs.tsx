@@ -1,3 +1,4 @@
+import { ChevronDown } from "lucide-react";
 import { useNavigate } from "react-router";
 import { decodeEntities } from "@/lib/decode-entities.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
@@ -14,10 +15,11 @@ import {
 
 interface HeaderBreadcrumbsProps {
   fallback?: string;
+  onTriggerClick?: () => void;
 }
 
 /** Breadcrumb trail showing current feed and article in the header. */
-export function HeaderBreadcrumbs({ fallback }: HeaderBreadcrumbsProps) {
+export function HeaderBreadcrumbs({ fallback, onTriggerClick }: HeaderBreadcrumbsProps) {
   const feeds = useFeedStore((s) => s.feeds);
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
   const selectedArticle = useArticleStore((s) => s.selectedArticle);
@@ -25,21 +27,38 @@ export function HeaderBreadcrumbs({ fallback }: HeaderBreadcrumbsProps) {
 
   const feed = feeds.find((f) => f.id === selectedFeedId);
   if (!feed) {
-    return fallback ? (
+    if (!fallback) return null;
+    return onTriggerClick ? (
+      <button
+        type="button"
+        className="text-sm font-medium truncate"
+        onClick={onTriggerClick}
+      >
+        {fallback}
+      </button>
+    ) : (
       <span className="text-sm font-medium truncate">{fallback}</span>
-    ) : null;
+    );
   }
+
+  const handleFeedClick = onTriggerClick ?? (() => navigate(`/feeds/${feed.id}`));
 
   return (
     <Breadcrumb className="min-w-0 flex-1">
       <BreadcrumbList className="flex-nowrap">
         <BreadcrumbItem className="shrink-0">
           <BreadcrumbLink
-            onClick={() => navigate(`/feeds/${feed.id}`)}
+            onClick={handleFeedClick}
             className="flex items-center gap-1.5 cursor-pointer"
           >
             <FeedFavicon siteUrl={feed.siteUrl} className="size-4 shrink-0" />
             <span className="truncate">{feed.title}</span>
+            {onTriggerClick && (
+              <ChevronDown
+                data-testid="feed-switcher-chevron"
+                className="size-3 shrink-0 text-muted-foreground"
+              />
+            )}
           </BreadcrumbLink>
         </BreadcrumbItem>
         {selectedArticle && (

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { HeaderBreadcrumbs } from "@/components/layout/header-breadcrumbs.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
@@ -132,5 +133,36 @@ describe("HeaderBreadcrumbs", () => {
     renderBreadcrumbs();
     const feedLink = screen.getByText("Example Feed");
     expect(feedLink.closest("a, [role='link'], button")).not.toBeNull();
+  });
+
+  describe("onTriggerClick prop", () => {
+    it("calls onTriggerClick when the feed breadcrumb is clicked", async () => {
+      const user = userEvent.setup();
+      const onTriggerClick = vi.fn();
+      useFeedStore.setState({ feeds: [FEED], selectedFeedId: "feed-1" });
+      render(<MemoryRouter><HeaderBreadcrumbs onTriggerClick={onTriggerClick} /></MemoryRouter>);
+      await user.click(screen.getByText("Example Feed").closest("[data-slot='breadcrumb-link']")!);
+      expect(onTriggerClick).toHaveBeenCalledOnce();
+    });
+
+    it("calls onTriggerClick when the fallback text is clicked", async () => {
+      const user = userEvent.setup();
+      const onTriggerClick = vi.fn();
+      render(<MemoryRouter><HeaderBreadcrumbs fallback="Articles" onTriggerClick={onTriggerClick} /></MemoryRouter>);
+      await user.click(screen.getByText("Articles"));
+      expect(onTriggerClick).toHaveBeenCalledOnce();
+    });
+
+    it("shows a ChevronDown affordance icon when onTriggerClick is provided", () => {
+      useFeedStore.setState({ feeds: [FEED], selectedFeedId: "feed-1" });
+      const { container } = render(<MemoryRouter><HeaderBreadcrumbs onTriggerClick={vi.fn()} /></MemoryRouter>);
+      expect(container.querySelector("[data-testid='feed-switcher-chevron']")).not.toBeNull();
+    });
+
+    it("does not show a ChevronDown icon when onTriggerClick is absent", () => {
+      useFeedStore.setState({ feeds: [FEED], selectedFeedId: "feed-1" });
+      const { container } = render(<MemoryRouter><HeaderBreadcrumbs /></MemoryRouter>);
+      expect(container.querySelector("[data-testid='feed-switcher-chevron']")).toBeNull();
+    });
   });
 });
