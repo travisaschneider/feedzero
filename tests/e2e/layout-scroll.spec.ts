@@ -41,11 +41,7 @@ async function setupFeedMobile(page: import("@playwright/test").Page) {
   // Sidebar closes automatically on mobile
   await expect(dialog).toBeHidden({ timeout: 5000 });
 
-  // On mobile, clicking a feed auto-selects the first article and shows the reader.
-  // Use Back button to go to the article list view.
-  await page.getByRole("button", { name: /back/i }).click();
-
-  // Article list should now be visible
+  // On mobile, tapping a feed lands on the article list (no auto-select).
   await expect(articleOption(page, "First Article")).toBeVisible({
     timeout: 10000,
   });

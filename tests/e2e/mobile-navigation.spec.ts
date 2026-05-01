@@ -25,8 +25,13 @@ test.describe("Mobile navigation", () => {
     await mockFeedEndpoint(page, SAMPLE_RSS);
     await addFeedViaUI(page, "https://example.com/feed");
 
-    // The app auto-selects the first article after adding a feed.
-    // Wait for the reader content to appear.
+    // After the feed is added the user lands on the article list (mobile
+    // does not auto-select the first article — the list is the destination,
+    // not a transient state). Tap the first article to enter the reader.
+    const articleListItem = page.locator('[role="option"]').first();
+    await articleListItem.waitFor({ state: "visible", timeout: 10000 });
+    await articleListItem.click();
+
     await expect(
       page.locator("article").first(),
     ).toBeVisible({ timeout: 10000 });
@@ -45,6 +50,11 @@ test.describe("Mobile navigation", () => {
     await mockFeedEndpoint(page, SAMPLE_RSS);
     await addFeedViaUI(page, "https://example.com/feed");
 
+    // Tap the first article to enter the reader (mobile no longer auto-selects).
+    const articleListItem = page.locator('[role="option"]').first();
+    await articleListItem.waitFor({ state: "visible", timeout: 10000 });
+    await articleListItem.click();
+
     // Wait for reader content
     await expect(
       page.locator("article").first(),
@@ -55,5 +65,56 @@ test.describe("Mobile navigation", () => {
     // main content flow.
     const backPill = page.locator('[data-testid="back-pill"]');
     await expect(backPill).toBeVisible({ timeout: 5000 });
+  });
+
+  test("tapping a feed lands on the article list, not the first article", async ({
+    page,
+  }) => {
+    // The architectural bias toward single-article view on mobile is fixed:
+    // selecting a feed should show the list, not skip into the reader.
+    await skipOnboarding(page);
+    await mockFeedEndpoint(page, SAMPLE_RSS);
+    await addFeedViaUI(page, "https://example.com/feed");
+
+    // URL must be /feeds/<id>, never /feeds/<id>/articles/<aid>.
+    await page.waitForURL(/\/feeds\/[^/]+$/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/feeds\/[^/]+$/);
+
+    // The article list is the visible mobile panel; the back pill is absent
+    // because we are not in the reader.
+    await expect(page.locator('[role="listbox"]')).toBeVisible();
+    await expect(
+      page.locator('[data-testid="back-pill"]'),
+    ).not.toBeVisible();
+  });
+
+  test("opening a new (unread) article shows it from the top, not mid-scroll", async ({
+    page,
+  }) => {
+    // After scrolling deep into article A and swiping/clicking to article B,
+    // article B must render at the top — not at the previous scroll offset.
+    await skipOnboarding(page);
+    await mockFeedEndpoint(page, SAMPLE_RSS);
+    await addFeedViaUI(page, "https://example.com/feed");
+
+    const items = page.locator('[role="option"]');
+    await items.first().waitFor({ state: "visible", timeout: 10000 });
+    await items.first().click();
+
+    const readerScroll = page.locator('[data-testid="reader-scroll-mobile"]');
+    await expect(readerScroll).toBeVisible({ timeout: 5000 });
+
+    // Scroll the reader part-way down, then return to the list and pick another.
+    await readerScroll.evaluate((el) => {
+      el.scrollTop = 600;
+    });
+    await page.locator('[data-testid="back-pill"]').click();
+
+    await items.nth(1).click();
+
+    // The new article must start at top.
+    await expect.poll(() =>
+      readerScroll.evaluate((el) => el.scrollTop),
+    ).toBe(0);
   });
 });

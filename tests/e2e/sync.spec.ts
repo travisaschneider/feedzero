@@ -298,7 +298,7 @@ test.describe("Sync", () => {
     });
   });
 
-  test("delete all data resets to explore page", async ({ feedPage: page }) => {
+  test("delete all data resets to All items article list", async ({ feedPage: page }) => {
     await addFeedForSync(page);
     await openSyncDialog(page);
     const dialog = page.getByRole("dialog");
@@ -314,9 +314,8 @@ test.describe("Sync", () => {
     // Confirm deletion
     await dialog.getByRole("button", { name: "Delete everything" }).click();
 
-    // Should reset the app — after auto-init, user lands on Explore page
-    await expect(page.getByText("Explore")).toBeVisible({
-      timeout: 15000,
-    });
+    // Should reset the app — after auto-init, user lands on /feeds/all
+    // (the All items article list, the new default landing).
+    await page.waitForURL(/\/feeds\/all/, { timeout: 15000 });
   });
 });

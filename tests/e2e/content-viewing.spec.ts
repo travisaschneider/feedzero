@@ -12,14 +12,20 @@ function articleOption(page: import("@playwright/test").Page, text: string) {
   return page.locator('[role="option"]', { hasText: text });
 }
 
-/** Adds a feed and selects it, waiting for articles to load. */
+/**
+ * Adds a feed, selects it, and opens the first article in the reader.
+ * Works on both desktop and mobile: desktop auto-selects the first article;
+ * mobile lands on the list, so we tap the first article ourselves.
+ */
 async function setupFeed(page: import("@playwright/test").Page) {
   await mockFeedEndpoint(page, SAMPLE_RSS);
   await addFeedViaUI(page, "https://example.com/feed");
   await selectFeedInSidebar(page, "Test Feed");
-  await expect(articleOption(page, "First Article")).toBeVisible({
-    timeout: 10000,
-  });
+  const firstArticle = articleOption(page, "First Article");
+  await expect(firstArticle).toBeVisible({ timeout: 10000 });
+  // Tap the first article. On desktop this is a no-op if it was auto-selected,
+  // but the click is idempotent. On mobile this opens the reader.
+  await firstArticle.click();
 }
 
 test.describe("Content viewing", () => {

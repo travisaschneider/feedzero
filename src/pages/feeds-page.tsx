@@ -36,16 +36,6 @@ const ExploreCatalog = lazy(() =>
 );
 
 /**
- * Returns the default feed ID to show when no feed is selected.
- * Whenever any feeds exist, the All items aggregated view is the landing
- * destination — users should always see their full stream first, regardless
- * of how many feeds they subscribe to.
- */
-function getDefaultFeedId(feeds: { id: string }[]): string | null {
-  return feeds.length === 0 ? null : ALL_FEEDS_ID;
-}
-
-/**
  * Listens for the feedzero:toggle-sidebar event and toggles the sidebar.
  * Must be rendered inside SidebarProvider.
  */
@@ -100,18 +90,17 @@ export function FeedsPage() {
   // Track whether user explicitly navigated back (to suppress auto-select)
   const skipAutoSelectRef = useRef(false);
 
-  // Auto-navigate to explore when no feeds exist, or to default feed when feeds exist
+  // Whenever no feedId is in the URL (and we're not explicitly on /explore),
+  // land on the All items article list. Even with zero feeds the list is the
+  // expected home — the auto-subscribe to the release notes feed populates
+  // it shortly, and Explore is reachable via the sidebar. Defaulting to
+  // Explore would otherwise make the app feel like a directory, not a reader.
   useEffect(() => {
     if (isExplorePage) return;
-    if (feeds.length === 0 && !feedId) {
-      navigate("/explore", { replace: true });
-    } else if (!feedId && feeds.length > 0) {
-      const defaultFeedId = getDefaultFeedId(feeds);
-      if (defaultFeedId) {
-        navigate(`/feeds/${defaultFeedId}`, { replace: true });
-      }
+    if (!feedId) {
+      navigate(`/feeds/${ALL_FEEDS_ID}`, { replace: true });
     }
-  }, [isExplorePage, feedId, feeds, navigate]);
+  }, [isExplorePage, feedId, navigate]);
 
   const isLoadingArticles = useArticleStore((s) => s.isLoading);
 
@@ -125,8 +114,11 @@ export function FeedsPage() {
     selectFeed(feedId);
     selectArticle(null);
     loadArticles(feedId).then(() => {
-      // After load, if no articleId in URL, auto-navigate to first article.
-      // Doing it here (instead of a separate effect) avoids a render gap.
+      // Only auto-select the first article on desktop, where the 3-panel
+      // layout would otherwise show an empty reader pane. On mobile the
+      // article list is a first-class destination — tapping a feed should
+      // land there, not skip past it into the reader.
+      if (!isDesktop) return;
       const { articles: loaded } = useArticleStore.getState();
       if (loaded.length > 0 && !articleId && !skipAutoSelectRef.current) {
         navigate(`/feeds/${feedId}/articles/${loaded[0].id}`, {
@@ -134,7 +126,7 @@ export function FeedsPage() {
         });
       }
     });
-  }, [feedId, selectFeed, selectArticle, loadArticles, articleId, navigate]);
+  }, [feedId, selectFeed, selectArticle, loadArticles, articleId, navigate, isDesktop]);
 
   // Article sync + auto-select (single effect replaces three cascading effects).
   // Waits until loading completes, then either syncs articleId from URL
@@ -147,12 +139,12 @@ export function FeedsPage() {
       if (current?.id === articleId) return;
       const article = articles.find((a) => a.id === articleId);
       if (article) selectArticle(article);
-    } else if (!skipAutoSelectRef.current) {
+    } else if (isDesktop && !skipAutoSelectRef.current) {
       navigate(`/feeds/${feedId}/articles/${articles[0].id}`, {
         replace: true,
       });
     }
-  }, [feedId, articleId, articles, isLoadingArticles, selectArticle, navigate]);
+  }, [feedId, articleId, articles, isLoadingArticles, selectArticle, navigate, isDesktop]);
 
   // Reset skip flag when user navigates to an article
   useEffect(() => {
@@ -176,7 +168,18 @@ export function FeedsPage() {
   // Scroll-snap: programmatically scroll to the reader panel when an
   // article is selected, and back to the list when the back pill is tapped.
   const snapContainerRef = useRef<HTMLDivElement>(null);
+  const readerScrollRef = useRef<HTMLDivElement>(null);
   const programmaticScrollRef = useRef(false);
+
+  // Reset the reader's vertical scroll to the top whenever the article
+  // changes. Without this, swiping to a new (unread) article would show its
+  // middle/bottom because the scroll position from the previous article
+  // persists on the same DOM element.
+  useEffect(() => {
+    if (!articleId) return;
+    const el = readerScrollRef.current;
+    if (el) el.scrollTop = 0;
+  }, [articleId]);
 
   /** Scroll the snap container to the reader (panel 2). */
   const scrollToReader = useCallback(() => {
@@ -264,8 +267,14 @@ export function FeedsPage() {
                 <ArticleList onArticleSelect={handleArticleSelect} />
               </main>
 
-              {/* Panel 2: Reader */}
-              <div className="shrink-0 w-full snap-start overflow-y-auto relative">
+              {/* Panel 2: Reader. pb-20 reserves space below the article so
+                  the floating back pill (bottom-6 + h-8) does not cover the
+                  last lines of content as the user scrolls to the end. */}
+              <div
+                ref={readerScrollRef}
+                data-testid="reader-scroll-mobile"
+                className="shrink-0 w-full snap-start overflow-y-auto relative pb-20"
+              >
                 <ReaderPanel />
                 {/* Floating back pill */}
                 {articleId && (

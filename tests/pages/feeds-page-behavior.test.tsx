@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, act } from "@testing-library/react";
-import { MemoryRouter, Routes, Route, useLocation } from "react-router";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter, Routes, Route, useLocation, useNavigate } from "react-router";
 import { FeedsPage } from "@/pages/feeds-page.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { useArticleStore, clearArticleCache } from "@/stores/article-store.ts";
@@ -74,6 +75,16 @@ function LocationCapture() {
   return null;
 }
 
+/** Test helper: a button that navigates to `to` when clicked. */
+function NavigateButton({ to, label }: { to: string; label: string }) {
+  const navigate = useNavigate();
+  return (
+    <button data-testid={`nav-to-${label}`} onClick={() => navigate(to)}>
+      {label}
+    </button>
+  );
+}
+
 function renderPage(route = "/feeds") {
   currentUrl = route;
   return render(
@@ -145,10 +156,15 @@ describe("FeedsPage behavior — desktop", () => {
     resetStores();
   });
 
-  it("shows explore catalog when there are no feeds", async () => {
+  it("shows explore catalog at /feeds when there are no feeds (desktop renders explore inline)", async () => {
     renderPage("/feeds");
 
-    // With no feeds, auto-redirects to /explore which shows the catalog
+    // Mobile redirects to /feeds/all (the ALL_FEEDS list, possibly empty).
+    // Desktop renders the explore catalog inline whenever feeds.length === 0,
+    // regardless of whether the URL is /feeds/all or /explore.
+    await vi.waitFor(() => {
+      expect(currentUrl).toBe(`/feeds/${ALL_FEEDS_ID}`);
+    });
     expect(await screen.findByRole("heading", { name: "Explore" })).toBeInTheDocument();
   });
 
@@ -284,11 +300,11 @@ describe("FeedsPage behavior — mobile", () => {
     resetStores();
   });
 
-  it("shows 'Feeds' in header at /feeds root", () => {
+  it("shows 'Articles' fallback in header at /feeds root after redirect", async () => {
     renderPage("/feeds");
-    // There are now two "Feeds" elements: one in header (fallback), one in sidebar group label
-    const feedsElements = screen.getAllByText("Feeds");
-    expect(feedsElements.length).toBeGreaterThanOrEqual(1);
+    // /feeds redirects to /feeds/all on mobile, so the header now reflects
+    // the article-list context (no feed match in store → "Articles" fallback).
+    expect(await screen.findByText("Articles")).toBeInTheDocument();
   });
 
   it("shows 'Articles' in header when feedId is present", () => {
@@ -303,10 +319,27 @@ describe("FeedsPage behavior — mobile", () => {
     expect(screen.getByText("Articles")).toBeInTheDocument();
   });
 
-  it("shows explore catalog when there are no feeds", async () => {
+  it("redirects /feeds to /feeds/all on mobile (article list, not explore)", async () => {
     renderPage("/feeds");
 
-    expect(await screen.findByRole("heading", { name: "Explore" })).toBeInTheDocument();
+    // Mobile lands on the All items article list — even when feeds is empty.
+    // The user reaches Explore via the sidebar, not as an unsolicited landing page.
+    await vi.waitFor(() => {
+      expect(currentUrl).toBe(`/feeds/${ALL_FEEDS_ID}`);
+    });
+  });
+
+  it("does NOT auto-navigate to first article when feed has articles (mobile)", async () => {
+    const articles = [makeArticle("art-1"), makeArticle("art-2")];
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+    useArticleStore.setState({ articles });
+
+    renderPage("/feeds/feed-1");
+
+    // On mobile, tapping a feed should land on the article list, not the
+    // first article. Wait long enough for any pending auto-nav to fire.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(currentUrl).toBe("/feeds/feed-1");
   });
 
   it("floating back pill is present when viewing an article", () => {
@@ -317,6 +350,23 @@ describe("FeedsPage behavior — mobile", () => {
     const pill = container.querySelector("[data-testid='back-pill']");
     expect(pill).not.toBeNull();
     expect(pill!.textContent).toContain("Back");
+  });
+
+  it("reader scroll container reserves bottom space so the back pill does not cover content", () => {
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+    useArticleStore.setState({
+      articles: [makeArticle("art-1")],
+      selectedArticle: makeArticle("art-1"),
+    });
+    const { container } = renderPage("/feeds/feed-1/articles/art-1");
+
+    // The reader's mobile scroll panel must reserve bottom padding for the
+    // fixed back pill so the last paragraph isn't hidden behind it.
+    const readerScroll = container.querySelector(
+      "[data-testid='reader-scroll-mobile']",
+    );
+    expect(readerScroll).not.toBeNull();
+    expect(readerScroll!.className).toMatch(/\bpb-(20|24|28|32)\b/);
   });
 
   it("back pill is not present on article list (no articleId in URL)", () => {
@@ -332,6 +382,54 @@ describe("FeedsPage behavior — mobile", () => {
 
     const pill = container.querySelector("[data-testid='back-pill']");
     expect(pill).toBeNull();
+  });
+
+  it("resets reader scroll position to top when articleId changes (mobile)", async () => {
+    const user = userEvent.setup();
+    useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
+    const a1 = makeArticle("art-1");
+    const a2 = makeArticle("art-2");
+    useArticleStore.setState({
+      articles: [a1, a2],
+      selectedArticle: a1,
+    });
+
+    const { container } = render(
+      <MemoryRouter initialEntries={["/feeds/feed-1/articles/art-1"]}>
+        <NavigateButton to="/feeds/feed-1/articles/art-2" label="next" />
+        <Routes>
+          <Route
+            path="/feeds/:feedId/articles/:articleId"
+            element={
+              <>
+                <FeedsPage />
+                <LocationCapture />
+              </>
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const readerScroll = container.querySelector(
+      "[data-testid='reader-scroll-mobile']",
+    ) as HTMLElement;
+    expect(readerScroll).not.toBeNull();
+
+    // Simulate the user having scrolled down inside the reader.
+    readerScroll.scrollTop = 500;
+    expect(readerScroll.scrollTop).toBe(500);
+
+    // Trigger a real route change — same as a swipe-driven URL update.
+    await user.click(screen.getByTestId("nav-to-next"));
+
+    // After the article changes, the reader scroll panel must be back at the top.
+    await vi.waitFor(() => {
+      const after = container.querySelector(
+        "[data-testid='reader-scroll-mobile']",
+      ) as HTMLElement;
+      expect(after.scrollTop).toBe(0);
+    });
   });
 
   it("mobile header is present with sidebar trigger", () => {

@@ -13,6 +13,13 @@ interface FeedbackBody {
 
 const MAX_MESSAGE_LENGTH = 2000;
 
+/**
+ * HTTP methods this handler accepts. Used by the routing contract test in
+ * server.test.ts to enforce that the Hono server, the Vercel wrapper, and
+ * the shared handler all agree on which methods are supported.
+ */
+export const SUPPORTED_METHODS: readonly string[] = ["POST"];
+
 export async function handleFeedbackRequest(
   request: Request,
 ): Promise<Response> {

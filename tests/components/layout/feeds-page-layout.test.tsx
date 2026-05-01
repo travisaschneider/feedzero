@@ -209,8 +209,11 @@ describe("FeedsPage layout — mobile", () => {
     expect(main).not.toBeNull();
   });
 
-  it("main has flex-1 and overflow-y-auto for scrollable content", () => {
-    const { container } = renderPage();
+  it("main has flex-1 and overflow-y-auto on the explore route", () => {
+    // Explore is the only mobile layout where <main> is the sole scrollable
+    // container. The default /feeds path now redirects to /feeds/all and
+    // renders the scroll-snap list/reader pair instead of a single main.
+    const { container } = renderPage("/explore");
     const main = container.querySelector("[role='main']");
     expect(main).not.toBeNull();
     expect(main!.className).toContain("flex-1");

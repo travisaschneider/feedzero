@@ -3,10 +3,12 @@ import { createApp } from "../server";
 import { SUPPORTED_METHODS } from "../src/core/sync/sync-handler";
 import { SUPPORTED_METHODS as PROXY_SUPPORTED_METHODS } from "../src/core/proxy/proxy-handler";
 import { SUPPORTED_METHODS as CATALOG_SUPPORTED_METHODS } from "../src/core/catalog/catalog-handler";
+import { SUPPORTED_METHODS as FEEDBACK_SUPPORTED_METHODS } from "../src/core/feedback/feedback-handler";
 import * as vercelSyncExports from "../api/sync";
 import * as vercelFeedExports from "../api/feed";
 import * as vercelPageExports from "../api/page";
 import * as vercelCatalogExports from "../api/catalog";
+import * as vercelFeedbackExports from "../api/feedback";
 
 // Mock fetch globally for proxy handler tests
 const mockFetch = vi.fn();
@@ -428,6 +430,140 @@ describe("server", () => {
           `Hono server returned 405 for ${method} /api/feed`,
         ).not.toBe(405);
       }
+    });
+  });
+
+  describe("feedback endpoint", () => {
+    const ORIGINAL_ENV = { ...process.env };
+    beforeEach(() => {
+      process.env = { ...ORIGINAL_ENV };
+    });
+
+    it("returns 503 when GitLab credentials are not configured", async () => {
+      delete process.env.GITLAB_FEEDBACK_TOKEN;
+      delete process.env.GITLAB_PROJECT_ID;
+
+      const res = await createApp().request("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "hello" }),
+      });
+
+      expect(res.status).toBe(503);
+      const data = await res.json();
+      expect(data.ok).toBe(false);
+      expect(data.error).toMatch(/not configured/i);
+    });
+
+    it("returns 400 when message is missing", async () => {
+      process.env.GITLAB_FEEDBACK_TOKEN = "fake-token";
+      process.env.GITLAB_PROJECT_ID = "12345";
+
+      const res = await createApp().request("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+
+      expect(res.status).toBe(400);
+      const data = await res.json();
+      expect(data.ok).toBe(false);
+      expect(data.error).toMatch(/required/i);
+    });
+
+    it("posts a GitLab issue and returns ok when credentials are valid", async () => {
+      process.env.GITLAB_FEEDBACK_TOKEN = "fake-token";
+      process.env.GITLAB_PROJECT_ID = "12345";
+
+      // The handler reads URL string + RequestInit, so match accordingly.
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({ iid: 1 }), {
+          status: 201,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+
+      const res = await createApp().request("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "Great app!" }),
+      });
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.ok).toBe(true);
+
+      // Verify it called the GitLab issues API with the right payload
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining("/api/v4/projects/12345/issues"),
+        expect.objectContaining({
+          method: "POST",
+          headers: expect.objectContaining({
+            "PRIVATE-TOKEN": "fake-token",
+          }),
+        }),
+      );
+    });
+
+    it("rejects non-POST methods (Hono returns 404 for unregistered method)", async () => {
+      const res = await createApp().request("/api/feedback", {
+        method: "GET",
+      });
+      // Hono only registered POST for /api/feedback, so a GET hits the
+      // 404 "Not Found" path rather than reaching the handler's 405 branch.
+      expect([404, 405]).toContain(res.status);
+    });
+  });
+
+  describe("feedback routing contract", () => {
+    it("FEEDBACK_SUPPORTED_METHODS lists POST", () => {
+      expect(FEEDBACK_SUPPORTED_METHODS).toContain("POST");
+    });
+
+    it("Vercel api/feedback.ts exports a handler for every supported method", () => {
+      for (const method of FEEDBACK_SUPPORTED_METHODS) {
+        expect(
+          vercelFeedbackExports,
+          `api/feedback.ts is missing export for ${method}`,
+        ).toHaveProperty(method);
+        expect(
+          typeof (vercelFeedbackExports as Record<string, unknown>)[method],
+        ).toBe("function");
+      }
+    });
+
+    it("Vercel api/feedback.ts does not export unsupported methods", () => {
+      const allHttpMethods = [
+        "GET",
+        "POST",
+        "PUT",
+        "PATCH",
+        "DELETE",
+        "HEAD",
+        "OPTIONS",
+      ];
+      const unsupported = allHttpMethods.filter(
+        (m) => !FEEDBACK_SUPPORTED_METHODS.includes(m),
+      );
+      for (const method of unsupported) {
+        expect(
+          vercelFeedbackExports,
+          `api/feedback.ts should not export ${method}`,
+        ).not.toHaveProperty(method);
+      }
+    });
+
+    it("Hono server accepts POST /api/feedback", async () => {
+      const app = createApp();
+      const res = await app.request("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "test" }),
+      });
+      // Endpoint is registered: status is whatever the handler returns,
+      // not 404 (route missing) or 405 (method not allowed).
+      expect(res.status).not.toBe(404);
+      expect(res.status).not.toBe(405);
     });
   });
 
