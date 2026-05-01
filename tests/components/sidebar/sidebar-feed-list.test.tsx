@@ -148,6 +148,24 @@ describe("SidebarFeedList", () => {
     expect(screen.getByTestId("auto-organize-pill")).toBeInTheDocument();
   });
 
+  it("auto-organize pill appears after folder items (at the bottom)", () => {
+    const feeds = Array.from({ length: 12 }, (_, i) =>
+      mockFeed(`f${i}`, `Feed ${i}`),
+    );
+    useFeedStore.setState({ feeds, folders: [], selectedFeedId: null });
+
+    const { container } = renderList();
+
+    // The pill must come AFTER all feed items in the DOM
+    const allItems = container.querySelectorAll("[data-sidebar='menu-item']");
+    const pill = screen.getByTestId("auto-organize-pill");
+    const lastItem = allItems[allItems.length - 1];
+    // pill should follow the last menu-item in document order
+    expect(
+      lastItem.compareDocumentPosition(pill) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it("does NOT render the auto-organize pill with few feeds", () => {
     useFeedStore.setState({
       feeds: [mockFeed("f1", "Only Feed")],
@@ -239,6 +257,85 @@ describe("SidebarFeedList", () => {
           "group-has-[[data-state=open]]/menu-item:opacity-0",
         );
       }
+    });
+  });
+
+  describe("sort mode", () => {
+    beforeEach(() => {
+      useFeedStore.setState({ feedSortMode: "name", feedCustomOrder: [], folderCustomOrder: [] });
+    });
+
+    it("renders a sort toggle button", () => {
+      useFeedStore.setState({
+        feeds: [mockFeed("f1", "Alpha"), mockFeed("f2", "Beta")],
+        folders: [],
+        selectedFeedId: null,
+        feedSortMode: "name",
+        feedCustomOrder: [],
+        folderCustomOrder: [],
+      });
+
+      renderList();
+
+      expect(screen.getByTestId("sort-toggle")).toBeInTheDocument();
+    });
+
+    it("in count mode renders feeds with higher unread counts first", () => {
+      useFeedStore.setState({
+        feeds: [
+          mockFeed("f1", "Alpha"), // 2 unread
+          mockFeed("f2", "Beta"),  // 10 unread
+          mockFeed("f3", "Gamma"), // 0 unread
+        ],
+        folders: [],
+        selectedFeedId: null,
+        feedSortMode: "count",
+        feedCustomOrder: [],
+        folderCustomOrder: [],
+      });
+      useArticleStore.setState({
+        articlesByFeedId: {
+          f1: unreadArticles("f1", 2),
+          f2: unreadArticles("f2", 10),
+          f3: [],
+        },
+      });
+
+      const { container } = renderList();
+
+      const buttons = container.querySelectorAll("[data-sidebar='menu-button']");
+      const titles = Array.from(buttons).map((b) => b.textContent?.trim()).filter(Boolean);
+      const betaIdx = titles.findIndex((t) => t?.includes("Beta"));
+      const alphaIdx = titles.findIndex((t) => t?.includes("Alpha"));
+      const gammaIdx = titles.findIndex((t) => t?.includes("Gamma"));
+      // Beta (10) before Alpha (2) before Gamma (0)
+      expect(betaIdx).toBeLessThan(alphaIdx);
+      expect(alphaIdx).toBeLessThan(gammaIdx);
+    });
+
+    it("in custom mode renders feeds in the stored custom order", () => {
+      useFeedStore.setState({
+        feeds: [
+          mockFeed("f1", "Alpha"),
+          mockFeed("f2", "Beta"),
+          mockFeed("f3", "Gamma"),
+        ],
+        folders: [],
+        selectedFeedId: null,
+        feedSortMode: "custom",
+        feedCustomOrder: ["f3", "f1", "f2"],
+        folderCustomOrder: [],
+      });
+
+      const { container } = renderList();
+
+      const buttons = container.querySelectorAll("[data-sidebar='menu-button']");
+      const titles = Array.from(buttons).map((b) => b.textContent?.trim()).filter(Boolean);
+      const gammaIdx = titles.findIndex((t) => t?.includes("Gamma"));
+      const alphaIdx = titles.findIndex((t) => t?.includes("Alpha"));
+      const betaIdx = titles.findIndex((t) => t?.includes("Beta"));
+      expect(gammaIdx).toBeLessThan(alphaIdx);
+      expect(alphaIdx).toBeLessThan(betaIdx);
     });
   });
 });

@@ -17,8 +17,8 @@ import {
 } from "../core/feeds/feed-service.ts";
 import { useSyncStore } from "./sync-store.ts";
 import { useArticleStore } from "./article-store.ts";
-import { CHANGELOG_FEED_URL } from "../utils/constants.ts";
-import type { Feed, Folder } from "../types/index.ts";
+import { CHANGELOG_FEED_URL, LOCAL_STORAGE } from "../utils/constants.ts";
+import type { Feed, Folder, FeedSortMode } from "../types/index.ts";
 import type { Result } from "../utils/result.ts";
 
 /** Whether a feed is the official FeedZero release notes feed. */
@@ -45,6 +45,9 @@ interface FeedStore {
   isRefreshingAll: boolean;
   refreshingFeedIds: Set<string>;
   error: string | null;
+  feedSortMode: FeedSortMode;
+  feedCustomOrder: string[];
+  folderCustomOrder: string[];
   loadFeeds: () => Promise<void>;
   addFeed: (url: string) => Promise<Result<void>>;
   removeFeed: (feedId: string) => Promise<void>;
@@ -60,6 +63,25 @@ interface FeedStore {
   applyAutoOrganize: (
     plan: { folderName: string; feedIds: string[] }[],
   ) => Promise<void>;
+  setFeedSortMode: (mode: FeedSortMode) => void;
+  reorderFeeds: (orderedIds: string[]) => void;
+  reorderFolders: (orderedIds: string[]) => void;
+}
+
+function readSortMode(): FeedSortMode {
+  try {
+    const v = localStorage.getItem(LOCAL_STORAGE.FEED_SORT_MODE);
+    if (v === "name" || v === "count" || v === "custom") return v;
+  } catch { /* localStorage unavailable */ }
+  return "name";
+}
+
+function readJsonArray(key: string): string[] {
+  try {
+    const v = localStorage.getItem(key);
+    if (v) return JSON.parse(v) as string[];
+  } catch { /* ignore */ }
+  return [];
 }
 
 export const useFeedStore = create<FeedStore>((set, get) => ({
@@ -70,6 +92,9 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   isRefreshingAll: false,
   refreshingFeedIds: new Set(),
   error: null,
+  feedSortMode: readSortMode(),
+  feedCustomOrder: readJsonArray(LOCAL_STORAGE.FEED_CUSTOM_ORDER),
+  folderCustomOrder: readJsonArray(LOCAL_STORAGE.FOLDER_CUSTOM_ORDER),
 
   loadFeeds: async () => {
     const [feedsResult, foldersResult] = await Promise.all([getFeeds(), dbGetFolders()]);
@@ -230,6 +255,21 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     const allFeeds = await getFeeds();
     if (allFeeds.ok) set({ feeds: sortFeeds(allFeeds.value) });
     useSyncStore.getState().scheduleSyncPush();
+  },
+
+  setFeedSortMode: (mode) => {
+    try { localStorage.setItem(LOCAL_STORAGE.FEED_SORT_MODE, mode); } catch { /* ignore */ }
+    set({ feedSortMode: mode });
+  },
+
+  reorderFeeds: (orderedIds) => {
+    try { localStorage.setItem(LOCAL_STORAGE.FEED_CUSTOM_ORDER, JSON.stringify(orderedIds)); } catch { /* ignore */ }
+    set({ feedCustomOrder: orderedIds });
+  },
+
+  reorderFolders: (orderedIds) => {
+    try { localStorage.setItem(LOCAL_STORAGE.FOLDER_CUSTOM_ORDER, JSON.stringify(orderedIds)); } catch { /* ignore */ }
+    set({ folderCustomOrder: orderedIds });
   },
 
   /**

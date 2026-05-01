@@ -3,6 +3,17 @@ import { useFeedStore, selectFeedsById } from "../../src/stores/feed-store.ts";
 import { useArticleStore } from "../../src/stores/article-store.ts";
 import { useSyncStore } from "../../src/stores/sync-store.ts";
 
+const localStorageMock = (() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: vi.fn((key: string) => store[key] ?? null),
+    setItem: vi.fn((key: string, value: string) => { store[key] = value; }),
+    removeItem: vi.fn((key: string) => { delete store[key]; }),
+    clear: vi.fn(() => { store = {}; }),
+  };
+})();
+Object.defineProperty(globalThis, "localStorage", { value: localStorageMock, writable: true });
+
 vi.mock("../../src/core/storage/db.ts", () => ({
   getFeeds: vi.fn(),
   getFeed: vi.fn(),
@@ -651,6 +662,52 @@ describe("feed-store", () => {
       const byId = selectFeedsById(useFeedStore.getState());
 
       expect(byId).toEqual({});
+    });
+  });
+
+  describe("feed sort mode", () => {
+    const LS_SORT_MODE = "feedzero:feed-sort-mode";
+    const LS_FEED_ORDER = "feedzero:feed-custom-order";
+    const LS_FOLDER_ORDER = "feedzero:folder-custom-order";
+
+    beforeEach(() => {
+      localStorageMock.clear();
+      // Re-initialize sort mode from now-empty storage
+      useFeedStore.setState({ feedSortMode: "name", feedCustomOrder: [], folderCustomOrder: [] });
+    });
+
+    it("defaults to 'name' sort mode", () => {
+      expect(useFeedStore.getState().feedSortMode).toBe("name");
+    });
+
+    it("setFeedSortMode updates state", () => {
+      useFeedStore.getState().setFeedSortMode("count");
+      expect(useFeedStore.getState().feedSortMode).toBe("count");
+    });
+
+    it("setFeedSortMode persists to localStorage", () => {
+      useFeedStore.getState().setFeedSortMode("custom");
+      expect(localStorage.getItem(LS_SORT_MODE)).toBe("custom");
+    });
+
+    it("reorderFeeds updates feedCustomOrder", () => {
+      useFeedStore.getState().reorderFeeds(["f3", "f1", "f2"]);
+      expect(useFeedStore.getState().feedCustomOrder).toEqual(["f3", "f1", "f2"]);
+    });
+
+    it("reorderFeeds persists to localStorage as JSON", () => {
+      useFeedStore.getState().reorderFeeds(["f2", "f1"]);
+      expect(localStorage.getItem(LS_FEED_ORDER)).toBe(JSON.stringify(["f2", "f1"]));
+    });
+
+    it("reorderFolders updates folderCustomOrder", () => {
+      useFeedStore.getState().reorderFolders(["folder-b", "folder-a"]);
+      expect(useFeedStore.getState().folderCustomOrder).toEqual(["folder-b", "folder-a"]);
+    });
+
+    it("reorderFolders persists to localStorage as JSON", () => {
+      useFeedStore.getState().reorderFolders(["folder-b", "folder-a"]);
+      expect(localStorage.getItem(LS_FOLDER_ORDER)).toBe(JSON.stringify(["folder-b", "folder-a"]));
     });
   });
 });

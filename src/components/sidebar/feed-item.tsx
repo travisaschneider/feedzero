@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { MoreHorizontal, Pencil, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import { useDraggable } from "@dnd-kit/core";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useArticleStore, selectUnreadCount } from "@/stores/article-store.ts";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import { FeedFavicon } from "@/components/feeds/feed-favicon.tsx";
@@ -22,12 +24,14 @@ interface FeedItemProps {
   feed: Feed;
   isSelected: boolean;
   inFolder?: boolean;
+  /** When true, uses @dnd-kit/sortable for reorder-in-place behavior. */
+  sortable?: boolean;
   onSelect: () => void;
   onRemove: () => void;
   onReload: () => void;
 }
 
-export function FeedItem({ feed, isSelected, inFolder = false, onSelect, onRemove, onReload }: FeedItemProps) {
+export function FeedItem({ feed, isSelected, inFolder = false, sortable = false, onSelect, onRemove, onReload }: FeedItemProps) {
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const unreadCount = useArticleStore((s) => selectUnreadCount(s, feed.id));
@@ -38,7 +42,17 @@ export function FeedItem({ feed, isSelected, inFolder = false, onSelect, onRemov
   const moveFeedToFolder = useFeedStore((s) => s.moveFeedToFolder);
   const isRefreshing = refreshingFeedIds.has(feed.id);
 
-  const { listeners, setNodeRef, isDragging } = useDraggable({ id: feed.id });
+  // Both hooks are always called (hooks must not be conditional).
+  // Only one is active at a time: disabled=true keeps the hook from registering.
+  const draggable = useDraggable({ id: feed.id, disabled: sortable });
+  const sortableHook = useSortable({ id: feed.id, disabled: !sortable });
+
+  const dragRef = sortable ? sortableHook.setNodeRef : draggable.setNodeRef;
+  const dragListeners = sortable ? sortableHook.listeners : draggable.listeners;
+  const isDragging = sortable ? sortableHook.isDragging : draggable.isDragging;
+  const sortStyle: React.CSSProperties = sortable && sortableHook.transform
+    ? { transform: CSS.Transform.toString(sortableHook.transform), transition: sortableHook.transition }
+    : {};
 
   function handleStartRename() {
     setRenameValue(feed.title);
@@ -53,10 +67,10 @@ export function FeedItem({ feed, isSelected, inFolder = false, onSelect, onRemov
 
   return (
     <SidebarMenuItem
-      ref={setNodeRef}
-      style={{ opacity: isDragging ? 0.4 : 1 }}
+      ref={dragRef}
+      style={{ opacity: isDragging ? 0.4 : 1, ...sortStyle }}
       className={inFolder ? "pl-4" : ""}
-      {...listeners}
+      {...dragListeners}
     >
       {isRenaming ? (
         <form className="flex items-center gap-2 px-2 py-1" onSubmit={handleSubmitRename}>

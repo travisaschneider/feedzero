@@ -37,6 +37,8 @@ export interface CreateFeedInput {
   siteUrl?: string;
 }
 
+export type FeedSortMode = "name" | "count" | "custom";
+
 export interface CreateArticleInput {
   feedId: string;
   title: string;

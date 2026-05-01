@@ -65,6 +65,10 @@ export const LOCAL_STORAGE = {
   ONBOARDING_COMPLETE: "feedzero:onboarding-complete",
   STORAGE_MODE: "feedzero:storage-mode",
   DERIVED_KEYS: "feedzero:derived-keys",
+  FEED_SORT_MODE: "feedzero:feed-sort-mode",
+  FEED_CUSTOM_ORDER: "feedzero:feed-custom-order",
+  FOLDER_CUSTOM_ORDER: "feedzero:folder-custom-order",
+  AUTO_ORGANIZE_DISMISSED_COUNT: "feedzero:auto-organize-dismissed-count",
 } as const;
 
 const textEncoder = new TextEncoder();
