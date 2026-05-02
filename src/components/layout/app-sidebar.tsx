@@ -1,17 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate, useLocation } from "react-router";
 import {
   ChevronsUpDown,
-  Cloud,
   Compass,
-  Keyboard,
   Layers,
-  Loader2,
-  MessageSquare,
   RefreshCw,
   Settings,
-  Sparkles,
-  Wand2,
   X,
 } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
@@ -23,12 +17,6 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip.tsx";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu.tsx";
 import {
   Sidebar,
   SidebarContent,
@@ -44,13 +32,10 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar.tsx";
 import { useSyncStore } from "@/stores/sync-store.ts";
-import { Switch } from "@/components/ui/switch.tsx";
-import { KeyboardShortcutsDialog } from "@/components/layout/keyboard-shortcuts-dialog.tsx";
-import { FeedbackDialog } from "@/components/feedback/feedback-dialog.tsx";
-import { AutoOrganizeDialog } from "@/components/folders/auto-organize-dialog.tsx";
 import { CHANGELOG_FEED_URL } from "@/utils/constants.ts";
 import { Kbd } from "@/components/ui/kbd.tsx";
 import { useIsOnline } from "@/hooks/use-online.ts";
+import { SettingsMenu } from "@/components/settings/settings-menu.tsx";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onFeedSelect?: (feedId: string) => void;
@@ -94,118 +79,34 @@ function SyncBadge({ status, isOnline }: { status: string; isOnline: boolean }) 
 
 function SidebarFooterMenu({ hasFeeds, onWhatsNew }: { hasFeeds: boolean; onWhatsNew: () => void }) {
   const syncStatus = useSyncStore((s) => s.status);
-  const setSyncDialogOpen = useSyncStore((s) => s.setDialogOpen);
   const isOnline = useIsOnline();
-  const [shortcutsOpen, setShortcutsOpen] = useState(false);
-  const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const [autoOrganizeOpen, setAutoOrganizeOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const handleWhatsNew = onWhatsNew;
-
-  const isSyncOn = syncStatus === "synced" || syncStatus === "syncing";
-  const isSyncing = syncStatus === "syncing";
-  const canSync = hasFeeds;
-
-  // Listen for Cmd/Ctrl+, to open settings dropdown
-  useEffect(() => {
-    const handler = () => setMenuOpen(true);
-    document.addEventListener("feedzero:open-settings", handler);
-    return () =>
-      document.removeEventListener("feedzero:open-settings", handler);
-  }, []);
 
   return (
-    <>
-      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-        <DropdownMenuTrigger asChild>
-          <SidebarMenuButton
-            size="lg"
-            className="group/settings py-3 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-          >
-            <div className="flex items-center justify-center size-8 rounded-lg bg-muted text-muted-foreground">
-              <Settings className="size-4" />
-            </div>
-            <div className="grid flex-1 text-left text-sm leading-tight">
-              <span className="truncate font-semibold">Settings</span>
-              <span className="flex items-center gap-1.5 mt-0.5">
-                <SyncBadge status={syncStatus} isOnline={isOnline} />
-                <Kbd className="h-4 text-[9px] px-1 opacity-0 group-hover/settings:opacity-100 transition-opacity">{settingsShortcutLabel}</Kbd>
-              </span>
-            </div>
-            <ChevronsUpDown className="ml-auto size-4" />
-          </SidebarMenuButton>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
-          side="top"
-          align="end"
-          sideOffset={4}
+    <SettingsMenu
+      hasFeeds={hasFeeds}
+      onWhatsNew={onWhatsNew}
+      side="top"
+      align="end"
+      contentClassName="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
+      trigger={
+        <SidebarMenuButton
+          size="lg"
+          className="group/settings py-3 data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
         >
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <DropdownMenuItem
-                disabled={!canSync && !isSyncOn}
-                onSelect={(e) => {
-                  e.preventDefault();
-                  if (canSync || isSyncOn) setSyncDialogOpen(true);
-                }}
-              >
-                <div className="flex items-center gap-2 flex-1">
-                  {isSyncing ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Cloud className="size-4" />
-                  )}
-                  <span>Cloud sync</span>
-                </div>
-                <Switch
-                  size="sm"
-                  checked={isSyncOn}
-                  disabled={!canSync && !isSyncOn}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (canSync || isSyncOn) setSyncDialogOpen(true);
-                  }}
-                />
-              </DropdownMenuItem>
-            </TooltipTrigger>
-            {!canSync && !isSyncOn && (
-              <TooltipContent side="left">
-                Add a feed first to enable sync
-              </TooltipContent>
-            )}
-          </Tooltip>
-          {hasFeeds && (
-            <DropdownMenuItem onSelect={() => setAutoOrganizeOpen(true)}>
-              <Wand2 className="size-4" />
-              <span>Auto-organize feeds</span>
-            </DropdownMenuItem>
-          )}
-          <DropdownMenuItem onSelect={() => setShortcutsOpen(true)}>
-            <Keyboard className="size-4" />
-            <span>Keyboard shortcuts</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => setFeedbackOpen(true)}>
-            <MessageSquare className="size-4" />
-            <span>Send feedback</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={handleWhatsNew}>
-            <Sparkles className="size-4" />
-            <span>What&apos;s new</span>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      <KeyboardShortcutsDialog
-        open={shortcutsOpen}
-        onOpenChange={setShortcutsOpen}
-      />
-      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
-      <AutoOrganizeDialog
-        open={autoOrganizeOpen}
-        onOpenChange={setAutoOrganizeOpen}
-      />
-    </>
+          <div className="flex items-center justify-center size-8 rounded-lg bg-muted text-muted-foreground">
+            <Settings className="size-4" />
+          </div>
+          <div className="grid flex-1 text-left text-sm leading-tight">
+            <span className="truncate font-semibold">Settings</span>
+            <span className="flex items-center gap-1.5 mt-0.5">
+              <SyncBadge status={syncStatus} isOnline={isOnline} />
+              <Kbd className="h-4 text-[9px] px-1 opacity-0 group-hover/settings:opacity-100 transition-opacity">{settingsShortcutLabel}</Kbd>
+            </span>
+          </div>
+          <ChevronsUpDown className="ml-auto size-4" />
+        </SidebarMenuButton>
+      }
+    />
   );
 }
 

@@ -134,6 +134,21 @@ describe("MobileNavDrawer", () => {
     expect(safeAreaPadded!.className).toContain("safe-area-inset-bottom");
   });
 
+  it("tapping Settings opens a menu with all settings options (not just sync)", async () => {
+    const user = userEvent.setup();
+    useFeedStore.setState({ feeds: [makeFeed("f1", "Test Feed")] });
+    renderDrawer();
+    await user.click(screen.getByRole("button", { name: "Open feed list" }));
+    await user.click(await screen.findByText("Settings"));
+
+    // The full settings menu — same items as the desktop sidebar footer
+    expect(await screen.findByText("Cloud sync")).toBeInTheDocument();
+    expect(screen.getByText("Auto-organize feeds")).toBeInTheDocument();
+    expect(screen.getByText("Keyboard shortcuts")).toBeInTheDocument();
+    expect(screen.getByText("Send feedback")).toBeInTheDocument();
+    expect(screen.getByText(/What.*new/)).toBeInTheDocument();
+  });
+
   it("toggles open when feedzero:toggle-sidebar event is dispatched", async () => {
     const { container } = renderDrawer();
     const doc = container.ownerDocument;

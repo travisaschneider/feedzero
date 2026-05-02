@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router";
 import { ChevronUp, Layers, Settings } from "lucide-react";
 import { Drawer } from "vaul";
 import { useFeedStore } from "@/stores/feed-store.ts";
-import { useSyncStore } from "@/stores/sync-store.ts";
-import { ALL_FEEDS_ID } from "@/utils/constants.ts";
+import { ALL_FEEDS_ID, CHANGELOG_FEED_URL } from "@/utils/constants.ts";
 import {
   SidebarProvider,
   SidebarMenu,
@@ -12,6 +12,7 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar.tsx";
 import { SidebarFeedList } from "@/components/sidebar/sidebar-feed-list.tsx";
+import { SettingsMenu } from "@/components/settings/settings-menu.tsx";
 
 interface MobileNavDrawerProps {
   onFeedSelect: (feedId: string) => void;
@@ -21,7 +22,8 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
   const [open, setOpen] = useState(false);
   const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
   const feeds = useFeedStore((s) => s.feeds);
-  const setSyncDialogOpen = useSyncStore((s) => s.setDialogOpen);
+  const addFeed = useFeedStore((s) => s.addFeed);
+  const navigate = useNavigate();
 
   useEffect(() => {
     function handleToggle() {
@@ -34,6 +36,23 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
   function handleSelect(feedId: string) {
     onFeedSelect(feedId);
     setOpen(false);
+  }
+
+  async function handleWhatsNew() {
+    const existing = feeds.find((f) => f.url === CHANGELOG_FEED_URL);
+    if (existing) {
+      handleSelect(existing.id);
+      navigate(`/feeds/${existing.id}`);
+      return;
+    }
+    try {
+      await addFeed(CHANGELOG_FEED_URL);
+      const added = useFeedStore.getState().feeds.find((f) => f.url === CHANGELOG_FEED_URL);
+      if (added) {
+        handleSelect(added.id);
+        navigate(`/feeds/${added.id}`);
+      }
+    } catch { /* noop */ }
   }
 
   const activeFeed = feeds.find((f) => f.id === selectedFeedId);
@@ -103,10 +122,18 @@ export function MobileNavDrawer({ onFeedSelect }: MobileNavDrawerProps) {
               <div className="border-t mt-2 px-2 py-2">
                 <SidebarMenu>
                   <SidebarMenuItem>
-                    <SidebarMenuButton onClick={() => { setSyncDialogOpen(true); setOpen(false); }}>
-                      <Settings className="size-4" />
-                      <span>Settings</span>
-                    </SidebarMenuButton>
+                    <SettingsMenu
+                      hasFeeds={feeds.length > 0}
+                      onWhatsNew={handleWhatsNew}
+                      side="top"
+                      align="start"
+                      trigger={
+                        <SidebarMenuButton>
+                          <Settings className="size-4" />
+                          <span>Settings</span>
+                        </SidebarMenuButton>
+                      }
+                    />
                   </SidebarMenuItem>
                 </SidebarMenu>
               </div>
