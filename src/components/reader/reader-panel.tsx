@@ -102,7 +102,7 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
           size="sm"
           className={cn(
             "min-w-0 flex items-center gap-1 justify-start rounded-full shadow-md bg-background/95 backdrop-blur-sm",
-            isDesktop ? "max-w-[35%]" : "flex-1",
+            !isDesktop && "flex-1",
           )}
           onClick={() => onNavigate(prevArticle)}
         >
@@ -119,7 +119,7 @@ export function ReaderPanel({ nextArticle, prevArticle, onNavigate, onBack }: Re
           size="sm"
           className={cn(
             "min-w-0 flex items-center gap-1 justify-end rounded-full shadow-md bg-background/95 backdrop-blur-sm",
-            isDesktop ? "max-w-[35%]" : "flex-1",
+            !isDesktop && "flex-1",
           )}
           onClick={() => onNavigate(nextArticle)}
         >

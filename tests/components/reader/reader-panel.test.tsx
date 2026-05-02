@@ -412,6 +412,12 @@ describe("ReaderPanel", () => {
       expect(screen.getByTestId("next-pill").className).not.toContain("flex-1");
     });
 
+    it("pills are not capped at 35% width — they grow to fit long titles", () => {
+      render(<ReaderPanel nextArticle={nextArt} prevArticle={prevArt} onNavigate={vi.fn()} />);
+      expect(screen.getByTestId("prev-pill").className).not.toContain("max-w-[35%]");
+      expect(screen.getByTestId("next-pill").className).not.toContain("max-w-[35%]");
+    });
+
     it("back button appears in nav bar when onBack is provided", () => {
       render(<ReaderPanel nextArticle={nextArt} onNavigate={vi.fn()} onBack={vi.fn()} />);
       expect(screen.getByTestId("back-pill")).toBeInTheDocument();
