@@ -1,16 +1,12 @@
 import { useState } from "react";
-import { useNavigate, useLocation } from "react-router";
+import { useNavigate } from "react-router";
 import {
   ChevronsUpDown,
-  Compass,
-  Layers,
   RefreshCw,
   Settings,
   X,
 } from "lucide-react";
 import { useFeedStore } from "@/stores/feed-store.ts";
-import { SidebarFeedList } from "@/components/sidebar/sidebar-feed-list.tsx";
-import { ALL_FEEDS_ID } from "@/utils/constants.ts";
 import { Button } from "@/components/ui/button.tsx";
 import {
   Tooltip,
@@ -28,7 +24,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-  SidebarSeparator,
   useSidebar,
 } from "@/components/ui/sidebar.tsx";
 import { useSyncStore } from "@/stores/sync-store.ts";
@@ -36,6 +31,7 @@ import { CHANGELOG_FEED_URL } from "@/utils/constants.ts";
 import { Kbd } from "@/components/ui/kbd.tsx";
 import { useIsOnline } from "@/hooks/use-online.ts";
 import { SettingsMenu } from "@/components/settings/settings-menu.tsx";
+import { SidebarBody } from "@/components/layout/sidebar-body.tsx";
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onFeedSelect?: (feedId: string) => void;
@@ -163,16 +159,12 @@ function LocalStorageWarning() {
 
 export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
   const feeds = useFeedStore((s) => s.feeds);
-  const selectedFeedId = useFeedStore((s) => s.selectedFeedId);
   const refreshAll = useFeedStore((s) => s.refreshAll);
   const isRefreshingAll = useFeedStore((s) => s.isRefreshingAll);
-
   const addFeed = useFeedStore((s) => s.addFeed);
 
   const { isMobile, setOpenMobile } = useSidebar();
   const navigate = useNavigate();
-  const { pathname } = useLocation();
-  const isExplorePage = pathname === "/explore";
 
   function handleSelect(feedId: string) {
     if (isMobile) setOpenMobile(false);
@@ -239,37 +231,10 @@ export function AppSidebar({ onFeedSelect, ...props }: AppSidebarProps) {
         <SidebarContent>
           <SidebarGroup>
             <SidebarGroupContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    isActive={isExplorePage}
-                    onClick={() => {
-                      if (isMobile) setOpenMobile(false);
-                      navigate("/explore");
-                    }}
-                    tooltip="Explore"
-                  >
-                    <Compass className="size-4" />
-                    <span>Explore</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                {feeds.length > 0 && (
-                  <>
-                    <SidebarMenuItem key="all-items">
-                      <SidebarMenuButton
-                        isActive={selectedFeedId === ALL_FEEDS_ID}
-                        onClick={() => handleSelect(ALL_FEEDS_ID)}
-                        tooltip="All items"
-                      >
-                        <Layers className="size-4" />
-                        <span>All items</span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                    <SidebarSeparator className="mx-0 my-1" />
-                    <SidebarFeedList onFeedSelect={handleSelect} />
-                  </>
-                )}
-              </SidebarMenu>
+              <SidebarBody
+                onFeedSelect={handleSelect}
+                onBeforeNavigate={() => { if (isMobile) setOpenMobile(false); }}
+              />
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>

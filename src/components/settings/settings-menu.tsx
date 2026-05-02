@@ -19,38 +19,44 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip.tsx";
+import {
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+} from "@/components/ui/sidebar.tsx";
 import { Switch } from "@/components/ui/switch.tsx";
 import { KeyboardShortcutsDialog } from "@/components/layout/keyboard-shortcuts-dialog.tsx";
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog.tsx";
 import { AutoOrganizeDialog } from "@/components/folders/auto-organize-dialog.tsx";
 
-interface SettingsMenuProps {
-  /** The DropdownMenuTrigger child — typically a button or SidebarMenuButton. */
-  trigger: React.ReactNode;
-  /** Whether the user has any feeds (gates Auto-organize and Cloud-sync enable). */
+interface SettingsMenuBaseProps {
   hasFeeds: boolean;
-  /** Called when the user picks "What's new" — implementation differs by host. */
   onWhatsNew: () => void;
-  /** DropdownMenuContent positioning — sidebar uses "top", drawer uses "top" too. */
+}
+
+interface SettingsMenuDropdownProps extends SettingsMenuBaseProps {
+  variant?: "dropdown";
+  trigger: React.ReactNode;
   side?: "top" | "right" | "bottom" | "left";
   align?: "start" | "center" | "end";
   contentClassName?: string;
 }
 
+interface SettingsMenuListProps extends SettingsMenuBaseProps {
+  variant: "list";
+}
+
+type SettingsMenuProps = SettingsMenuDropdownProps | SettingsMenuListProps;
+
 /**
- * Shared settings menu used by both the desktop sidebar footer and the mobile
- * bottom drawer. Owns the dialogs (keyboard shortcuts, feedback, auto-organize)
- * and listens for the `feedzero:open-settings` event so Cmd/Ctrl+, opens the menu
- * regardless of which surface is hosting it.
+ * Shared settings UI for the desktop sidebar (dropdown) and mobile drawer
+ * (inline list). Owns the dialogs (keyboard shortcuts, feedback, auto-organize)
+ * and the cmd/ctrl+, listener. The variant prop swaps the wrapper without
+ * duplicating the per-item logic.
  */
-export function SettingsMenu({
-  trigger,
-  hasFeeds,
-  onWhatsNew,
-  side = "top",
-  align = "end",
-  contentClassName,
-}: SettingsMenuProps) {
+export function SettingsMenu(props: SettingsMenuProps) {
+  const { hasFeeds, onWhatsNew } = props;
+
   const syncStatus = useSyncStore((s) => s.status);
   const setSyncDialogOpen = useSyncStore((s) => s.setDialogOpen);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -61,6 +67,7 @@ export function SettingsMenu({
   const isSyncOn = syncStatus === "synced" || syncStatus === "syncing";
   const isSyncing = syncStatus === "syncing";
   const canSync = hasFeeds;
+  const showSync = canSync || isSyncOn;
 
   useEffect(() => {
     const handler = () => setMenuOpen(true);
@@ -68,6 +75,72 @@ export function SettingsMenu({
     return () =>
       document.removeEventListener("feedzero:open-settings", handler);
   }, []);
+
+  const dialogs = (
+    <>
+      <KeyboardShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
+      <AutoOrganizeDialog open={autoOrganizeOpen} onOpenChange={setAutoOrganizeOpen} />
+    </>
+  );
+
+  if (props.variant === "list") {
+    return (
+      <>
+        <SidebarMenu>
+          {showSync && (
+            <SidebarMenuItem>
+              <SidebarMenuButton onClick={() => setSyncDialogOpen(true)}>
+                {isSyncing ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Cloud className="size-4" />
+                )}
+                <span className="flex-1">Cloud sync</span>
+                <Switch
+                  size="sm"
+                  checked={isSyncOn}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSyncDialogOpen(true);
+                  }}
+                />
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+          {hasFeeds && (
+            <SidebarMenuItem>
+              <SidebarMenuButton onClick={() => setAutoOrganizeOpen(true)}>
+                <Wand2 className="size-4" />
+                <span>Auto-organize feeds</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={() => setShortcutsOpen(true)}>
+              <Keyboard className="size-4" />
+              <span>Keyboard shortcuts</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={() => setFeedbackOpen(true)}>
+              <MessageSquare className="size-4" />
+              <span>Send feedback</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={onWhatsNew}>
+              <Sparkles className="size-4" />
+              <span>What&apos;s new</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+        {dialogs}
+      </>
+    );
+  }
+
+  const { trigger, side = "top", align = "end", contentClassName } = props;
 
   return (
     <>
@@ -133,10 +206,7 @@ export function SettingsMenu({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-
-      <KeyboardShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
-      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
-      <AutoOrganizeDialog open={autoOrganizeOpen} onOpenChange={setAutoOrganizeOpen} />
+      {dialogs}
     </>
   );
 }

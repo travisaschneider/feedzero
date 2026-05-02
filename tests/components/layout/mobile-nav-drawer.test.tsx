@@ -63,16 +63,28 @@ describe("MobileNavDrawer", () => {
     expect(container.ownerDocument.querySelector("[data-testid='drawer-handle-strip']")).not.toBeNull();
   });
 
-  it("renders 'All items' entry when drawer is open", async () => {
+  it("renders 'All items' entry when drawer is open and there are feeds", async () => {
     const user = userEvent.setup();
+    useFeedStore.setState({ feeds: [makeFeed("f1", "Feed One")] });
     renderDrawer();
     await user.click(screen.getByRole("button", { name: "Open feed list" }));
     expect(await screen.findByText("All items")).toBeInTheDocument();
   });
 
+  it("renders an Explore entry that navigates to the explore catalog", async () => {
+    const user = userEvent.setup();
+    renderDrawer();
+    await user.click(screen.getByRole("button", { name: "Open feed list" }));
+    const explore = await screen.findByText("Explore");
+    expect(explore).toBeInTheDocument();
+    // The button should be reachable via role
+    expect(explore.closest("button, a")).not.toBeNull();
+  });
+
   it("calls onFeedSelect with ALL_FEEDS_ID when All items is tapped", async () => {
     const user = userEvent.setup();
     const onFeedSelect = vi.fn();
+    useFeedStore.setState({ feeds: [makeFeed("f1", "Feed One")] });
     renderDrawer({ onFeedSelect });
     await user.click(screen.getByRole("button", { name: "Open feed list" }));
     await user.click(await screen.findByText("All items"));
