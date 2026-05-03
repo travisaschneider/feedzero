@@ -147,6 +147,44 @@ describe("ArticleList", () => {
     expect(onSelect).toHaveBeenCalled();
   });
 
+  it("clicking an article does not snap-scroll the list (the user-initiated click implies the item is already visible)", async () => {
+    const user = userEvent.setup();
+    useFeedStore.setState({
+      feeds: [],
+      selectedFeedId: "f1",
+      isLoading: false,
+      error: null,
+    });
+    // Build a long list so the virtualizer has work to do.
+    const articles = Array.from({ length: 200 }, (_, i) =>
+      mockArticle(`a${i}`, `Article ${i}`),
+    );
+    useArticleStore.setState({
+      articles,
+      selectedArticle: null,
+      isLoading: false,
+    });
+
+    const { container } = render(<ArticleList />);
+    const scrollEl = container.querySelector(".overflow-y-auto") as HTMLElement;
+
+    // Move scroll to a known mid-list position.
+    Object.defineProperty(scrollEl, "scrollTop", {
+      configurable: true,
+      writable: true,
+      value: 1500,
+    });
+    const scrollToSpy = vi.fn();
+    scrollEl.scrollTo = scrollToSpy as unknown as typeof scrollEl.scrollTo;
+
+    // Click any visible article — the list should not call scrollTo on the
+    // container as a result. (Before the fix, the selection-change effect
+    // unconditionally re-anchored the virtualizer to the new selection.)
+    await user.click(screen.getAllByRole("option")[0]);
+
+    expect(scrollToSpy).not.toHaveBeenCalled();
+  });
+
   it("shows read/unread styling", () => {
     useFeedStore.setState({
       feeds: [],

@@ -60,8 +60,15 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
   // onArticleSelect (from props) are stable. Passing a stable handler into
   // memoized ArticleItem lets React skip re-rendering items whose props did
   // not change — critical when the list has thousands of entries.
+  //
+  // skipNextAutoScroll: when the user CLICKS an article, the resulting
+  // selection change must not trigger the auto-scroll-into-view effect
+  // below. The clicked item is by definition visible, and re-anchoring the
+  // virtualizer to it shifts the scroll position out from under the user.
+  const skipNextAutoScroll = useRef(false);
   const handleSelect = useCallback(
     (article: Article) => {
+      skipNextAutoScroll.current = true;
       selectArticle(article);
       if (onArticleSelect) onArticleSelect(article);
     },
@@ -78,10 +85,15 @@ export function ArticleList({ onArticleSelect }: ArticleListProps) {
 
   // Keep the selected article in view. Covers j/k keyboard nav (which selects
   // off-screen items once the user scrolls) and the initial reveal of a
-  // selection that was restored from URL state.
+  // selection that was restored from URL state. NOT for click-driven
+  // selection — see skipNextAutoScroll above.
   const selectedId = selectedArticle?.id;
   useEffect(() => {
     if (!selectedId) return;
+    if (skipNextAutoScroll.current) {
+      skipNextAutoScroll.current = false;
+      return;
+    }
     const index = articles.findIndex((a) => a.id === selectedId);
     if (index !== -1) virtualizer.scrollToIndex(index, { align: "auto" });
   }, [selectedId, articles, virtualizer]);
