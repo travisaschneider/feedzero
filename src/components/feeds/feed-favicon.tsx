@@ -4,6 +4,9 @@ import { Rss } from "lucide-react";
 interface FeedFaviconProps {
   siteUrl: string;
   className?: string;
+  /** Render as a circular, filled avatar (no border ring). Used on dark
+   * surfaces like the Signal splash hero where the default ring looks ugly. */
+  avatar?: boolean;
 }
 
 /**
@@ -105,6 +108,7 @@ export function setFaviconCacheEntry(
 export function FeedFavicon({
   siteUrl,
   className = "size-4",
+  avatar = false,
 }: FeedFaviconProps) {
   let origin: string;
   try {
@@ -140,7 +144,11 @@ export function FeedFavicon({
       <img
         src={faviconUrl}
         alt=""
-        className={`${className} shrink-0 rounded-sm ring-1 ring-border/50 ${loaded ? "" : "hidden"}`}
+        className={`${className} shrink-0 ${
+          avatar
+            ? "rounded-full bg-white object-cover p-px"
+            : "rounded-sm ring-1 ring-border/50"
+        } ${loaded ? "" : "hidden"}`}
         onLoad={() => {
           resolvedCache.set(origin, { index: pathIndex, ts: Date.now() });
           persistCache();
