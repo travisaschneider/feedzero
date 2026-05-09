@@ -8,3 +8,6 @@ playwright-report/
 .claude/
 .vercel
 .env*.local
+
+# Private operational/strategy docs — not for the public repo
+docs/internal/
