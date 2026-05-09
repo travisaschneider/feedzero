@@ -1,3 +1,4 @@
+// @ts-nocheck
 // api/catalog.ts
 var API_HEADERS = {
   "Content-Type": "application/json",

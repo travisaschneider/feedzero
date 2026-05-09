@@ -1,12 +1,11 @@
-// src/utils/result.ts
+// @ts-nocheck
+// api/page.ts
 function ok(value) {
   return { ok: true, value };
 }
 function err(error) {
   return { ok: false, error };
 }
-
-// src/core/proxy/validate-url.ts
 var BLOCKED_HOSTNAMES = /* @__PURE__ */ new Set([
   "localhost",
   "127.0.0.1",
@@ -55,8 +54,6 @@ function validateProxyUrl(url) {
   }
   return ok(parsed);
 }
-
-// src/core/cleaner/tracker-stripper.ts
 var TRACKER_DOMAINS = [
   "pixel.quantserve.com",
   "sb.scorecardresearch.com",
@@ -99,8 +96,6 @@ function stripTrackers(html) {
     (imgTag) => isTrackingPixel(imgTag) ? "" : imgTag
   );
 }
-
-// src/core/cleaner/link-cleaner.ts
 var TRACKING_PARAMS = /* @__PURE__ */ new Set([
   "utm_source",
   "utm_medium",
@@ -143,8 +138,6 @@ function cleanLinks(html) {
     return `${attr}="${cleanUrl(url)}"`;
   });
 }
-
-// src/core/cleaner/cleaner.ts
 function cleanFeedContent(raw) {
   let result = raw;
   result = result.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, (_, content) => {
@@ -157,8 +150,6 @@ function cleanFeedContent(raw) {
   });
   return result;
 }
-
-// src/core/proxy/proxy-handler.ts
 async function handleProxyRequest(req, defaultContentType, options) {
   const target = await extractTargetUrl(req);
   const validation = validateProxyUrl(target);
@@ -233,8 +224,6 @@ async function extractTargetUrl(req) {
   const url = new URL(req.url, "http://localhost");
   return url.searchParams.get("url");
 }
-
-// api/page.ts
 async function GET(req) {
   return handleProxyRequest(req, "text/html");
 }

@@ -1,4 +1,5 @@
-// src/core/sync/sync-stats-handler.ts
+// @ts-nocheck
+// api/stats-sync.ts
 var API_HEADERS = {
   "Content-Type": "application/json",
   "Access-Control-Allow-Origin": "*",
@@ -23,16 +24,12 @@ async function handleSyncStatsRequest(request, adapter2) {
     { status: 200, headers: API_HEADERS }
   );
 }
-
-// src/utils/result.ts
 function ok(value) {
   return { ok: true, value };
 }
 function err(error) {
   return { ok: false, error };
 }
-
-// src/core/sync/adapters/vercel-blob-adapter.ts
 function createVercelBlobAdapter() {
   return {
     async get(vaultId) {
@@ -99,8 +96,6 @@ function createVercelBlobAdapter() {
     }
   };
 }
-
-// api/stats-sync.ts
 var adapter = createVercelBlobAdapter();
 async function GET(req) {
   return handleSyncStatsRequest(req, adapter);

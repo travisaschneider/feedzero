@@ -1,4 +1,5 @@
-// src/core/favicon/favicon-resolver.ts
+// @ts-nocheck
+// api/favicon.ts
 var WELL_KNOWN_PATHS = [
   "/favicon.ico",
   "/favicon.png",
@@ -83,16 +84,12 @@ function duckDuckGoFallback(origin) {
   const host = new URL(origin).host;
   return `https://icons.duckduckgo.com/ip3/${host}.ico`;
 }
-
-// src/utils/result.ts
 function ok(value) {
   return { ok: true, value };
 }
 function err(error) {
   return { ok: false, error };
 }
-
-// src/core/proxy/validate-url.ts
 var BLOCKED_HOSTNAMES = /* @__PURE__ */ new Set([
   "localhost",
   "127.0.0.1",
@@ -141,8 +138,6 @@ function validateProxyUrl(url) {
   }
   return ok(parsed);
 }
-
-// src/core/favicon/favicon-handler.ts
 async function handleFaviconRequest(req) {
   const url = new URL(req.url, "http://localhost");
   const domain = url.searchParams.get("domain");
@@ -176,8 +171,6 @@ async function handleFaviconRequest(req) {
     return new Response("Favicon fetch failed", { status: 502 });
   }
 }
-
-// api/favicon.ts
 async function GET(req) {
   return handleFaviconRequest(req);
 }

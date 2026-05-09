@@ -1,4 +1,5 @@
-// src/utils/constants.ts
+// @ts-nocheck
+// api/sync.ts
 var textEncoder = new TextEncoder();
 var SYNC = {
   /** Static salt for vault ID derivation (domain separation from encryption key). */
@@ -14,8 +15,6 @@ var SYNC = {
   /** Sync data format version for forward compatibility. */
   FORMAT_VERSION: 1
 };
-
-// src/core/sync/sync-handler.ts
 var VAULT_ID_PATTERN = /^[0-9a-f]{64}$/;
 var API_HEADERS = {
   "Content-Type": "application/json",
@@ -82,16 +81,12 @@ async function handleSyncRequest(request, adapter2) {
   if (!handler) return errorResponse("Method not allowed", 405);
   return handler(request, adapter2);
 }
-
-// src/utils/result.ts
 function ok(value) {
   return { ok: true, value };
 }
 function err(error) {
   return { ok: false, error };
 }
-
-// src/core/sync/adapters/vercel-blob-adapter.ts
 function createVercelBlobAdapter() {
   return {
     async get(vaultId) {
@@ -158,8 +153,6 @@ function createVercelBlobAdapter() {
     }
   };
 }
-
-// api/sync.ts
 var adapter = createVercelBlobAdapter();
 async function GET(req) {
   return handleSyncRequest(req, adapter);

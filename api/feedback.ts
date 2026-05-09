@@ -1,4 +1,5 @@
-// src/core/feedback/feedback-handler.ts
+// @ts-nocheck
+// api/feedback.ts
 var MAX_MESSAGE_LENGTH = 2e3;
 async function handleFeedbackRequest(request) {
   if (request.method !== "POST") {
@@ -67,8 +68,6 @@ function jsonResponse(body, status = 200) {
     }
   });
 }
-
-// api/feedback.ts
 async function POST(req) {
   return handleFeedbackRequest(req);
 }

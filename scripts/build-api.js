@@ -59,14 +59,19 @@ try {
     }
   }
 
-  // Overwrite api/*.ts with bundled .js content (Vercel expects .ts extension)
+  // Overwrite api/*.ts with bundled .js content (Vercel expects .ts extension).
+  // Prepend // @ts-nocheck because the bundled output is esbuild-emitted JS that
+  // violates the project's strict tsconfig (implicit any, etc.) and gets pulled
+  // into typecheck via tests/server.test.ts contract imports. The src/ originals
+  // are still typechecked normally; bundles are build artifacts, not source.
+  const TS_NOCHECK_HEADER = "// @ts-nocheck\n";
   for (const tsFile of tsFiles) {
     const baseName = path.basename(tsFile, ".ts");
     const bundledContent = readFileSync(
       path.join(tempOut, baseName + ".js"),
       "utf-8",
     );
-    writeFileSync(tsFile, bundledContent);
+    writeFileSync(tsFile, TS_NOCHECK_HEADER + bundledContent);
   }
 
   console.log(
