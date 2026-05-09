@@ -34,6 +34,30 @@ describe("API bundle contract", () => {
     }
   });
 
+  // Bundles are esbuild output that violates the strict tsconfig (implicit any
+  // etc.). Since tests/server.test.ts imports api/* for routing contract tests,
+  // the bundles get pulled into typecheck via reference. Prepending @ts-nocheck
+  // tells tsc to skip them — src/ originals are still typechecked normally.
+  it("each bundled api/*.ts starts with // @ts-nocheck", () => {
+    const allBundles = [
+      "feed.ts",
+      "page.ts",
+      "sync.ts",
+      "feedback.ts",
+      "icon.ts",
+      "favicon.ts",
+      "catalog.ts",
+      "stats-sync.ts",
+    ];
+    for (const name of allBundles) {
+      const content = readFileSync(join(apiDir, name), "utf-8");
+      expect(
+        content.startsWith("// @ts-nocheck"),
+        `${name} should start with // @ts-nocheck`,
+      ).toBe(true);
+    }
+  });
+
   it("no .js files are produced in api/", () => {
     expect(existsSync(join(apiDir, "feed.js"))).toBe(false);
     expect(existsSync(join(apiDir, "page.js"))).toBe(false);
