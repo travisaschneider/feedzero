@@ -157,4 +157,62 @@ describe("resolveIconUrl", () => {
     // No valid icon in HTML, falls back to DuckDuckGo
     expect(result).toBe("https://icons.duckduckgo.com/ip3/example.com.ico");
   });
+
+  it("survives fetch HEAD throwing (timeout/network) and tries the next path", async () => {
+    const fetchMock = vi.fn()
+      // First well-known HEAD aborts (e.g. AbortSignal timeout) — falls through
+      .mockRejectedValueOnce(new Error("aborted"))
+      // Second well-known HEAD also throws — falls through
+      .mockRejectedValueOnce(new Error("network down"))
+      // Third well-known HEAD also throws — falls through to HTML parsing
+      .mockRejectedValueOnce(new Error("network down"))
+      // HTML fetch returns a valid icon
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () =>
+          Promise.resolve(
+            '<html><head><link rel="icon" href="/icon.png" sizes="64x64"></head></html>',
+          ),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await resolveIconUrl("https://example.com");
+    expect(result).toBe("https://example.com/icon.png");
+  });
+
+  it("falls back to DuckDuckGo when the HTML fetch itself throws", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 404 })
+      .mockResolvedValueOnce({ ok: false, status: 404 })
+      .mockResolvedValueOnce({ ok: false, status: 404 })
+      // HTML fetch throws (DNS error, TLS handshake failure, etc.)
+      .mockRejectedValueOnce(new TypeError("fetch failed"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await resolveIconUrl("https://example.com");
+    expect(result).toBe("https://icons.duckduckgo.com/ip3/example.com.ico");
+  });
+
+  it("skips href values that fail URL parsing (e.g. out-of-range port)", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({ ok: false, status: 404 })
+      .mockResolvedValueOnce({ ok: false, status: 404 })
+      .mockResolvedValueOnce({ ok: false, status: 404 })
+      .mockResolvedValueOnce({
+        ok: true,
+        text: () =>
+          Promise.resolve(
+            '<html><head>' +
+            // Port 99999 is out of range — `new URL` throws TypeError
+            '<link rel="icon" href="http://broken.example:99999/icon.png">' +
+            '<link rel="icon" href="/good.png" sizes="32x32">' +
+            '</head></html>',
+          ),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    // The bad href is silently skipped; the good href wins.
+    const result = await resolveIconUrl("https://example.com");
+    expect(result).toBe("https://example.com/good.png");
+  });
 });
