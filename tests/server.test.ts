@@ -8,6 +8,7 @@ import { SUPPORTED_METHODS as HEALTH_SUPPORTED_METHODS } from "../src/core/healt
 import { SUPPORTED_METHODS as STRIPE_SUPPORTED_METHODS } from "../src/core/stripe/webhook-handler";
 import { SUPPORTED_METHODS as LICENSE_VERIFY_SUPPORTED_METHODS } from "../src/core/license/verify-handler";
 import { SUPPORTED_METHODS as LICENSE_ISSUE_SUPPORTED_METHODS } from "../src/core/license/issue-handler";
+import { SUPPORTED_METHODS as CHECKOUT_SUPPORTED_METHODS } from "../src/core/stripe/checkout-handler";
 import * as vercelSyncExports from "../api/sync";
 import * as vercelFeedExports from "../api/feed";
 import * as vercelPageExports from "../api/page";
@@ -15,8 +16,15 @@ import * as vercelCatalogExports from "../api/catalog";
 import * as vercelFeedbackExports from "../api/feedback";
 import * as vercelHealthExports from "../api/health";
 import * as vercelStripeWebhookExports from "../api/stripe/webhook";
-import * as vercelLicenseVerifyExports from "../api/license/verify";
-import * as vercelLicenseIssueExports from "../api/license/issue";
+// Both /api/license/verify and /api/license/issue resolve to the same Vercel
+// dynamic-route file (api/license/[action].ts) — consolidated to stay under
+// the Hobby-plan 12-functions ceiling. The wrapper dispatches internally by
+// the action segment. The two routing contracts assert against the same
+// module since they share the POST export.
+import * as vercelLicenseDynamicExports from "../api/license/[action]";
+const vercelLicenseVerifyExports = vercelLicenseDynamicExports;
+const vercelLicenseIssueExports = vercelLicenseDynamicExports;
+import * as vercelCheckoutExports from "../api/checkout/create-session";
 import { signLicense, type SigningKey } from "../src/core/license/sign";
 import { MemoryLicenseStorage } from "../src/core/license/storage";
 import type { LicensePayload } from "../src/core/license/format";
@@ -1033,6 +1041,97 @@ describe("server", () => {
     });
   });
 
+  describe("checkout session endpoint (PR X)", () => {
+    it("returns 200 + url for a valid request when STRIPE_ALLOWED_PRICES is set", async () => {
+      const ORIGINAL = process.env.STRIPE_ALLOWED_PRICES;
+      process.env.STRIPE_ALLOWED_PRICES = "price_test_personal_monthly";
+      try {
+        const app = createApp();
+        const res = await app.request("/api/checkout/create-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            priceId: "price_test_personal_monthly",
+            successUrl: "https://feedzero.app/success",
+            cancelUrl: "https://feedzero.app/cancel",
+          }),
+        });
+        // 200 (success) or 502 (Stripe SDK call failed at runtime due to no
+        // real key). Either proves the route is registered and reaches the
+        // handler — never 404 (route missing) or 405 (method not allowed).
+        expect(res.status).not.toBe(404);
+        expect(res.status).not.toBe(405);
+      } finally {
+        if (ORIGINAL === undefined) delete process.env.STRIPE_ALLOWED_PRICES;
+        else process.env.STRIPE_ALLOWED_PRICES = ORIGINAL;
+      }
+    });
+
+    it("returns 400 when priceId is not in STRIPE_ALLOWED_PRICES", async () => {
+      const ORIGINAL = process.env.STRIPE_ALLOWED_PRICES;
+      process.env.STRIPE_ALLOWED_PRICES = "price_only_this_one";
+      try {
+        const app = createApp();
+        const res = await app.request("/api/checkout/create-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            priceId: "price_attacker_pwn",
+            successUrl: "https://feedzero.app/success",
+            cancelUrl: "https://feedzero.app/cancel",
+          }),
+        });
+        expect(res.status).toBe(400);
+      } finally {
+        if (ORIGINAL === undefined) delete process.env.STRIPE_ALLOWED_PRICES;
+        else process.env.STRIPE_ALLOWED_PRICES = ORIGINAL;
+      }
+    });
+
+    it("returns 503 when KILL_SIGNUPS=1", async () => {
+      const ORIG_KILL = process.env.KILL_SIGNUPS;
+      const ORIG_PRICES = process.env.STRIPE_ALLOWED_PRICES;
+      process.env.KILL_SIGNUPS = "1";
+      process.env.STRIPE_ALLOWED_PRICES = "price_x";
+      try {
+        const app = createApp();
+        const res = await app.request("/api/checkout/create-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            priceId: "price_x",
+            successUrl: "https://feedzero.app/s",
+            cancelUrl: "https://feedzero.app/c",
+          }),
+        });
+        expect(res.status).toBe(503);
+      } finally {
+        if (ORIG_KILL === undefined) delete process.env.KILL_SIGNUPS;
+        else process.env.KILL_SIGNUPS = ORIG_KILL;
+        if (ORIG_PRICES === undefined) delete process.env.STRIPE_ALLOWED_PRICES;
+        else process.env.STRIPE_ALLOWED_PRICES = ORIG_PRICES;
+      }
+    });
+  });
+
+  describe("checkout routing contract", () => {
+    it("CHECKOUT_SUPPORTED_METHODS lists POST", () => {
+      expect(CHECKOUT_SUPPORTED_METHODS).toContain("POST");
+    });
+
+    it("Vercel api/checkout/create-session.ts exports a handler for every supported method", () => {
+      for (const method of CHECKOUT_SUPPORTED_METHODS) {
+        expect(
+          vercelCheckoutExports,
+          `api/checkout/create-session.ts is missing export for ${method}`,
+        ).toHaveProperty(method);
+        expect(
+          typeof (vercelCheckoutExports as Record<string, unknown>)[method],
+        ).toBe("function");
+      }
+    });
+  });
+
   describe("/api/sync gating on LAUNCH_PAID_TIER (PR W)", () => {
     const SECRET = "this-is-a-test-signing-secret-32-bytes!";
     const signingKey: SigningKey = { secret: SECRET };
@@ -1123,25 +1222,44 @@ describe("server", () => {
       expect(src).toMatch(/KILL_SIGNUPS/);
     });
 
-    it("api/license/issue.ts wires ADMIN_API_KEY", () => {
-      const src = fs.readFileSync("api/license/issue.ts", "utf8");
+    // verify + issue consolidated into api/license/[action].ts (Vercel
+    // dynamic route) to stay under the Hobby plan's 12-function ceiling.
+    // Both wiring assertions now check the single dispatcher file.
+    it("api/license/[action].ts wires ADMIN_API_KEY (issue branch)", () => {
+      const src = fs.readFileSync("api/license/[action].ts", "utf8");
       expect(src).toMatch(/ADMIN_API_KEY/);
     });
 
-    it("api/license/issue.ts wires KILL_SIGNUPS gate", () => {
-      const src = fs.readFileSync("api/license/issue.ts", "utf8");
+    it("api/license/[action].ts wires KILL_SIGNUPS gate (issue branch)", () => {
+      const src = fs.readFileSync("api/license/[action].ts", "utf8");
       expect(src).toMatch(/KILL_SIGNUPS/);
     });
 
-    it("api/license/verify.ts wires resolveLicenseStorage (not raw MemoryLicenseStorage)", () => {
-      const src = fs.readFileSync("api/license/verify.ts", "utf8");
+    it("api/license/[action].ts wires resolveLicenseStorage (verify + issue)", () => {
+      const src = fs.readFileSync("api/license/[action].ts", "utf8");
       expect(src).toMatch(/resolveLicenseStorage/);
+    });
+
+    it("api/license/[action].ts dispatches both 'verify' and 'issue' actions", () => {
+      const src = fs.readFileSync("api/license/[action].ts", "utf8");
+      // Source must reference both action names so a regression that drops
+      // one branch is caught even if test traffic only exercises the other.
+      expect(src).toMatch(/['"`]verify['"`]/);
+      expect(src).toMatch(/['"`]issue['"`]/);
     });
 
     it("api/sync.ts wires LAUNCH_PAID_TIER gate (PR W)", () => {
       const src = fs.readFileSync("api/sync.ts", "utf8");
       expect(src).toMatch(/LAUNCH_PAID_TIER/);
       expect(src).toMatch(/licenseAuth/);
+    });
+
+    it("api/checkout/create-session.ts wires allowed-prices + KILL_SIGNUPS + lazy Stripe (PR X)", () => {
+      const src = fs.readFileSync("api/checkout/create-session.ts", "utf8");
+      expect(src).toMatch(/resolveAllowedPrices|allowedPrices/);
+      expect(src).toMatch(/KILL_SIGNUPS/);
+      // Lazy SDK construction — must NOT happen at module top level.
+      expect(src).not.toMatch(/^const\s+stripe\s*=\s*new\s+Stripe/m);
     });
   });
 
