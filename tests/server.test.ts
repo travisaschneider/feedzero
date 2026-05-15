@@ -8,6 +8,8 @@ import { SUPPORTED_METHODS as HEALTH_SUPPORTED_METHODS } from "../src/core/healt
 import { SUPPORTED_METHODS as STRIPE_SUPPORTED_METHODS } from "../src/core/stripe/webhook-handler";
 import { SUPPORTED_METHODS as LICENSE_VERIFY_SUPPORTED_METHODS } from "../src/core/license/verify-handler";
 import { SUPPORTED_METHODS as LICENSE_ISSUE_SUPPORTED_METHODS } from "../src/core/license/issue-handler";
+import { SUPPORTED_METHODS as LICENSE_RETRIEVE_SUPPORTED_METHODS } from "../src/core/license/retrieve-handler";
+import { SUPPORTED_METHODS as PORTAL_SUPPORTED_METHODS } from "../src/core/stripe/portal-handler";
 import { SUPPORTED_METHODS as CHECKOUT_SUPPORTED_METHODS } from "../src/core/stripe/checkout-handler";
 import * as vercelSyncExports from "../api/sync";
 import * as vercelFeedExports from "../api/feed";
@@ -16,15 +18,20 @@ import * as vercelCatalogExports from "../api/catalog";
 import * as vercelFeedbackExports from "../api/feedback";
 import * as vercelHealthExports from "../api/health";
 import * as vercelStripeWebhookExports from "../api/stripe/webhook";
-// Both /api/license/verify and /api/license/issue resolve to the same Vercel
-// dynamic-route file (api/license/[action].ts) — consolidated to stay under
-// the Hobby-plan 12-functions ceiling. The wrapper dispatches internally by
-// the action segment. The two routing contracts assert against the same
-// module since they share the POST export.
+// /api/license/{verify,issue,retrieve} resolve to the same Vercel dynamic-route
+// file (api/license/[action].ts) — consolidated to stay under the Hobby-plan
+// 12-functions ceiling. The wrapper dispatches internally by the action
+// segment. The three routing contracts assert against the same module since
+// they share the POST export.
 import * as vercelLicenseDynamicExports from "../api/license/[action]";
 const vercelLicenseVerifyExports = vercelLicenseDynamicExports;
 const vercelLicenseIssueExports = vercelLicenseDynamicExports;
+const vercelLicenseRetrieveExports = vercelLicenseDynamicExports;
 import * as vercelCheckoutExports from "../api/checkout/create-session";
+// /api/license/portal is served by the same dynamic-route file as verify,
+// issue, retrieve — consolidated to stay under the Hobby plan's 12-function
+// ceiling. Alias for parity with the other contract tests.
+const vercelPortalExports = vercelLicenseDynamicExports;
 import { signLicense, type SigningKey } from "../src/core/license/sign";
 import { MemoryLicenseStorage } from "../src/core/license/storage";
 import type { LicensePayload } from "../src/core/license/format";
@@ -967,6 +974,94 @@ describe("server", () => {
     });
   });
 
+  describe("license retrieve routing contract", () => {
+    it("LICENSE_RETRIEVE_SUPPORTED_METHODS lists POST", () => {
+      expect(LICENSE_RETRIEVE_SUPPORTED_METHODS).toContain("POST");
+    });
+
+    it("Vercel api/license/[action].ts exports a handler for every retrieve-supported method", () => {
+      for (const method of LICENSE_RETRIEVE_SUPPORTED_METHODS) {
+        expect(
+          vercelLicenseRetrieveExports,
+          `api/license/[action].ts is missing export for ${method}`,
+        ).toHaveProperty(method);
+        expect(
+          typeof (vercelLicenseRetrieveExports as Record<string, unknown>)[method],
+        ).toBe("function");
+      }
+    });
+
+    it("Hono server accepts POST /api/license/retrieve", async () => {
+      const app = createApp(undefined, undefined, undefined, {
+        signingKey: { secret: "this-is-a-test-signing-secret-32-bytes!" },
+        storage: new MemoryLicenseStorage(),
+        // Resolve to a real customerId so we hit the handler's pending-202 path
+        // (no records yet) — proves the route is wired AND the storage lookup
+        // runs. A null customer would 404 from the handler itself, masking
+        // whether the route exists at all.
+        sessions: { retrieve: async () => ({ customer: "cus_test_routed" }) },
+      });
+      const res = await app.request("/api/license/retrieve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: "cs_test_abc123" }),
+      });
+      expect(res.status).toBe(202);
+    });
+  });
+
+  describe("billing portal routing contract (now at /api/license/portal)", () => {
+    it("PORTAL_SUPPORTED_METHODS lists POST", () => {
+      expect(PORTAL_SUPPORTED_METHODS).toContain("POST");
+    });
+
+    it("Vercel api/license/[action].ts exports POST (portal is one of the dispatched actions)", () => {
+      for (const method of PORTAL_SUPPORTED_METHODS) {
+        expect(
+          vercelPortalExports,
+          `api/license/[action].ts is missing export for ${method}`,
+        ).toHaveProperty(method);
+        expect(
+          typeof (vercelPortalExports as Record<string, unknown>)[method],
+        ).toBe("function");
+      }
+    });
+
+    it("Hono server accepts POST /api/license/portal", async () => {
+      const app = createApp(undefined, undefined, undefined, {
+        signingKey: { secret: "this-is-a-test-signing-secret-32-bytes!" },
+        storage: new MemoryLicenseStorage(),
+        portalSessions: {
+          retrieve: async () => ({ customer: "cus_test_portal" }),
+        },
+        portal: {
+          create: async () => ({ url: "https://billing.stripe.com/p/session_test" }),
+        },
+      });
+      const res = await app.request("/api/license/portal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: "cs_test_abc123",
+          returnUrl: "https://my.feedzero.app/settings",
+        }),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.url).toMatch(/billing\.stripe\.com/);
+    });
+
+    it("Hono server returns 404 for the OLD /api/billing/portal URL (route removed)", async () => {
+      const app = createApp();
+      const res = await app.request("/api/billing/portal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: "cs_test_xyz", returnUrl: "https://x" }),
+      });
+      expect(res.status).toBe(404);
+    });
+  });
+
   describe("stripe webhook endpoint", () => {
     const WEBHOOK_SECRET = "whsec_test_value";
     const SIGNING_SECRET = "this-is-a-test-signing-secret-32-bytes!";
@@ -1240,12 +1335,16 @@ describe("server", () => {
       expect(src).toMatch(/resolveLicenseStorage/);
     });
 
-    it("api/license/[action].ts dispatches both 'verify' and 'issue' actions", () => {
+    it("api/license/[action].ts dispatches 'verify', 'issue', 'retrieve', and 'portal' actions", () => {
       const src = fs.readFileSync("api/license/[action].ts", "utf8");
-      // Source must reference both action names so a regression that drops
-      // one branch is caught even if test traffic only exercises the other.
+      // Source must reference every action name so a regression that drops
+      // one branch is caught even if test traffic only exercises the others.
       expect(src).toMatch(/['"`]verify['"`]/);
       expect(src).toMatch(/['"`]issue['"`]/);
+      expect(src).toMatch(/['"`]retrieve['"`]/);
+      expect(src).toMatch(/['"`]portal['"`]/);
+      expect(src).toMatch(/handleLicenseRetrieveRequest/);
+      expect(src).toMatch(/handlePortalRequest/);
     });
 
     it("api/sync.ts wires LAUNCH_PAID_TIER gate (PR W)", () => {
