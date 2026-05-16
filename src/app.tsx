@@ -9,11 +9,14 @@ import { generatePassphrase } from "@/core/crypto/passphrase-generator.ts";
 import { Toaster } from "@/components/ui/sonner.tsx";
 import { SyncSetupDialog } from "@/components/sync/sync-setup-dialog.tsx";
 import { SyncMigrationDialog } from "@/components/sync/sync-migration-dialog.tsx";
+import { UpgradeDialog } from "@/components/billing/upgrade-dialog.tsx";
 import { NavigateWithSearch } from "@/components/routing/navigate-with-search.tsx";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import { FeedsPage } from "@/pages/feeds-page.tsx";
 import { BillingSuccess } from "@/pages/billing-success.tsx";
 import { BillingCancelled } from "@/pages/billing-cancelled.tsx";
+import { BillingRecover } from "@/pages/billing-recover.tsx";
+import { BillingIssued } from "@/pages/billing-issued.tsx";
 import { SubscribeDeeplink } from "@/components/billing/subscribe-deeplink.tsx";
 import { useLicenseStore } from "@/stores/license-store.ts";
 import { Button } from "@/components/ui/button.tsx";
@@ -160,6 +163,8 @@ export function App() {
             <Route path="/stats" element={<FeedsPage />} />
             <Route path="/billing/success" element={<BillingSuccess />} />
             <Route path="/billing/cancelled" element={<BillingCancelled />} />
+            <Route path="/billing/recover" element={<BillingRecover />} />
+            <Route path="/billing/issued" element={<BillingIssued />} />
             <Route path="*" element={<NavigateWithSearch to="/feeds" />} />
           </Routes>
         </AppInit>
@@ -167,6 +172,7 @@ export function App() {
       </BrowserRouter>
       <SyncSetupDialog />
       <SyncMigrationDialog />
+      <UpgradeDialog />
       <SpeedInsights />
     </>
   );
