@@ -95,7 +95,10 @@ function renderFolderWithFeed(folderProps: Partial<React.ComponentProps<typeof F
 
 describe("FolderItem", () => {
   beforeEach(() => {
-    useFeedStore.setState({ folders: [mockFolder] });
+    // Reset folder open-state so a prior test's chevron click doesn't leak
+    // a "closed" state into the next test's render (folder open-state moved
+    // from per-component useState into feed-store).
+    useFeedStore.setState({ folders: [mockFolder], folderOpenState: {} });
   });
 
   it("renders the folder name", () => {
@@ -108,7 +111,7 @@ describe("FolderItem", () => {
     expect(screen.getByTestId("child-content")).toBeInTheDocument();
   });
 
-  it("calls onSelect when folder title is clicked AND also collapses the folder", async () => {
+  it("calls onSelect when folder title is clicked and does NOT collapse the folder", async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
     renderFolder({ onSelect });
@@ -116,8 +119,8 @@ describe("FolderItem", () => {
     await user.click(screen.getByText("Tech News"));
 
     expect(onSelect).toHaveBeenCalledTimes(1);
-    // Clicking the title also collapses — title is both a navigate AND toggle target.
-    expect(screen.queryByTestId("child-content")).not.toBeInTheDocument();
+    // Clicking the title only navigates; the chevron is the toggle affordance.
+    expect(screen.getByTestId("child-content")).toBeInTheDocument();
   });
 
   it("collapses children when the chevron toggle is clicked, without calling onSelect", async () => {
@@ -133,7 +136,19 @@ describe("FolderItem", () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
-  it("chevron trigger uses hover:bg-white/20 on colored folders to avoid light square on dark background", () => {
+  it("chevron uses a color-only hover affordance, not a background box", () => {
+    // The folder name and the chevron sit next to each other; a filled
+    // hover rectangle on the chevron used to blur into the name's hover
+    // background. The chevron now uses color-only transitions so the two
+    // affordances read as distinct.
+    renderFolder();
+    const toggle = screen.getByRole("button", { name: /toggle folder/i });
+    expect(toggle.className).not.toContain("hover:bg-sidebar-accent");
+    expect(toggle.className).not.toContain("hover:bg-white/20");
+    expect(toggle.className).toContain("hover:text-foreground");
+  });
+
+  it("chevron uses a brighter color hover on colored folders (no fill)", () => {
     const coloredFolder = { ...mockFolder, color: "#7c3aed" };
     render(
       <SidebarProvider>
@@ -143,8 +158,8 @@ describe("FolderItem", () => {
       </SidebarProvider>
     );
     const toggle = screen.getByRole("button", { name: /toggle folder/i });
-    expect(toggle.className).toContain("hover:bg-white/20");
-    expect(toggle.className).not.toContain("hover:bg-sidebar-accent");
+    expect(toggle.className).not.toContain("hover:bg-white/20");
+    expect(toggle.className).toContain("hover:text-white");
   });
 
   it("marks the folder header active when isSelected is true", () => {

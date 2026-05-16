@@ -66,17 +66,21 @@ function SyncBadge({ status, isOnline }: { status: string; isOnline: boolean }) 
       </span>
     );
   }
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
-      <span className="rounded-full size-1.5 bg-amber-500" />
-      Local
-    </span>
-  );
+  // Local-only (and any unknown status): suppress the chip on the Settings
+  // button. The amber "Local" indicator now lives inside the Settings
+  // dropdown on the Cloud sync row — see SettingsMenu.
+  return null;
 }
 
 function SidebarFooterMenu({ hasFeeds, onWhatsNew }: { hasFeeds: boolean; onWhatsNew: () => void }) {
   const syncStatus = useSyncStore((s) => s.status);
   const isOnline = useIsOnline();
+  // SyncBadge returns null when the user is local-only AND online (that
+  // indicator now lives inside the Settings dropdown instead). In that
+  // case there's no chip on the second line, so render a single-line,
+  // vertically-centered label instead of an empty two-row grid that
+  // makes "Settings" look top-aligned.
+  const hasChip = !isOnline || syncStatus !== "local-only";
 
   return (
     <SettingsMenu
@@ -93,13 +97,20 @@ function SidebarFooterMenu({ hasFeeds, onWhatsNew }: { hasFeeds: boolean; onWhat
           <div className="flex items-center justify-center size-8 rounded-lg bg-muted text-muted-foreground">
             <Settings className="size-4" />
           </div>
-          <div className="grid flex-1 text-left text-sm leading-tight">
-            <span className="truncate font-semibold">Settings</span>
-            <span className="flex items-center gap-1.5 mt-0.5">
-              <SyncBadge status={syncStatus} isOnline={isOnline} />
-              <Kbd className="h-4 text-[9px] px-1 opacity-0 group-hover/settings:opacity-100 transition-opacity">{settingsShortcutLabel}</Kbd>
-            </span>
-          </div>
+          {hasChip ? (
+            <div className="grid flex-1 text-left text-sm leading-tight">
+              <span className="truncate font-semibold">Settings</span>
+              <span className="flex items-center gap-1.5 mt-0.5">
+                <SyncBadge status={syncStatus} isOnline={isOnline} />
+                <Kbd className="h-4 text-[9px] px-1 opacity-0 group-hover/settings:opacity-100 transition-opacity">{settingsShortcutLabel}</Kbd>
+              </span>
+            </div>
+          ) : (
+            <div className="flex flex-1 items-center text-left">
+              <span className="flex-1 truncate text-base font-semibold">Settings</span>
+              <Kbd className="h-5 text-[10px] px-1.5 mr-1 opacity-0 group-hover/settings:opacity-100 transition-opacity">{settingsShortcutLabel}</Kbd>
+            </div>
+          )}
           <ChevronsUpDown className="ml-auto size-4" />
         </SidebarMenuButton>
       }

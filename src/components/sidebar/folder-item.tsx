@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils.ts";
-import { ChevronRight, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { ChevronRight, GripVertical, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 import * as Collapsible from "@radix-ui/react-collapsible";
 import { useDroppable } from "@dnd-kit/core";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useFeedStore } from "@/stores/feed-store.ts";
 import {
   SidebarMenu,
@@ -26,15 +28,30 @@ interface FolderItemProps {
   isSelected: boolean;
   /** Called when the user wants to view the folder's aggregated feed. */
   onSelect: () => void;
+  /** When true, the folder header shows a grip handle and is reorderable
+   *  via @dnd-kit/sortable. Used in custom sort mode. */
+  sortable?: boolean;
 }
 
-export function FolderItem({ folder, children, onDelete, isSelected, onSelect }: FolderItemProps) {
-  const [open, setOpen] = useState(true);
+export function FolderItem({ folder, children, onDelete, isSelected, onSelect, sortable = false }: FolderItemProps) {
+  const open = useFeedStore((s) => s.folderOpenState[folder.id] ?? true);
+  const setFolderOpen = useFeedStore((s) => s.setFolderOpen);
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
   const renameFolder = useFeedStore((s) => s.renameFolder);
   const updateFolderColor = useFeedStore((s) => s.updateFolderColor);
-  const { setNodeRef, isOver } = useDroppable({ id: folder.id });
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ id: folder.id });
+  const sortableHook = useSortable({ id: folder.id, disabled: !sortable });
+  const sortStyle: React.CSSProperties = sortable && sortableHook.transform
+    ? { transform: CSS.Transform.toString(sortableHook.transform), transition: sortableHook.transition }
+    : {};
+
+  /** Combine the droppable ref (feed→folder drop target) with the sortable
+   *  ref (folder reorder) into a single ref callback for the outer <li>. */
+  function setNodeRef(node: HTMLLIElement | null) {
+    setDropRef(node);
+    if (sortable) sortableHook.setNodeRef(node);
+  }
 
   function handleStartRename() {
     setRenameValue(folder.name);
@@ -59,13 +76,29 @@ export function FolderItem({ folder, children, onDelete, isSelected, onSelect }:
   return (
     <li
       ref={setNodeRef}
+      style={{ opacity: sortable && sortableHook.isDragging ? 0.4 : 1, ...sortStyle }}
       className={isOver ? "bg-accent/50 rounded-md transition-colors" : "transition-colors"}
     >
-      <Collapsible.Root className="group/folder" open={open} onOpenChange={setOpen}>
+      <Collapsible.Root
+        className="group/folder"
+        open={open}
+        onOpenChange={(v) => setFolderOpen(folder.id, v)}
+      >
         <div
           data-sidebar="menu-item"
           className="group/menu-item relative"
         >
+          {sortable && (
+            <button
+              type="button"
+              {...sortableHook.listeners}
+              {...sortableHook.attributes}
+              aria-label={`Drag folder ${folder.name}`}
+              className="absolute -left-2 top-1.5 z-20 flex size-5 items-center justify-center cursor-grab opacity-0 group-hover/menu-item:opacity-100 transition-opacity"
+            >
+              <GripVertical className="size-3 text-muted-foreground" />
+            </button>
+          )}
           {isRenaming ? (
             <form className="flex items-center gap-2 px-2 py-1" onSubmit={handleSubmitRename}>
               <ChevronRight className="size-3.5" />
@@ -81,15 +114,18 @@ export function FolderItem({ folder, children, onDelete, isSelected, onSelect }:
           ) : (
             <>
               {/*
-                The SidebarMenuButton does both: navigate to the folder's
-                aggregated feed AND toggle collapse. The absolutely-positioned
-                Collapsible.Trigger (chevron) also toggles collapse but does
-                NOT navigate — useful for keyboard/pointer users who want
-                collapse-only. Button padding (pl-7) leaves room for the chevron.
+                Click the folder name → navigate to the folder's aggregated
+                feed only. Click the absolutely-positioned chevron (the
+                Collapsible.Trigger below) → toggle collapse only. The two
+                affordances are intentionally distinct: clicking the name
+                used to also toggle, which surprised users who expected
+                "click name = open that feed" without losing their place
+                in the folder tree. Button padding (pl-7) leaves room for
+                the chevron.
               */}
               <SidebarMenuButton
                 isActive={isSelected}
-                onClick={() => { onSelect(); setOpen(o => !o); }}
+                onClick={onSelect}
                 className="font-semibold pl-7"
                 style={colorStyle}
               >
@@ -100,10 +136,11 @@ export function FolderItem({ folder, children, onDelete, isSelected, onSelect }:
                   type="button"
                   aria-label="Toggle folder"
                   className={cn(
-                    "absolute left-1 top-1 size-6 flex items-center justify-center rounded-sm z-10",
-                    folder.color ? "hover:bg-white/20" : "hover:bg-sidebar-accent",
+                    "absolute left-1 top-1 size-6 flex items-center justify-center z-10 transition-colors",
+                    folder.color
+                      ? "text-white/70 hover:text-white"
+                      : "text-muted-foreground hover:text-foreground",
                   )}
-                  style={folder.color ? { color: "#ffffff" } : undefined}
                 >
                   <ChevronRight className="size-3.5 transition-transform group-data-[state=open]/folder:rotate-90" />
                 </button>

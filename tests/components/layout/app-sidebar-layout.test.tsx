@@ -4,6 +4,7 @@ import { MemoryRouter } from "react-router";
 import { AppSidebar } from "@/components/layout/app-sidebar.tsx";
 import { SidebarProvider } from "@/components/ui/sidebar.tsx";
 import { useFeedStore } from "@/stores/feed-store.ts";
+import { useSyncStore } from "@/stores/sync-store.ts";
 
 vi.mock("@/core/storage/db.ts", () => ({
   getFeeds: vi.fn().mockResolvedValue({ ok: true, value: [] }),
@@ -142,5 +143,58 @@ describe("AppSidebar layout structure", () => {
       name: /explore/i,
     });
     expect(exploreButton.dataset.active).toBe("true");
+  });
+
+  describe("sync chip visibility", () => {
+    it("does not render the SyncBadge for local-only online users", () => {
+      useSyncStore.setState({ status: "local-only" });
+      renderSidebar();
+      // The amber sidebar-footer chip is the one we want suppressed; ensure
+      // no element with the visible 'Local' label is in the document.
+      expect(screen.queryByText(/^Local$/)).not.toBeInTheDocument();
+    });
+
+    it("still renders the Synced pill when sync is active", () => {
+      useSyncStore.setState({ status: "synced" });
+      renderSidebar();
+      expect(screen.getByText(/^Synced$/)).toBeInTheDocument();
+    });
+
+    it("renders the Settings label centered (single-line) when no chip is visible", () => {
+      // For local-only online users SyncBadge returns null. The footer
+      // trigger should collapse to a single, vertically-centered "Settings"
+      // line instead of leaving an empty second row that makes the label
+      // look top-aligned.
+      useSyncStore.setState({ status: "local-only" });
+      renderSidebar();
+      const settingsLabel = screen.getByText("Settings");
+      const container = settingsLabel.parentElement as HTMLElement;
+      // Single-line layout uses flex with items-center, not the two-row grid.
+      expect(container.className).toContain("items-center");
+      expect(container.className).not.toContain("grid");
+    });
+
+    it("shows a Local pill inside the Settings dropdown when status is local-only", async () => {
+      useSyncStore.setState({ status: "local-only" });
+      useFeedStore.setState({
+        feeds: [
+          {
+            id: "feed-1",
+            url: "https://example.com/rss",
+            title: "Example Feed",
+            description: "",
+            siteUrl: "https://example.com",
+            createdAt: 0,
+            updatedAt: 0,
+          },
+        ],
+      });
+      const { default: userEvent } = await import("@testing-library/user-event");
+      const user = userEvent.setup();
+      renderSidebar();
+      await user.click(screen.getByRole("button", { name: /settings/i }));
+      // Local pill inside the open dropdown.
+      expect(await screen.findByText(/^Local$/)).toBeInTheDocument();
+    });
   });
 });

@@ -83,6 +83,19 @@ export function FeedsPage() {
       document.removeEventListener("feedzero:navigate-explore", handler);
   }, [navigate]);
 
+  // U / I keyboard nav dispatches feedzero:navigate-feed with the next feed
+  // id (built from feed-store state so closed-folder children are reachable).
+  // Translate that into a URL push so feedId state propagates through React
+  // Router and the sidebar's data-active state updates.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const id = (e as CustomEvent<{ feedId: string }>).detail.feedId;
+      navigate(`/feeds/${id}`);
+    };
+    document.addEventListener("feedzero:navigate-feed", handler);
+    return () => document.removeEventListener("feedzero:navigate-feed", handler);
+  }, [navigate]);
+
   function handleFeedAdded(feedId: string) {
     handleFeedSelect(feedId);
   }
@@ -99,17 +112,33 @@ export function FeedsPage() {
   // article matching the previous URL.
   const lastSyncedArticleIdRef = useRef<string | undefined>(undefined);
 
-  // Whenever no feedId is in the URL (and we're not explicitly on /explore),
-  // land on the All items article list. Even with zero feeds the list is the
-  // expected home — the auto-subscribe to the release notes feed populates
-  // it shortly, and Explore is reachable via the sidebar. Defaulting to
-  // Explore would otherwise make the app feel like a directory, not a reader.
+  // Default destination for a bare /feeds URL (no feedId). The decision is
+  // driven by the actual feed count, not a persistent flag, so it is robust
+  // across browser sessions, reset flows, and the timing race between the
+  // first loadFeeds() and the release-feed auto-subscribe.
+  //
+  //   * 0 or 1 feeds  → /explore (still in starter mode; the one feed is
+  //                     typically just the auto-subscribed release feed,
+  //                     so we'd rather show the catalog than a one-feed
+  //                     All Items list)
+  //   * 2+ feeds      → /feeds/all (returning user — go to the aggregate)
+  //
+  // The `feedsLoaded` gate prevents a flash where the effect fires with
+  // feeds=[] before loadFeeds() has populated the store. Without it, a
+  // returning multi-feed user would land on /explore briefly and then get
+  // stuck there once isExplorePage flipped true.
+  const feedsLoaded = useFeedStore((s) => s.feedsLoaded);
+  const feedCount = feeds.length;
   useEffect(() => {
     if (isExplorePage || isStatsPage) return;
-    if (!feedId) {
-      navigate(`/feeds/${ALL_FEEDS_ID}`, { replace: true });
+    if (feedId) return;
+    if (!feedsLoaded) return;
+    if (feedCount <= 1) {
+      navigate("/explore", { replace: true });
+      return;
     }
-  }, [isExplorePage, isStatsPage, feedId, navigate]);
+    navigate(`/feeds/${ALL_FEEDS_ID}`, { replace: true });
+  }, [isExplorePage, isStatsPage, feedId, feedsLoaded, feedCount, navigate]);
 
   const isLoadingArticles = useArticleStore((s) => s.isLoading);
 

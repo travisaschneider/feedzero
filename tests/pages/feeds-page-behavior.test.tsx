@@ -139,6 +139,11 @@ function resetStores() {
     error: null,
     isRefreshingAll: false,
     refreshingFeedIds: new Set(),
+    // Default to "feeds already loaded" so the most common test path
+    // (set feeds via setState then render) doesn't get blocked by the
+    // explore-vs-all redirect gate. The dedicated gate test below sets
+    // feedsLoaded:false explicitly.
+    feedsLoaded: true,
   });
   useArticleStore.setState({
     articles: [],
@@ -156,14 +161,14 @@ describe("FeedsPage behavior — desktop", () => {
     resetStores();
   });
 
-  it("shows explore catalog at /feeds when there are no feeds (desktop renders explore inline)", async () => {
+  it("shows explore catalog at /feeds when there are no feeds (redirects to /explore)", async () => {
     renderPage("/feeds");
 
-    // Mobile redirects to /feeds/all (the ALL_FEEDS list, possibly empty).
-    // Desktop renders the explore catalog inline whenever feeds.length === 0,
-    // regardless of whether the URL is /feeds/all or /explore.
+    // Minimal-feed states (zero feeds, single feed) route to /explore on
+    // both desktop and mobile so the user immediately sees a discoverable
+    // catalog instead of an empty list.
     await vi.waitFor(() => {
-      expect(currentUrl).toBe(`/feeds/${ALL_FEEDS_ID}`);
+      expect(currentUrl).toBe("/explore");
     });
     expect(await screen.findByRole("heading", { name: "Explore" })).toBeInTheDocument();
   });
@@ -203,15 +208,16 @@ describe("FeedsPage behavior — desktop", () => {
     expect(useFeedStore.getState().selectedFeedId).toBe(folderFeedId);
   });
 
-  it("auto-navigates to All items feed when feeds exist and no feedId in URL", async () => {
+  it("auto-navigates to /explore when only one feed exists (starter state)", async () => {
     useFeedStore.setState({ feeds: [makeFeed("feed-1")] });
 
     renderPage("/feeds");
 
-    // Whenever feeds exist, default destination is the All items feed —
-    // even for a single feed — so users always land on the aggregated view.
+    // A single feed — typically just the auto-subscribed release feed —
+    // counts as "still in starter mode": route to /explore so the user
+    // can discover more to read, instead of landing in a one-feed All Items.
     await vi.waitFor(() => {
-      expect(currentUrl).toBe(`/feeds/${ALL_FEEDS_ID}`);
+      expect(currentUrl).toBe("/explore");
     });
   });
 
@@ -291,6 +297,58 @@ describe("FeedsPage behavior — desktop", () => {
     // Observable: URL stays the same
     expect(currentUrl).toBe("/feeds/feed-1/articles/art-2");
   });
+
+  describe("explore-as-home when feed count is minimal", () => {
+    it("redirects /feeds to /explore when the user has zero feeds", async () => {
+      useFeedStore.setState({ feeds: [], feedsLoaded: true });
+
+      renderPage("/feeds");
+
+      await vi.waitFor(() => {
+        expect(currentUrl).toBe("/explore");
+      });
+    });
+
+    it("redirects /feeds to /explore when the user has only one feed (e.g. the auto-subscribed release feed)", async () => {
+      useFeedStore.setState({
+        feeds: [makeFeed("release")],
+        feedsLoaded: true,
+      });
+
+      renderPage("/feeds");
+
+      await vi.waitFor(() => {
+        expect(currentUrl).toBe("/explore");
+      });
+    });
+
+    it("falls back to All items once the user has two or more feeds", async () => {
+      useFeedStore.setState({
+        feeds: [makeFeed("feed-1"), makeFeed("feed-2")],
+        feedsLoaded: true,
+      });
+
+      renderPage("/feeds");
+
+      await vi.waitFor(() => {
+        expect(currentUrl).toBe(`/feeds/${ALL_FEEDS_ID}`);
+      });
+    });
+
+    it("does not redirect until loadFeeds has completed (avoids the empty-store flash)", () => {
+      // feedsLoaded=false models the brief window between FeedsPage mounting
+      // and loadFeeds resolving. Without the gate, the effect would fire with
+      // feeds=[] and route a returning multi-feed user to /explore.
+      useFeedStore.setState({
+        feeds: [makeFeed("feed-1"), makeFeed("feed-2")],
+        feedsLoaded: false,
+      });
+
+      renderPage("/feeds");
+
+      expect(currentUrl).toBe("/feeds");
+    });
+  });
 });
 
 describe("FeedsPage behavior — mobile", () => {
@@ -300,11 +358,13 @@ describe("FeedsPage behavior — mobile", () => {
     resetStores();
   });
 
-  it("shows 'Articles' fallback in header at /feeds root after redirect", async () => {
+  it("redirects /feeds → /explore when feed count is minimal (mobile)", async () => {
     renderPage("/feeds");
-    // /feeds redirects to /feeds/all on mobile, so the header now reflects
-    // the article-list context (no feed match in store → "Articles" fallback).
-    expect(await screen.findByText("Articles")).toBeInTheDocument();
+    // Minimal-feed mobile users land on /explore (same robust contract as
+    // desktop), where the catalog renders inline.
+    await vi.waitFor(() => {
+      expect(currentUrl).toBe("/explore");
+    });
   });
 
   it("shows 'Articles' in header when feedId is present", () => {
@@ -319,13 +379,15 @@ describe("FeedsPage behavior — mobile", () => {
     expect(screen.getByText("Articles")).toBeInTheDocument();
   });
 
-  it("redirects /feeds to /feeds/all on mobile (article list, not explore)", async () => {
+  it("redirects /feeds to /explore on mobile when feed count is minimal", async () => {
+    // Empty + single-feed states land on /explore (mobile renders the explore
+    // catalog inline) so a brand new user immediately sees discoverable feeds
+    // instead of an empty list. Multi-feed users land on /feeds/all as before
+    // — covered by the desktop suite above.
     renderPage("/feeds");
 
-    // Mobile lands on the All items article list — even when feeds is empty.
-    // The user reaches Explore via the sidebar, not as an unsolicited landing page.
     await vi.waitFor(() => {
-      expect(currentUrl).toBe(`/feeds/${ALL_FEEDS_ID}`);
+      expect(currentUrl).toBe("/explore");
     });
   });
 

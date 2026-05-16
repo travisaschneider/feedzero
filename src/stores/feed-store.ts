@@ -54,10 +54,15 @@ interface FeedStore {
   feedSortMode: FeedSortMode;
   feedCustomOrder: string[];
   folderCustomOrder: string[];
+  /** True once loadFeeds() has resolved at least once. Used by the
+   *  /feeds → /explore-vs-/feeds/all routing decision to avoid firing
+   *  with an empty store before the DB is read. */
+  feedsLoaded: boolean;
   loadFeeds: () => Promise<void>;
   addFeed: (url: string) => Promise<Result<void>>;
   removeFeed: (feedId: string) => Promise<void>;
   renameFeed: (feedId: string, newTitle: string) => Promise<void>;
+  setFeedPreferFullText: (feedId: string, value: boolean) => Promise<void>;
   reloadSingleFeed: (feedId: string) => Promise<void>;
   selectFeed: (feedId: string) => void;
   refreshAll: () => Promise<void>;
@@ -73,6 +78,10 @@ interface FeedStore {
   setFeedSortMode: (mode: FeedSortMode) => void;
   reorderFeeds: (orderedIds: string[]) => void;
   reorderFolders: (orderedIds: string[]) => void;
+  /** Per-folder collapse state. Missing key means "open" (the default). */
+  folderOpenState: Record<string, boolean>;
+  setFolderOpen: (folderId: string, open: boolean) => void;
+  toggleFolderOpen: (folderId: string) => void;
 }
 
 function readSortMode(): FeedSortMode {
@@ -102,6 +111,8 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
   feedSortMode: readSortMode(),
   feedCustomOrder: readJsonArray(LOCAL_STORAGE.FEED_CUSTOM_ORDER),
   folderCustomOrder: readJsonArray(LOCAL_STORAGE.FOLDER_CUSTOM_ORDER),
+  folderOpenState: {},
+  feedsLoaded: false,
 
   loadFeeds: async () => {
     const [feedsResult, foldersResult] = await Promise.all([getFeeds(), dbGetFolders()]);
@@ -109,6 +120,7 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
       feeds: feedsResult.ok ? sortFeeds(feedsResult.value) : [],
       folders: foldersResult.ok ? foldersResult.value.sort((a, b) => a.name.localeCompare(b.name)) : [],
       error: feedsResult.ok ? null : feedsResult.error,
+      feedsLoaded: true,
     });
   },
 
@@ -170,6 +182,16 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     const feedResult = await getFeed(feedId);
     if (!feedResult.ok) return;
     const updated = { ...feedResult.value, title: newTitle, updatedAt: Date.now() };
+    await dbUpdateFeed(updated);
+    const allFeeds = await getFeeds();
+    set({ feeds: allFeeds.ok ? sortFeeds(allFeeds.value) : get().feeds });
+    useSyncStore.getState().scheduleSyncPush();
+  },
+
+  setFeedPreferFullText: async (feedId, value) => {
+    const feedResult = await getFeed(feedId);
+    if (!feedResult.ok) return;
+    const updated = { ...feedResult.value, preferFullText: value, updatedAt: Date.now() };
     await dbUpdateFeed(updated);
     const allFeeds = await getFeeds();
     set({ feeds: allFeeds.ok ? sortFeeds(allFeeds.value) : get().feeds });
@@ -303,6 +325,18 @@ export const useFeedStore = create<FeedStore>((set, get) => ({
     try { localStorage.setItem(LOCAL_STORAGE.FOLDER_CUSTOM_ORDER, JSON.stringify(orderedIds)); } catch { /* ignore */ }
     set({ folderCustomOrder: orderedIds });
   },
+
+  setFolderOpen: (folderId, open) =>
+    set((s) => ({ folderOpenState: { ...s.folderOpenState, [folderId]: open } })),
+
+  toggleFolderOpen: (folderId) =>
+    set((s) => {
+      const current = s.folderOpenState[folderId];
+      // undefined is treated as open (matches the previous useState(true)
+      // default in FolderItem), so the first toggle closes the folder.
+      const next = current === undefined ? false : !current;
+      return { folderOpenState: { ...s.folderOpenState, [folderId]: next } };
+    }),
 
   /**
    * Bulk-apply an auto-organize plan: for each entry with feeds, create a
