@@ -21,6 +21,7 @@ import { groupByHostForRefresh } from "./group-by-host.ts";
 import { parseRetryAfter } from "./parse-retry-after.ts";
 import { applyRules } from "../rules/engine.ts";
 import { buildContext } from "../filters/evaluator.ts";
+import { isFeedDueForRefresh } from "./refresh-backoff.ts";
 
 interface AddFeedResult {
   feed: Feed;
@@ -356,13 +357,35 @@ export async function previewFeed(
 export async function refreshFeed(feed: Feed): Promise<Result<RefreshResult>> {
   const now = Date.now();
   try {
-    const response = await proxyFetch("/api/feed", feed.url);
+    const response = await proxyFetch("/api/feed", feed.url, {
+      etag: feed.etag,
+      lastModified: feed.lastModified,
+    });
+    // 304 Not Modified: the publisher confirms nothing changed since the
+    // last fetch. Don't parse, don't write the DB, don't reshuffle the
+    // article list — just record that we tried and got a clean "no
+    // change" signal. Bump consecutive304Count so the bulk auto-refresh
+    // can stretch this feed's interval (see refresh-backoff.ts). The
+    // user-facing sidebar still updates its "last refreshed" indicator
+    // off `lastSuccessfulFetchAt`.
+    if (response.status === 304) {
+      feed.consecutive304Count = (feed.consecutive304Count ?? 0) + 1;
+      await persistFreshness(feed, {
+        fetchedAt: now,
+        successfulAt: now,
+        lastError: null,
+      });
+      return ok({ newCount: 0, updatedCount: 0 });
+    }
     if (!response.ok) {
       // Always record the attempt so the stale-indicator clock keeps
       // moving; never clobber a prior success timestamp. The user-facing
       // error message surfaces Retry-After when the upstream sent one
       // (feedback #97: self-host bulk refresh against fresh IPs trips
       // upstream WAFs and the user needs to know when to retry).
+      // A non-304 response ends the 304 streak (the publisher answered
+      // with something other than "nothing changed").
+      delete feed.consecutive304Count;
       const errorMessage = fetchErrorMessage(response, "Failed to fetch feed");
       await persistFreshness(feed, {
         fetchedAt: now,
@@ -375,7 +398,8 @@ export async function refreshFeed(feed: Feed): Promise<Result<RefreshResult>> {
     const parseResult = parse(text, feed.url);
     if (!parseResult.ok) {
       // HTTP succeeded but content was unparseable — the publisher is alive,
-      // so this still counts as a successful reach.
+      // so this still counts as a successful reach and ends the 304 streak.
+      delete feed.consecutive304Count;
       await persistFreshness(feed, {
         fetchedAt: now,
         successfulAt: now,
@@ -459,6 +483,24 @@ export async function refreshFeed(feed: Feed): Promise<Result<RefreshResult>> {
       if (parsedFeed.siteUrl) feed.siteUrl = parsedFeed.siteUrl;
     }
 
+    // Capture the upstream's cache validators so the next refresh can
+    // present them and resolve as a 304 when nothing changed. Either
+    // header may be absent — many feeds set one but not both. Strip
+    // when absent so a publisher that drops one between fetches doesn't
+    // leave a stale validator on the Feed record. Defensive `?.get?.`
+    // covers test mocks that return bare objects without a `headers`
+    // shape (refresh tests that pre-date this finding).
+    const upstreamEtag = response.headers?.get?.("etag") ?? null;
+    const upstreamLastModified = response.headers?.get?.("last-modified") ?? null;
+    if (upstreamEtag) feed.etag = upstreamEtag;
+    else delete feed.etag;
+    if (upstreamLastModified) feed.lastModified = upstreamLastModified;
+    else delete feed.lastModified;
+
+    // Fresh content means the 304-backoff streak ends — clear the
+    // counter so the feed returns to the default refresh cadence.
+    delete feed.consecutive304Count;
+
     await persistFreshness(feed, {
       fetchedAt: now,
       successfulAt: now,
@@ -515,16 +557,43 @@ async function persistFreshness(
  * against many feeds on one upstream (feeds.feedburner.com, Substack
  * domains, etc.) doesn't burst-fire and trip per-IP rate limits — the
  * self-host symptom from feedback #97.
+ *
+ * When `respectBackoff` is set with a `defaultIntervalMs`, feeds whose
+ * `consecutive304Count` has stretched their effective interval past
+ * elapsed-since-last-refresh are skipped (returns ok with empty results
+ * for them). This is the auto-refresh path's optimization; user-clicked
+ * "Refresh All" omits this option so every feed is queried.
  */
 /** Max concurrent feed refreshes to avoid network/CPU spikes. */
 const REFRESH_CONCURRENCY = 5;
 
-export async function refreshAllFeeds(): Promise<Result<RefreshAllResult>> {
+export interface RefreshAllOptions {
+  /**
+   * When set, feeds whose effective refresh interval (after consecutive-304
+   * backoff) has not yet elapsed are skipped. Pass the auto-refresh
+   * cadence here (typically AUTO_REFRESH_INTERVAL_MS); omit for explicit
+   * user-triggered refresh-all.
+   */
+  respectBackoffWithDefaultMs?: number;
+}
+
+export async function refreshAllFeeds(
+  options: RefreshAllOptions = {},
+): Promise<Result<RefreshAllResult>> {
   const feedsResult = await getFeeds();
   if (!feedsResult.ok) return err(feedsResult.error);
 
-  const feeds = feedsResult.value;
+  const allFeeds = feedsResult.value;
   const results: RefreshAllResult["results"] = [];
+
+  // Apply backoff filter when the caller is the auto-refresh timer; an
+  // explicit user-click bypasses by omitting the default interval.
+  const feeds =
+    options.respectBackoffWithDefaultMs !== undefined
+      ? allFeeds.filter((f) =>
+          isFeedDueForRefresh(f, Date.now(), options.respectBackoffWithDefaultMs!),
+        )
+      : allFeeds;
 
   // Pack into batches where each batch has at most REFRESH_CONCURRENCY
   // feeds AND no two feeds share a host. Same-host duplicates fall into

@@ -40,6 +40,24 @@ export interface Feed {
    * `applyRules` call.
    */
   rules?: Rule[];
+  /**
+   * Most-recent `ETag` returned by the publisher on a 2xx fetch. Replayed
+   * on the next refresh as `If-None-Match`; a 304 short-circuits the
+   * download. These are public HTTP cache validators for a public feed
+   * URL — they betray nothing about the user's read state — so they
+   * ride in the encrypted vault alongside the other feed metadata.
+   */
+  etag?: string;
+  /** Most-recent `Last-Modified` returned by the publisher; see {@link Feed.etag}. */
+  lastModified?: string;
+  /**
+   * Number of consecutive 304 Not Modified responses the publisher has
+   * returned. Used by the bulk auto-refresh path to stretch the effective
+   * refresh interval for feeds that publish infrequently — see
+   * `effectiveRefreshIntervalMs` in `src/core/feeds/refresh-backoff.ts`.
+   * Cleared on any non-304 response.
+   */
+  consecutive304Count?: number;
 }
 
 export interface Folder {

@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { compress } from "hono/compress";
 import { handleProxyRequest } from "./src/core/proxy/proxy-handler";
 import { handleFeedbackRequest } from "./src/core/feedback/feedback-handler";
 import { handleSyncRequest } from "./src/core/sync/sync-handler";
@@ -172,6 +173,16 @@ export function createApp(
     }
     await next();
   });
+
+  // Gzip/deflate compression for any compressible response above the
+  // default 1 KB threshold. Self-host parity with Vercel's edge — the
+  // hosted deployment compresses at the CDN automatically. Without
+  // this, a returning user pulling a 2 MB encrypted vault over
+  // /api/sync downloads the full ciphertext on every reload; with it,
+  // typical JSON+base64 responses compress 70–80%. Mounted AFTER the
+  // rate-limit middleware so 429 short-circuits don't pay the
+  // compression cost.
+  app.use("*", compress());
 
   // Health/diagnostics endpoint
   app.get("/api/diagnostics", (c) =>
@@ -386,6 +397,16 @@ async function startServer(): Promise<void> {
   };
   const app = createApp(adapter, cache, catalog, licenseDeps);
 
+  // Long-lived immutable caching for hashed asset filenames (everything
+  // under /assets/ comes out of Vite with a content hash in its name, so
+  // the URL changes whenever the bytes change). Without this, every
+  // self-host visitor re-downloads ~430 KB of vendor chunks on each
+  // revisit — defeats the per-vendor split. The hosted (Vercel)
+  // deployment sets the same header automatically for hashed assets.
+  app.use("/assets/*", async (c, next) => {
+    await next();
+    c.header("Cache-Control", "public, max-age=31536000, immutable");
+  });
   app.use("/*", serveStatic({ root: "./dist" }));
   app.get("/*", serveStatic({ path: "./dist/index.html" }));
 

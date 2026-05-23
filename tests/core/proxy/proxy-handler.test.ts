@@ -420,3 +420,141 @@ describe("handleProxyRequest — rate limiting", () => {
     expect(res.status).toBe(200);
   });
 });
+
+describe("Cache-Control on image responses", () => {
+  beforeEach(() => {
+    fetchSpy.mockReset();
+  });
+
+  it("sets a long-lived Cache-Control on proxied image responses", async () => {
+    fetchSpy.mockResolvedValue(
+      new Response(new ArrayBuffer(64), {
+        status: 200,
+        headers: { "Content-Type": "image/png" },
+      }),
+    );
+    const req = new Request("http://localhost/api/icon", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: "https://example.com/favicon.ico" }),
+    });
+    const res = await handleProxyRequest(req, "image/x-icon");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Cache-Control")).toMatch(/max-age=86400/);
+    expect(res.headers.get("Cache-Control")).toMatch(/stale-while-revalidate/);
+  });
+
+  it("does NOT set Cache-Control on text feed responses", async () => {
+    // Feed XML is driven by the refresh cycle (and now ETag); a stale
+    // HTTP cache hit would mask publisher updates the user expects to
+    // see on their next refresh. Keep the no-cache default in place.
+    fetchSpy.mockResolvedValue(
+      new Response("<rss/>", {
+        status: 200,
+        headers: { "Content-Type": "text/xml" },
+      }),
+    );
+    const req = new Request("http://localhost/api/feed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: "https://example.com/feed.xml" }),
+    });
+    const res = await handleProxyRequest(req, "text/xml");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Cache-Control")).toBeNull();
+  });
+});
+
+describe("conditional-fetch (ETag / Last-Modified) passthrough", () => {
+  beforeEach(() => {
+    fetchSpy.mockReset();
+  });
+
+  it("forwards client-supplied etag as upstream If-None-Match", async () => {
+    fetchSpy.mockResolvedValue(
+      new Response("<rss/>", {
+        status: 200,
+        headers: { "Content-Type": "text/xml" },
+      }),
+    );
+    const req = new Request("http://localhost/api/feed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: "https://example.com/feed.xml",
+        etag: 'W/"abc123"',
+      }),
+    });
+    await handleProxyRequest(req, "text/xml");
+    const [, options] = fetchSpy.mock.calls[0];
+    const headers = new Headers(options!.headers as HeadersInit);
+    expect(headers.get("If-None-Match")).toBe('W/"abc123"');
+  });
+
+  it("forwards client-supplied lastModified as upstream If-Modified-Since", async () => {
+    fetchSpy.mockResolvedValue(
+      new Response("<rss/>", {
+        status: 200,
+        headers: { "Content-Type": "text/xml" },
+      }),
+    );
+    const req = new Request("http://localhost/api/feed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: "https://example.com/feed.xml",
+        lastModified: "Wed, 21 Oct 2026 07:28:00 GMT",
+      }),
+    });
+    await handleProxyRequest(req, "text/xml");
+    const [, options] = fetchSpy.mock.calls[0];
+    const headers = new Headers(options!.headers as HeadersInit);
+    expect(headers.get("If-Modified-Since")).toBe(
+      "Wed, 21 Oct 2026 07:28:00 GMT",
+    );
+  });
+
+  it("returns 304 with an empty body when upstream returns 304 Not Modified", async () => {
+    fetchSpy.mockResolvedValue(
+      new Response(null, {
+        status: 304,
+        headers: { "Content-Type": "text/xml" },
+      }),
+    );
+    const req = new Request("http://localhost/api/feed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: "https://example.com/feed.xml",
+        etag: 'W/"abc123"',
+      }),
+    });
+    const res = await handleProxyRequest(req, "text/xml");
+    expect(res.status).toBe(304);
+    expect(await res.text()).toBe("");
+  });
+
+  it("passes upstream ETag and Last-Modified through on 200 responses", async () => {
+    fetchSpy.mockResolvedValue(
+      new Response("<rss/>", {
+        status: 200,
+        headers: {
+          "Content-Type": "text/xml",
+          ETag: 'W/"new-etag"',
+          "Last-Modified": "Thu, 22 Oct 2026 09:00:00 GMT",
+        },
+      }),
+    );
+    const req = new Request("http://localhost/api/feed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: "https://example.com/feed.xml" }),
+    });
+    const res = await handleProxyRequest(req, "text/xml");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("ETag")).toBe('W/"new-etag"');
+    expect(res.headers.get("Last-Modified")).toBe(
+      "Thu, 22 Oct 2026 09:00:00 GMT",
+    );
+  });
+});
