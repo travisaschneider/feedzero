@@ -24,7 +24,7 @@
  * specialize key shape, TTL, and behavior independently of license storage.
  */
 
-import { type Result, ok, err } from "../../utils/result";
+import { type Result, ok, err } from "../../../packages/core/src/utils/result";
 import { markTestOnly } from "../test-only-brand";
 
 /**

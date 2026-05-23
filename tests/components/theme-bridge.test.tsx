@@ -3,7 +3,7 @@ import { act, render, screen } from "@testing-library/react";
 import { ThemeProvider, useTheme } from "next-themes";
 import { ThemeBridge } from "@/components/theme-bridge";
 import { usePreferencesStore } from "@/stores/preferences-store";
-import { DEFAULT_PREFERENCES } from "@/types";
+import { DEFAULT_PREFERENCES } from "@feedzero/core/types";
 
 function CurrentTheme() {
   const { theme } = useTheme();

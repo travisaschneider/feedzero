@@ -1,4 +1,4 @@
-import type { UserPreferences } from "../types/index.ts";
+import type { UserPreferences } from "@feedzero/core/types";
 import { usePreferencesStore } from "./preferences-store.ts";
 
 /**

@@ -19,7 +19,7 @@ import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { usePreferencesStore } from "../../stores/preferences-store";
-import type { UserPreferences } from "../../types";
+import type { UserPreferences } from "@feedzero/core/types";
 
 type ThemeValue = NonNullable<UserPreferences["theme"]>;
 

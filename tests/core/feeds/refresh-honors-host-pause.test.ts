@@ -38,7 +38,7 @@ import {
   clearHostPauses,
   hostPausedUntil,
 } from "@/core/feeds/host-pause";
-import type { Feed } from "@/types";
+import type { Feed } from "@feedzero/core/types";
 
 const proxyFetchMock = vi.mocked(proxyFetch);
 

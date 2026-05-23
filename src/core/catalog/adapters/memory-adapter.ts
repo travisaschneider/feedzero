@@ -1,5 +1,5 @@
+import { ok } from "../../../../packages/core/src/utils/result";
 import { markTestOnly } from "../../test-only-brand.ts";
-import { ok } from "../../../utils/result.ts";
 import type { CatalogFeed, CatalogStorageAdapter } from "../catalog-types.ts";
 
 /**

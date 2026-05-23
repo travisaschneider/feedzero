@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { ThemeProvider } from "next-themes";
 import { ThemeToggle } from "@/components/settings/theme-toggle";
 import { usePreferencesStore } from "@/stores/preferences-store";
-import { DEFAULT_PREFERENCES } from "@/types";
+import { DEFAULT_PREFERENCES } from "@feedzero/core/types";
 
 describe("ThemeToggle — vault wiring", () => {
   beforeEach(() => {

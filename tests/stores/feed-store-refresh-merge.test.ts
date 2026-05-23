@@ -29,7 +29,7 @@ vi.mock("@/core/proxy/proxy-fetch.ts", () => ({
 import { useFeedStore } from "@/stores/feed-store";
 import { getFeeds } from "@/core/storage/db";
 import { refreshAllFeeds } from "@/core/feeds/feed-service";
-import type { Feed } from "@/types";
+import type { Feed } from "@feedzero/core/types";
 
 const getFeedsMock = vi.mocked(getFeeds);
 const refreshAllFeedsMock = vi.mocked(refreshAllFeeds);

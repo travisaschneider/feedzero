@@ -1,4 +1,4 @@
-import { type Result } from "../../utils/result";
+import { type Result } from "../../../packages/core/src/utils/result";
 import { markTestOnly } from "../test-only-brand";
 
 /**
