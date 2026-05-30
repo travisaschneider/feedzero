@@ -1,0 +1,16 @@
+name: Auto Sync Fork
+
+on:
+  schedule:
+    - cron: '0 3 * * *' # Runs every day at 3:00 AM UTC
+  workflow_dispatch: # Allows you to run it manually from the Actions tab
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync with Upstream
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh repo sync $GITHUB_REPOSITORY
