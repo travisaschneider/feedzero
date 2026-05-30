@@ -3,18 +3,29 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { SyncStatusBadge } from "@/components/sync/sync-status-badge";
 import { useSyncStore } from "@/stores/sync-store";
+import { useFeedStore } from "@/stores/feed-store";
+import { useLicenseStore } from "@/stores/license-store";
 
 /**
- * The persistent "are we synced?" affordance in the top-right of the
- * app shell. Lives outside the sidebar so it's visible on every route
- * — including /settings where the sidebar might be tucked behind a
- * Sheet on narrow viewports.
+ * The persistent "what's happening with my data?" affordance in the
+ * sidebar header. It surfaces two independent facts in one line:
  *
- * Visual states match the underlying SyncStatus union:
- *   local-only → amber dot, "Local only"
- *   syncing    → animated dot, "Syncing…"
- *   synced     → emerald dot, "Synced · 2 min ago" (relative)
- *   error      → rose dot, "Sync error" + retry chevron
+ *   <refresh state> · <sync mode>
+ *
+ * `refresh state` is about the publisher fetch — "Refreshing…" /
+ * "Refreshed 5 min ago". It changes every ~30 min.
+ *
+ * `sync mode` is whether the user has cloud sync turned on — "local"
+ * or "synced". It usually changes once.
+ *
+ * Conflating them (which the old "Local only" / "Synced" pill did,
+ * via useIsAppBusy) made the badge look like it was always "Syncing…"
+ * during routine refreshes, which buried the actual mode.
+ *
+ * Visual rules:
+ *   - Idle states are visually subtle (muted text + small dot).
+ *   - Active states use the sky/spinner colour to signal "in flight".
+ *   - Errors stay loud rose — that's a signal the user needs to see.
  */
 function renderBadge() {
   return render(
@@ -28,65 +39,120 @@ describe("SyncStatusBadge", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-24T20:00:00Z"));
+    useFeedStore.setState({ isRefreshingAll: false, lastRefreshAllAt: null });
+    useLicenseStore.setState({ verifying: false });
   });
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it("shows amber 'Local only' when sync is off", () => {
-    useSyncStore.setState({ status: "local-only", lastSyncedAt: null });
-    renderBadge();
-    const badge = screen.getByTestId("sync-status-badge");
-    expect(badge).toHaveAttribute("data-state", "local-only");
-    expect(badge).toHaveTextContent(/local only/i);
-  });
-
-  it("shows emerald 'Synced · just now' when freshly synced", () => {
-    useSyncStore.setState({
-      status: "synced",
-      lastSyncedAt: Date.now() - 5_000,
+  describe("idle states", () => {
+    it("shows just 'Local' when local-only with no refresh history", () => {
+      useSyncStore.setState({ status: "local-only", lastSyncedAt: null });
+      renderBadge();
+      const badge = screen.getByTestId("sync-status-badge");
+      expect(badge).toHaveAttribute("data-state", "local-only");
+      expect(badge).toHaveTextContent(/^Local$/);
     });
-    renderBadge();
-    const badge = screen.getByTestId("sync-status-badge");
-    expect(badge).toHaveAttribute("data-state", "synced");
-    expect(badge).toHaveTextContent(/just now/i);
-  });
 
-  it("shows the relative timestamp in minutes when older than a minute", () => {
-    useSyncStore.setState({
-      status: "synced",
-      lastSyncedAt: Date.now() - 3 * 60 * 1000,
+    it("shows just 'Synced' when sync-on with no refresh history", () => {
+      useSyncStore.setState({ status: "synced", lastSyncedAt: Date.now() });
+      renderBadge();
+      const badge = screen.getByTestId("sync-status-badge");
+      expect(badge).toHaveAttribute("data-state", "synced");
+      expect(badge).toHaveTextContent(/^Synced$/);
     });
-    renderBadge();
-    expect(screen.getByTestId("sync-status-badge")).toHaveTextContent(
-      /3 min ago/i,
-    );
-  });
 
-  it("shows a spinner and 'Syncing…' during sync", () => {
-    useSyncStore.setState({ status: "syncing", lastSyncedAt: null });
-    const { container } = renderBadge();
-    expect(screen.getByTestId("sync-status-badge")).toHaveAttribute(
-      "data-state",
-      "syncing",
-    );
-    expect(container.querySelector(".animate-spin")).not.toBeNull();
-  });
-
-  it("shows 'Sync error' state in red", () => {
-    useSyncStore.setState({
-      status: "error",
-      lastSyncedAt: null,
-      error: "fetch failed",
+    it("shows 'Refreshed 5 min ago · local' for local-only with refresh history", () => {
+      useFeedStore.setState({ lastRefreshAllAt: Date.now() - 5 * 60_000 });
+      useSyncStore.setState({ status: "local-only", lastSyncedAt: null });
+      renderBadge();
+      const badge = screen.getByTestId("sync-status-badge");
+      expect(badge).toHaveTextContent("Refreshed 5 min ago · local");
     });
-    renderBadge();
-    expect(screen.getByTestId("sync-status-badge")).toHaveAttribute(
-      "data-state",
-      "error",
-    );
-    expect(screen.getByTestId("sync-status-badge")).toHaveTextContent(
-      /sync error/i,
-    );
+
+    it("shows 'Refreshed 5 min ago · synced' for sync users with refresh history", () => {
+      useFeedStore.setState({ lastRefreshAllAt: Date.now() - 5 * 60_000 });
+      useSyncStore.setState({ status: "synced", lastSyncedAt: Date.now() });
+      renderBadge();
+      const badge = screen.getByTestId("sync-status-badge");
+      expect(badge).toHaveTextContent("Refreshed 5 min ago · synced");
+    });
+
+    it("shows 'Refreshed just now' for a freshly-completed refresh", () => {
+      useFeedStore.setState({ lastRefreshAllAt: Date.now() - 5_000 });
+      useSyncStore.setState({ status: "local-only", lastSyncedAt: null });
+      renderBadge();
+      expect(screen.getByTestId("sync-status-badge")).toHaveTextContent(
+        /Refreshed just now/,
+      );
+    });
+
+    it("idle states render the muted-foreground text colour (subtle)", () => {
+      useFeedStore.setState({ lastRefreshAllAt: Date.now() - 60_000 });
+      useSyncStore.setState({ status: "synced", lastSyncedAt: Date.now() });
+      renderBadge();
+      const badge = screen.getByTestId("sync-status-badge");
+      expect(badge.className).toContain("text-muted-foreground");
+    });
+  });
+
+  describe("active states", () => {
+    it("shows 'Refreshing… · local' with spinner while refreshing locally", () => {
+      useFeedStore.setState({ isRefreshingAll: true });
+      useSyncStore.setState({ status: "local-only", lastSyncedAt: null });
+      const { container } = renderBadge();
+      expect(screen.getByTestId("sync-status-badge")).toHaveTextContent(
+        "Refreshing… · local",
+      );
+      expect(container.querySelector(".animate-spin")).not.toBeNull();
+    });
+
+    it("shows 'Refreshing… · synced' with spinner while refreshing under sync", () => {
+      useFeedStore.setState({ isRefreshingAll: true });
+      useSyncStore.setState({ status: "synced", lastSyncedAt: Date.now() });
+      renderBadge();
+      expect(screen.getByTestId("sync-status-badge")).toHaveTextContent(
+        "Refreshing… · synced",
+      );
+    });
+
+    it("shows 'Syncing… · synced' when the vault push is in flight", () => {
+      useSyncStore.setState({ status: "syncing", lastSyncedAt: null });
+      renderBadge();
+      const badge = screen.getByTestId("sync-status-badge");
+      expect(badge).toHaveAttribute("data-state", "syncing");
+      expect(badge).toHaveTextContent("Syncing… · synced");
+    });
+
+    it("license verify does NOT promote the badge to the active state", () => {
+      // License re-check is background plumbing — surfacing it as
+      // "Syncing…" the way the old badge did made every license refresh
+      // look like a cloud event. The badge ignores it now; the license
+      // store has its own surfaces (Settings → Account).
+      useFeedStore.setState({ lastRefreshAllAt: Date.now() - 60_000 });
+      useSyncStore.setState({ status: "synced", lastSyncedAt: Date.now() });
+      useLicenseStore.setState({ verifying: true });
+      renderBadge();
+      const badge = screen.getByTestId("sync-status-badge");
+      expect(badge).toHaveAttribute("data-state", "synced");
+      expect(badge).not.toHaveTextContent(/Syncing/);
+    });
+  });
+
+  describe("error state", () => {
+    it("shows 'Sync error' in rose regardless of refresh state", () => {
+      useFeedStore.setState({ lastRefreshAllAt: Date.now() - 60_000 });
+      useSyncStore.setState({
+        status: "error",
+        lastSyncedAt: null,
+        error: "fetch failed",
+      });
+      renderBadge();
+      const badge = screen.getByTestId("sync-status-badge");
+      expect(badge).toHaveAttribute("data-state", "error");
+      expect(badge).toHaveTextContent(/Sync error/);
+    });
   });
 
   it("is a link to the Sync & Data settings tab", () => {
